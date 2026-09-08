@@ -79,6 +79,14 @@ export class IdentityService {
           ["journal_entry.read", "Read journal entries"],
           ["journal_entry.create", "Create manual journal entries"],
           ["journal_entry.reverse", "Reverse journal entries"],
+          ["bank_account.read", "Read bank accounts"],
+          ["bank_account.manage", "Manage bank accounts"],
+          [
+            "bank_transaction.read",
+            "Read bank transactions and suggestions",
+          ],
+          ["bank_transaction.import", "Import bank transactions"],
+          ["bank_transaction.reconcile", "Reconcile bank transactions"],
         ].map(([code, name]) =>
           tx.permission.upsert({
             where: { code },

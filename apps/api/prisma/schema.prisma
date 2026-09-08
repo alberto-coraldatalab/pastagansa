@@ -164,6 +164,11 @@ enum JournalSourceType {
   SUPPLIER_PAYMENT
 }
 
+enum BankTransactionStatus {
+  UNMATCHED
+  RECONCILED
+}
+
 model Organization {
   id                   String                 @id @default(uuid()) @db.Uuid
   name                 String
@@ -193,6 +198,9 @@ model Organization {
   journalEntries       JournalEntry[]
   journalLines         JournalLine[]
   supplierPayments     SupplierPayment[]
+  bankAccounts         BankAccount[]
+  bankTransactions     BankTransaction[]
+  bankReconciliations  BankReconciliation[]
 
   @@map("organizations")
 }
@@ -231,6 +239,9 @@ model Company {
   journalEntries       JournalEntry[]
   journalLines         JournalLine[]
   supplierPayments     SupplierPayment[]
+  bankAccounts         BankAccount[]
+  bankTransactions     BankTransaction[]
+  bankReconciliations  BankReconciliation[]
 
   @@unique([organizationId, taxId])
   @@index([organizationId])
@@ -574,6 +585,74 @@ model SupplierPayment {
   @@map("supplier_payments")
 }
 
+model BankAccount {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  companyId      String            @map("company_id") @db.Uuid
+  accountId      String            @map("account_id") @db.Uuid
+  name           String            @db.VarChar(240)
+  iban           String?           @db.VarChar(34)
+  currency       String            @default("EUR") @db.Char(3)
+  active         Boolean           @default(true)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  account        Account           @relation(fields: [accountId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  transactions   BankTransaction[]
+
+  @@unique([companyId, accountId])
+  @@unique([companyId, iban])
+  @@unique([id, organizationId, companyId])
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id               String                @id @default(uuid()) @db.Uuid
+  organizationId   String                @map("organization_id") @db.Uuid
+  companyId        String                @map("company_id") @db.Uuid
+  bankAccountId    String                @map("bank_account_id") @db.Uuid
+  externalId       String                @map("external_id") @db.VarChar(240)
+  bookingDate      DateTime              @map("booking_date") @db.Date
+  valueDate        DateTime?             @map("value_date") @db.Date
+  amount           Decimal               @db.Decimal(14, 2)
+  currency         String                @db.Char(3)
+  description      String                @db.VarChar(1000)
+  counterpartyName String?               @map("counterparty_name") @db.VarChar(240)
+  counterpartyIban String?               @map("counterparty_iban") @db.VarChar(34)
+  reference        String?               @db.VarChar(240)
+  status           BankTransactionStatus @default(UNMATCHED)
+  importedAt       DateTime              @default(now()) @map("imported_at") @db.Timestamptz(6)
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company          Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  bankAccount      BankAccount           @relation(fields: [bankAccountId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  reconciliation   BankReconciliation?
+
+  @@unique([bankAccountId, externalId])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, status, bookingDate, id])
+  @@map("bank_transactions")
+}
+
+model BankReconciliation {
+  id                String          @id @default(uuid()) @db.Uuid
+  organizationId    String          @map("organization_id") @db.Uuid
+  companyId         String          @map("company_id") @db.Uuid
+  bankTransactionId String          @unique @map("bank_transaction_id") @db.Uuid
+  journalLineId     String          @unique @map("journal_line_id") @db.Uuid
+  reconciledById    String          @map("reconciled_by_id") @db.Uuid
+  reconciledAt      DateTime        @default(now()) @map("reconciled_at") @db.Timestamptz(6)
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  bankTransaction   BankTransaction @relation(fields: [bankTransactionId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  journalLine       JournalLine     @relation(fields: [journalLineId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+
+  @@unique([bankTransactionId, organizationId, companyId])
+  @@unique([journalLineId, organizationId, companyId])
+  @@unique([id, organizationId, companyId])
+  @@map("bank_reconciliations")
+}
+
 model PurchaseInvoiceLine {
   id                String            @id @default(uuid()) @db.Uuid
   organizationId    String            @map("organization_id") @db.Uuid
@@ -647,6 +726,7 @@ model Account {
   parent         Account?        @relation("AccountHierarchy", fields: [parentId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   children       Account[]       @relation("AccountHierarchy")
   journalLines   JournalLine[]
+  bankAccounts   BankAccount[]
 
   @@unique([companyId, code])
   @@unique([companyId, systemRole])
@@ -749,8 +829,10 @@ model JournalLine {
   entry          JournalEntry @relation(fields: [journalEntryId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   account        Account      @relation(fields: [accountId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   contact        Contact?     @relation(fields: [contactId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  reconciliation BankReconciliation?
 
   @@unique([journalEntryId, position])
+  @@unique([id, organizationId, companyId])
   @@index([companyId, accountId, createdAt])
   @@map("journal_lines")
 }

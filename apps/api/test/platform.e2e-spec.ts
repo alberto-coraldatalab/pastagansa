@@ -778,6 +778,212 @@ describe("platform integrity", () => {
       "400000": { debit: "142", credit: "0" },
       "572000": { debit: "0", credit: "142" },
     });
+
+    const accountingAccounts = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/accounts")
+      .expect(200);
+    const bankAccountingAccount = accountingAccounts.body.find(
+      ({ code }: { code: string }) => code === "572000",
+    );
+    const customerAccountingAccount = accountingAccounts.body.find(
+      ({ code }: { code: string }) => code === "430000",
+    );
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/banking/accounts")
+      .send({
+        accountId: customerAccountingAccount.id,
+        name: "Invalid bank ledger",
+        currency: "EUR",
+      })
+      .expect(400);
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/banking/accounts")
+      .send({
+        accountId: bankAccountingAccount.id,
+        name: "Invalid IBAN",
+        iban: "ES00 2100 0418 4502 0005 1332",
+        currency: "EUR",
+      })
+      .expect(400);
+    const createdBankAccount = await authed(accountA.accessToken, tenantA)
+      .post("/v1/banking/accounts")
+      .send({
+        accountId: bankAccountingAccount.id,
+        name: "Operating account",
+        iban: "ES91 2100 0418 4502 0005 1332",
+        currency: "EUR",
+      })
+      .expect(201);
+    expect(createdBankAccount.body).toMatchObject({
+      accountId: bankAccountingAccount.id,
+      iban: "ES9121000418450200051332",
+      currency: "EUR",
+    });
+    await expect(
+      admin.bankAccount.update({
+        where: { id: createdBankAccount.body.id },
+        data: { accountId: customerAccountingAccount.id },
+      }),
+    ).rejects.toThrow(/bank account ledger mapping and currency are immutable/);
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/banking/accounts")
+      .send({
+        accountId: bankAccountingAccount.id,
+        name: "Duplicate operating account",
+      })
+      .expect(409);
+    const bankImport = {
+      bankAccountId: createdBankAccount.body.id,
+      transactions: [
+        {
+          externalId: "BANK-CUSTOMER-001",
+          bookingDate: "2026-09-15",
+          valueDate: "2026-09-15",
+          amount: 60.5,
+          description: "Incoming transfer F2026-00001",
+          counterpartyName: "Customer A",
+          reference: "F2026-00001",
+        },
+        {
+          externalId: "BANK-SUPPLIER-001",
+          bookingDate: "2026-10-10",
+          amount: -100,
+          description: "Outgoing transfer PROV-2026-0042",
+          counterpartyName: "Supplier A",
+          reference: "PROV-2026-0042",
+        },
+      ],
+    };
+    const importedBankTransactions = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .post("/v1/banking/transactions/import")
+      .send(bankImport)
+      .expect(201);
+    expect(importedBankTransactions.body).toHaveLength(2);
+    expect(
+      importedBankTransactions.body.map(
+        ({ status }: { status: string }) => status,
+      ),
+    ).toEqual(["UNMATCHED", "UNMATCHED"]);
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/banking/transactions/import")
+      .send(bankImport)
+      .expect(409);
+    const customerBankTransaction = importedBankTransactions.body.find(
+      ({ externalId }: { externalId: string }) =>
+        externalId === "BANK-CUSTOMER-001",
+    );
+    const supplierBankTransaction = importedBankTransactions.body.find(
+      ({ externalId }: { externalId: string }) =>
+        externalId === "BANK-SUPPLIER-001",
+    );
+    await authed(accountB.accessToken, tenantB)
+      .get(
+        `/v1/banking/transactions/${customerBankTransaction.id}/suggestions`,
+      )
+      .expect(404);
+    const customerSuggestions = await authed(accountA.accessToken, tenantA)
+      .get(
+        `/v1/banking/transactions/${customerBankTransaction.id}/suggestions`,
+      )
+      .expect(200);
+    const firstCustomerEntry = paymentEntries.body.data.find(
+      ({ sourceId }: { sourceId: string }) =>
+        sourceId === firstPayment.body.id,
+    );
+    const customerBankLine = firstCustomerEntry.lines.find(
+      ({ account }: { account: { code: string } }) =>
+        account.code === "572000",
+    );
+    expect(customerSuggestions.body[0]).toMatchObject({
+      journalLineId: customerBankLine.id,
+      score: 100,
+      debit: "60.5",
+      credit: "0",
+    });
+    const customerReconciliation = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .post(
+        `/v1/banking/transactions/${customerBankTransaction.id}/reconcile`,
+      )
+      .send({ journalLineId: customerBankLine.id })
+      .expect(200);
+    const retriedReconciliation = await authed(accountA.accessToken, tenantA)
+      .post(
+        `/v1/banking/transactions/${customerBankTransaction.id}/reconcile`,
+      )
+      .send({ journalLineId: customerBankLine.id })
+      .expect(200);
+    expect(retriedReconciliation.body.id).toBe(
+      customerReconciliation.body.id,
+    );
+    await expect(
+      admin.bankReconciliation.update({
+        where: { id: customerReconciliation.body.id },
+        data: { reconciledAt: new Date() },
+      }),
+    ).rejects.toThrow(/bank reconciliations are append-only/);
+    await expect(
+      admin.bankTransaction.update({
+        where: { id: customerBankTransaction.id },
+        data: { description: "TAMPERED" },
+      }),
+    ).rejects.toThrow(/imported bank transaction contents are immutable/);
+    await expect(
+      admin.bankReconciliation.create({
+        data: {
+          organizationId: tenantA.organizationId,
+          companyId: tenantA.companyId,
+          bankTransactionId: supplierBankTransaction.id,
+          journalLineId: customerBankLine.id,
+          reconciledById: tenantA.userId,
+        },
+      }),
+    ).rejects.toThrow(
+      /bank reconciliation must match an unreconciled transaction to an equal posted bank line/,
+    );
+    await authed(accountA.accessToken, tenantA)
+      .post(
+        `/v1/banking/transactions/${supplierBankTransaction.id}/reconcile`,
+      )
+      .send({ journalLineId: customerBankLine.id })
+      .expect(409);
+    const supplierSuggestions = await authed(accountA.accessToken, tenantA)
+      .get(
+        `/v1/banking/transactions/${supplierBankTransaction.id}/suggestions`,
+      )
+      .expect(200);
+    const firstSupplierEntry = supplierPaymentEntries.body.data.find(
+      ({ sourceId }: { sourceId: string }) =>
+        sourceId === firstSupplierPayment.body.id,
+    );
+    const supplierBankLine = firstSupplierEntry.lines.find(
+      ({ account }: { account: { code: string } }) =>
+        account.code === "572000",
+    );
+    expect(supplierSuggestions.body[0]).toMatchObject({
+      journalLineId: supplierBankLine.id,
+      score: 100,
+      debit: "0",
+      credit: "100",
+    });
+    await authed(accountA.accessToken, tenantA)
+      .post(
+        `/v1/banking/transactions/${supplierBankTransaction.id}/reconcile`,
+      )
+      .send({ journalLineId: supplierBankLine.id })
+      .expect(200);
+    const reconciledTransactions = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .get("/v1/banking/transactions?status=RECONCILED")
+      .expect(200);
+    expect(reconciledTransactions.body.data).toHaveLength(2);
     await expect(
       admin.purchaseInvoice.update({
         where: { id: purchaseDraft.body.id },
@@ -989,6 +1195,7 @@ describe("platform integrity", () => {
     return {
       organizationId: membership.organizationId,
       companyId: membership.companyId!,
+      userId: membership.userId,
     };
   }
   function authed(
