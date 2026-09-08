@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -40,7 +41,10 @@ export class QuotesController {
   ) {
     return this.quotes.update(id, input);
   }
-  @Post(":id/status") @RequirePermissions("quote.change_status") status(
+  @Post(":id/status")
+  @HttpCode(200)
+  @RequirePermissions("quote.change_status")
+  status(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() input: ChangeQuoteStatusDto,
   ) {

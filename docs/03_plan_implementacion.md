@@ -15,10 +15,11 @@
 
 | Fase | Estado | Alcance implementado / pendiente relevante |
 |---|---|---|
-| Fase 0 — Descubrimiento y arquitectura | En curso | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local, CI con PostgreSQL configurada y tooling de build/lint/test/audit. Descubrimiento, runtime Node 22, wiring DI, adaptador HTTP e interoperabilidad CommonJS de la prueba de integración corregidos; ejecución completa pendiente de validación. Pendientes ADRs, despliegue staging y matriz normativa validada. |
+| Fase 0 — Descubrimiento y arquitectura | En curso | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local, CI con PostgreSQL configurada y tooling de build/lint/test/audit. La prueba PostgreSQL ya alcanza los escenarios de concurrencia tras corregir runtime Node 22, wiring DI, adaptador HTTP e interoperabilidad CommonJS; ejecución completa pendiente de validación. Pendientes ADRs, despliegue staging y matriz normativa validada. |
 | Fase 1 — Plataforma base | En curso | Registro y login; tokens con sesiones revocables y refresh rotativo protegido contra concurrencia; organización/empresa inicial; RBAC; transacciones por request con contexto RLS forzado; audit log transaccional y append-only; headers de seguridad, rate limit, request IDs, errores/logs estructurados, métricas y OpenAPI. Pendientes recuperación de contraseña, MFA, gestión completa de organizaciones/membresías/roles, archivos/antivirus, trazas distribuidas y backups. |
 | Fase 2 — Maestros | En curso | CRUD con archivado, permisos, auditoría y scope de empresa para contactos cliente/proveedor y catálogo de productos/servicios; direcciones y condiciones comerciales de contacto; importación CSV validada para contactos y catálogo; búsqueda y paginación por cursor en ambos listados. Pendientes filtros avanzados, UX web y configuración fiscal/contable validada. |
-| Fases 3–14 | No iniciadas | No existe todavía implementación de ventas, compras, contabilidad, fiscalidad, tesorería, SIF/VERI*FACTU, reporting, webhooks, hardening, piloto o GA. |
+| Fase 3 — Ventas | En curso | Presupuestos con snapshots, cálculo decimal, integridad de catálogo/cliente, límites de líneas y transiciones de estado atómicas; contrato HTTP de cambio de estado normalizado a `200`. Pendientes numeración legal, pedidos, albaranes, facturas, rectificativas, recurrencia, PDF/email y UX web. |
+| Fases 4–14 | No iniciadas | No existe todavía implementación de compras, contabilidad, fiscalidad, tesorería, SIF/VERI*FACTU, reporting, webhooks, hardening, piloto o GA. |
 
 ### Regla operativa de commits
 
