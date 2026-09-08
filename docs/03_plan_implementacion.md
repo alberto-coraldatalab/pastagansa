@@ -6,6 +6,24 @@
 **Unidad de planificación:** sprints de 2 semanas  
 **Objetivo:** entregar un P0 comercial con núcleo de facturación, contabilidad, IVA/IRPF, libros, modelos principales, bancos y SIF/VERI*FACTU, con arquitectura preparada para crecimiento.
 
+## Estado real de implementación
+
+**Actualizado:** 8 de septiembre de 2026
+
+**Rama de referencia:** `main`
+**Criterio:** un elemento solo se marca como completado cuando existe implementación, migración cuando aplica y validación automatizada básica. El estado no sustituye la revisión fiscal, de seguridad ni de producto exigida en este plan.
+
+| Fase | Estado | Alcance implementado / pendiente relevante |
+|---|---|---|
+| Fase 0 — Descubrimiento y arquitectura | En curso | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local y tooling de build/lint/test. Pendientes ADRs, CI/CD y matriz normativa validada. |
+| Fase 1 — Plataforma base | En curso | Registro, login, tokens de acceso, sesiones con refresh rotativo, organizaciones/empresa iniciales, RBAC por permisos, aislamiento por organización/empresa en la aplicación, políticas RLS iniciales y audit log para las operaciones implementadas. Pendientes recuperación de contraseña, MFA, gestión completa de organizaciones/membresías/roles, archivos, antivirus, trazas, métricas y gestión de errores de producción. |
+| Fase 2 — Maestros | En curso | CRUD con archivado, permisos, auditoría y scope de empresa para contactos cliente/proveedor y catálogo de productos/servicios. Pendientes direcciones y condiciones comerciales, importación CSV, filtros/paginación por cursor, UX web y configuración fiscal/contable validada. |
+| Fases 3–14 | No iniciadas | No existe todavía implementación de ventas, compras, contabilidad, fiscalidad, tesorería, SIF/VERI*FACTU, reporting, webhooks, hardening, piloto o GA. |
+
+### Regla operativa de commits
+
+Antes de cada commit que cambie producto, infraestructura, datos o documentación de alcance, actualizar esta tabla y/o su detalle cuando el estado real cambie. El commit debe incluir esa actualización y la validación ejecutada debe quedar indicada en su mensaje de entrega.
+
 > Los tiempos se expresan como referencia de planificación y dependen del tamaño, experiencia y dedicación del equipo. La prioridad del plan es el orden de dependencias y los criterios de calidad, no prometer una fecha fija.
 
 ---
