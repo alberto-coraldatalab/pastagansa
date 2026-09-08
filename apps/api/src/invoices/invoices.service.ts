@@ -12,11 +12,13 @@ import {
   Prisma,
   RectificationImpact,
   RectificationKind,
+  TaxRule,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditService } from "../audit/audit.service";
 import { decodeCursor, encodeCursor } from "../common/cursor";
 import { TenantContextService } from "../tenancy/tenant-context.service";
+import { TaxService } from "../tax/tax.service";
 import {
   CreateInvoiceDto,
   InvoiceLineDto,
@@ -33,6 +35,7 @@ export class InvoicesService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     private readonly pdf: InvoicePdfService,
+    private readonly tax: TaxService,
   ) {}
 
   async list(query: ListInvoicesDto) {
@@ -83,7 +86,10 @@ export class InvoicesService {
     const invoice = await this.tenant.db.invoice.findFirst({
       where: { id, ...this.scope() },
       include: {
-        lines: { orderBy: { position: "asc" } },
+        lines: {
+          orderBy: { position: "asc" },
+          include: { taxLines: true },
+        },
         installments: { orderBy: { position: "asc" } },
         originalInvoice: { select: { id: true, fullNumber: true } },
       },
@@ -112,14 +118,11 @@ export class InvoicesService {
       data: {
         ...scope,
         ...data.document,
-        lines: {
-          create: data.lines.map((line) => ({ ...line, ...scope })),
-        },
       },
-      include: { lines: { orderBy: { position: "asc" } } },
     });
+    await this.createInvoiceLines(invoice.id, data.lines);
     await this.audit.record("invoice.draft_created", "invoice", invoice.id);
-    return presentInvoice(invoice);
+    return this.get(invoice.id);
   }
 
   async createRectification(
@@ -137,7 +140,12 @@ export class InvoicesService {
     if (!locked.length) throw new NotFoundException("Invoice not found");
     const original = await this.tenant.db.invoice.findFirstOrThrow({
       where: { id: originalInvoiceId, ...scope },
-      include: { lines: { orderBy: { position: "asc" } } },
+      include: {
+        lines: {
+          orderBy: { position: "asc" },
+          include: { taxLines: true },
+        },
+      },
     });
     if (
       original.documentType !== DocumentType.INVOICE ||
@@ -171,27 +179,46 @@ export class InvoicesService {
         "Partial and difference rectifications require at least one line",
       );
 
-    const lines = input.lines
-      ? input.lines.map((line, index) => calculateInvoiceLine(line, index + 1))
-      : original.lines.map((line) => ({
-          gross: line.quantity.mul(line.unitPrice).toDecimalPlaces(2),
-          discount: line.quantity
-            .mul(line.unitPrice)
-            .toDecimalPlaces(2)
-            .minus(line.netAmount),
-          persisted: {
-            position: line.position,
-            catalogItemId: line.catalogItemId ?? undefined,
-            description: line.description,
-            quantity: line.quantity,
-            unitPrice: line.unitPrice,
-            discountPct: line.discountPct,
-            taxRate: line.taxRate,
-            netAmount: line.netAmount,
-            taxAmount: line.taxAmount,
-            totalAmount: line.totalAmount,
-          },
-        }));
+    const rules = input.lines
+      ? await this.resolveTaxRules(input.lines, input.issueDate)
+      : [];
+    const lines: BuiltInvoiceLine[] = input.lines
+      ? input.lines.map((line, index) => {
+          const calculation = calculateInvoiceLine(
+            { ...line, taxRate: Number(rules[index].rate ?? 0) },
+            index + 1,
+          );
+          return {
+            ...calculation,
+            tax: buildTaxLine(rules[index], calculation, line.exemptionReason),
+          };
+        })
+      : original.lines.map((line) => {
+          if (line.taxLines.length !== 1)
+            throw new ConflictException(
+              "Original invoice fiscal breakdown is incomplete",
+            );
+          return {
+            gross: line.quantity.mul(line.unitPrice).toDecimalPlaces(2),
+            discount: line.quantity
+              .mul(line.unitPrice)
+              .toDecimalPlaces(2)
+              .minus(line.netAmount),
+            persisted: {
+              position: line.position,
+              catalogItemId: line.catalogItemId ?? undefined,
+              description: line.description,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              discountPct: line.discountPct,
+              taxRate: line.taxRate,
+              netAmount: line.netAmount,
+              taxAmount: line.taxAmount,
+              totalAmount: line.totalAmount,
+            },
+            tax: copyTaxLine(line.taxLines[0]),
+          };
+        });
     if (input.lines) await this.validateCatalogItems(input.lines);
     const totals = sumInvoiceLines(lines);
 
@@ -217,15 +244,9 @@ export class InvoicesService {
           notes: input.notes?.trim() || null,
           ...totals,
           amountDue: new Decimal(0),
-          lines: {
-            create: lines.map(({ persisted }) => ({ ...persisted, ...scope })),
-          },
-        },
-        include: {
-          lines: { orderBy: { position: "asc" } },
-          originalInvoice: { select: { id: true, fullNumber: true } },
         },
       });
+      await this.createInvoiceLines(rectification.id, lines);
       await this.audit.record(
         "invoice.rectification_draft_created",
         "invoice",
@@ -236,7 +257,7 @@ export class InvoicesService {
           impact: input.impact,
         },
       );
-      return presentInvoice(rectification);
+      return this.get(rectification.id);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -272,9 +293,7 @@ export class InvoicesService {
     await this.tenant.db.invoiceLine.deleteMany({
       where: { invoiceId: id, ...scope },
     });
-    await this.tenant.db.invoiceLine.createMany({
-      data: data.lines.map((line) => ({ invoiceId: id, ...scope, ...line })),
-    });
+    await this.createInvoiceLines(id, data.lines);
     await this.audit.record("invoice.draft_updated", "invoice", id);
     return this.get(id);
   }
@@ -312,7 +331,12 @@ export class InvoicesService {
     if (!locked.length) throw new NotFoundException("Invoice not found");
     const invoice = await this.tenant.db.invoice.findFirstOrThrow({
       where: { id, ...scope },
-      include: { lines: { orderBy: { position: "asc" } } },
+      include: {
+        lines: {
+          orderBy: { position: "asc" },
+          include: { taxLines: true },
+        },
+      },
     });
     if (invoice.status !== InvoiceStatus.DRAFT) {
       if (invoice.issuanceKey === idempotencyKey)
@@ -321,6 +345,10 @@ export class InvoicesService {
     }
     if (!invoice.lines.length)
       throw new BadRequestException("Invoice must contain at least one line");
+    if (invoice.lines.some((line) => line.taxLines.length !== 1))
+      throw new BadRequestException(
+        "Every invoice line must have exactly one fiscal breakdown",
+      );
     const reusedKey = await this.tenant.db.invoice.findFirst({
       where: {
         ...scope,
@@ -413,6 +441,7 @@ export class InvoicesService {
       fullNumber,
       idempotencyKey,
     });
+    await this.tax.postInvoice(id);
     if (
       invoice.documentType === DocumentType.CREDIT_NOTE &&
       invoice.rectificationKind === RectificationKind.TOTAL &&
@@ -545,9 +574,17 @@ export class InvoicesService {
         "Invoice contact must be an active customer in this company",
       );
     await this.validateCatalogItems(input.lines);
-    const lines = input.lines.map((line, index) =>
-      calculateInvoiceLine(line, index + 1),
-    );
+    const rules = await this.resolveTaxRules(input.lines, input.issueDate);
+    const lines: BuiltInvoiceLine[] = input.lines.map((line, index) => {
+      const calculation = calculateInvoiceLine(
+        { ...line, taxRate: Number(rules[index].rate ?? 0) },
+        index + 1,
+      );
+      return {
+        ...calculation,
+        tax: buildTaxLine(rules[index], calculation, line.exemptionReason),
+      };
+    });
     const totals = sumInvoiceLines(lines);
     const address = contact.addresses[0];
     return {
@@ -578,8 +615,100 @@ export class InvoicesService {
         amountPaid: new Decimal(0),
         amountDue: totals.total,
       },
-      lines: lines.map(({ persisted }) => persisted),
+      lines,
     };
+  }
+
+  private async resolveTaxRules(lines: InvoiceLineDto[], issueDate: string) {
+    const effectiveOn = new Date(issueDate);
+    const ids = [
+      ...new Set(
+        lines.flatMap(({ taxRuleId }) => (taxRuleId ? [taxRuleId] : [])),
+      ),
+    ];
+    const rules = await this.tenant.db.taxRule.findMany({
+      where: {
+        effectiveFrom: { lte: effectiveOn },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveOn } }],
+        ...(ids.length ? { id: { in: ids } } : {}),
+      },
+    });
+    const byId = new Map(rules.map((rule) => [rule.id, rule]));
+    const rateCodes = new Map([
+      [21, "ES_VAT_GENERAL_21"],
+      [10, "ES_VAT_REDUCED_10"],
+      [4, "ES_VAT_SUPER_REDUCED_4"],
+    ]);
+    const missingCodes = [
+      ...new Set(
+        lines.flatMap((line) => {
+          if (line.taxRuleId || line.taxRate === undefined) return [];
+          const code = rateCodes.get(line.taxRate);
+          return code ? [code] : [];
+        }),
+      ),
+    ];
+    const fallbackRules = missingCodes.length
+      ? await this.tenant.db.taxRule.findMany({
+          where: {
+            code: { in: missingCodes },
+            effectiveFrom: { lte: effectiveOn },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveOn } }],
+          },
+        })
+      : [];
+    const byCode = new Map(fallbackRules.map((rule) => [rule.code, rule]));
+    return lines.map((line) => {
+      const rule = line.taxRuleId
+        ? byId.get(line.taxRuleId)
+        : byCode.get(rateCodes.get(line.taxRate ?? -1) ?? "");
+      if (!rule)
+        throw new BadRequestException(
+          line.taxRate === 0
+            ? "taxRuleId is required for zero-rated, exempt, or non-subject invoice lines"
+            : "An effective taxRuleId or a supported 21, 10, or 4 taxRate is required for every invoice line",
+        );
+      if (
+        line.taxRate !== undefined &&
+        !new Decimal(line.taxRate).equals(rule.rate ?? 0)
+      )
+        throw new BadRequestException(
+          "taxRate does not match the selected tax rule",
+        );
+      if (rule.exempt && !line.exemptionReason?.trim())
+        throw new BadRequestException(
+          "exemptionReason is required for exempt invoice lines",
+        );
+      if (!rule.exempt && line.exemptionReason)
+        throw new BadRequestException(
+          "exemptionReason is only valid for exempt invoice lines",
+        );
+      if (rule.surchargeRate?.greaterThan(0))
+        throw new BadRequestException(
+          "Equivalence surcharge rules are not supported in this fiscal slice",
+        );
+      return rule;
+    });
+  }
+
+  private async createInvoiceLines(
+    invoiceId: string,
+    lines: BuiltInvoiceLine[],
+  ) {
+    const scope = this.scope();
+    for (const line of lines) {
+      const created = await this.tenant.db.invoiceLine.create({
+        data: { invoiceId, ...scope, ...line.persisted },
+      });
+      await this.tenant.db.invoiceTaxLine.create({
+        data: {
+          invoiceId,
+          invoiceLineId: created.id,
+          ...scope,
+          ...line.tax,
+        },
+      });
+    }
   }
 
   private async validateCatalogItems(lines: InvoiceLineDto[]) {
@@ -641,6 +770,72 @@ export function calculateInvoiceLine(input: InvoiceLineDto, position: number) {
       taxAmount,
       totalAmount: netAmount.plus(taxAmount),
     },
+  };
+}
+
+type InvoiceLineCalculation = ReturnType<typeof calculateInvoiceLine>;
+
+interface BuiltInvoiceLine extends InvoiceLineCalculation {
+  tax: {
+    taxRuleId: string;
+    taxCode: string;
+    taxableBase: Decimal;
+    taxRate: Decimal | null;
+    taxAmount: Decimal;
+    surchargeRate: Decimal | null;
+    surchargeAmount: Decimal;
+    subject: boolean;
+    exempt: boolean;
+    exemptionReason: string | null;
+    reverseCharge: boolean;
+  };
+}
+
+function buildTaxLine(
+  rule: TaxRule,
+  calculation: InvoiceLineCalculation,
+  exemptionReason?: string,
+): BuiltInvoiceLine["tax"] {
+  return {
+    taxRuleId: rule.id,
+    taxCode: rule.code,
+    taxableBase: calculation.persisted.netAmount,
+    taxRate: rule.rate,
+    taxAmount: calculation.persisted.taxAmount,
+    surchargeRate: rule.surchargeRate,
+    surchargeAmount: new Decimal(0),
+    subject: rule.subject,
+    exempt: rule.exempt,
+    exemptionReason: exemptionReason?.trim() || null,
+    reverseCharge: rule.reverseCharge,
+  };
+}
+
+function copyTaxLine(line: {
+  taxRuleId: string;
+  taxCode: string;
+  taxableBase: Decimal;
+  taxRate: Decimal | null;
+  taxAmount: Decimal;
+  surchargeRate: Decimal | null;
+  surchargeAmount: Decimal;
+  subject: boolean;
+  exempt: boolean;
+  exemptionReason: string | null;
+  reverseCharge: boolean;
+}): BuiltInvoiceLine["tax"] {
+  return {
+    taxRuleId: line.taxRuleId,
+    taxCode: line.taxCode,
+    taxableBase: line.taxableBase,
+    taxRate: line.taxRate,
+    taxAmount: line.taxAmount,
+    surchargeRate: line.surchargeRate,
+    surchargeAmount: line.surchargeAmount,
+    subject: line.subject,
+    exempt: line.exempt,
+    exemptionReason: line.exemptionReason,
+    reverseCharge: line.reverseCharge,
   };
 }
 

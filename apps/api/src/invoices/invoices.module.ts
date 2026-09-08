@@ -8,9 +8,10 @@ import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceEmailService } from "./invoice-email.service";
 import { InvoiceEmailOutboxWorker } from "./invoice-email-outbox.worker";
 import { SmtpInvoiceMailer } from "./smtp-invoice-mailer.service";
+import { TaxModule } from "../tax/tax.module";
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, TaxModule],
   controllers: [DocumentSequencesController, InvoicesController],
   providers: [
     DocumentSequencesService,

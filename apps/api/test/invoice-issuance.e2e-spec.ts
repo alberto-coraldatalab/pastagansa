@@ -130,6 +130,28 @@ describe("invoice issuance concurrency", () => {
           totalAmount: "121",
         })),
       });
+      const taxRule = await db.taxRule.findFirstOrThrow({
+        where: { code: "ES_VAT_GENERAL_21" },
+      });
+      const invoiceLines = await db.invoiceLine.findMany({
+        where: { invoiceId: { in: created.map(({ id }) => id) } },
+      });
+      await db.invoiceTaxLine.createMany({
+        data: invoiceLines.map((line) => ({
+          organizationId: tenant.organizationId,
+          companyId: tenant.companyId,
+          invoiceId: line.invoiceId,
+          invoiceLineId: line.id,
+          taxRuleId: taxRule.id,
+          taxCode: taxRule.code,
+          taxableBase: line.netAmount,
+          taxRate: taxRule.rate,
+          taxAmount: line.taxAmount,
+          subject: taxRule.subject,
+          exempt: taxRule.exempt,
+          reverseCharge: taxRule.reverseCharge,
+        })),
+      });
       return draftCodes.map(
         (code) => created.find(({ draftCode }) => draftCode === code)!.id,
       );

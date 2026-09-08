@@ -16,6 +16,7 @@ import { PlatformModule } from "./platform/platform.module";
 import { validateConfiguration } from "./configuration";
 import { InvoicesModule } from "./invoices/invoices.module";
 import { PaymentsModule } from "./payments/payments.module";
+import { TaxModule } from "./tax/tax.module";
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { PaymentsModule } from "./payments/payments.module";
     QuotesModule,
     InvoicesModule,
     PaymentsModule,
+    TaxModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

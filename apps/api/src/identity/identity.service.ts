@@ -62,6 +62,8 @@ export class IdentityService {
           ["invoice.send", "Send invoices"],
           ["payment.read", "Read invoice payments"],
           ["payment.create", "Record invoice payments"],
+          ["tax_rule.read", "Read versioned tax rules"],
+          ["tax_ledger.read", "Read tax ledger"],
         ].map(([code, name]) =>
           tx.permission.upsert({
             where: { code },

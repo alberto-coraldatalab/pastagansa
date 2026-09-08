@@ -65,6 +65,14 @@ describe("platform integrity", () => {
     const tenantA = await tenantFor("owner-a@example.com");
     const tenantB = await tenantFor("owner-b@example.com");
 
+    const taxRules = await authed(accountA.accessToken, tenantA)
+      .get("/v1/tax-rules?effectiveOn=2026-09-08")
+      .expect(200);
+    expect(taxRules.body).toHaveLength(6);
+    expect(taxRules.body.map(({ code }: { code: string }) => code)).toContain(
+      "ES_VAT_GENERAL_21",
+    );
+
     const contactA = await authed(accountA.accessToken, tenantA)
       .post("/v1/contacts")
       .send({
@@ -136,6 +144,28 @@ describe("platform integrity", () => {
     expect(invoiceDraft.body.number).toBeNull();
     expect(invoiceDraft.body.customerEmail).toBe("billing-a@example.com");
     expect(invoiceDraft.body.total).toBe("121");
+    expect(invoiceDraft.body.lines[0].taxLines[0]).toMatchObject({
+      taxCode: "ES_VAT_GENERAL_21",
+      taxableBase: "100",
+      taxRate: "21",
+      taxAmount: "21",
+      subject: true,
+      exempt: false,
+    });
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/invoices")
+      .send({
+        ...invoice(contactA.body.id),
+        lines: [
+          {
+            description: "Ambiguous zero-rate operation",
+            quantity: 1,
+            unitPrice: 100,
+            taxRate: 0,
+          },
+        ],
+      })
+      .expect(400);
     await authed(accountB.accessToken, tenantB)
       .get(`/v1/invoices/${invoiceDraft.body.id}`)
       .expect(404);
@@ -189,6 +219,48 @@ describe("platform integrity", () => {
       .send({ sequenceId: sequence.body.id })
       .expect(200);
     expect(retriedIssue.body.fullNumber).toBe(issuedInvoice.body.fullNumber);
+    const originalLedger = await authed(accountA.accessToken, tenantA)
+      .get("/v1/tax-ledger")
+      .expect(200);
+    expect(originalLedger.body.data).toHaveLength(1);
+    expect(originalLedger.body.data[0]).toMatchObject({
+      invoiceId: invoiceDraft.body.id,
+      direction: "SALES",
+      bookType: "ISSUED_INVOICES",
+      documentNumber: "F2026-00001",
+      correctionOfId: null,
+    });
+    expect(originalLedger.body.data[0].amounts[0]).toMatchObject({
+      taxableBase: "100",
+      rate: "21",
+      taxAmount: "21",
+    });
+    await expect(
+      admin.taxRule.update({
+        where: { id: taxRules.body[0].id },
+        data: { legalReference: "Tampered" },
+      }),
+    ).rejects.toThrow(/tax rules are immutable/);
+    await expect(
+      admin.invoiceTaxLine.update({
+        where: { id: issuedInvoice.body.lines[0].taxLines[0].id },
+        data: { taxAmount: "999" },
+      }),
+    ).rejects.toThrow(/issued invoice tax lines are immutable/);
+    await expect(
+      admin.taxLedgerEntry.update({
+        where: { id: originalLedger.body.data[0].id },
+        data: { documentNumber: "TAMPERED" },
+      }),
+    ).rejects.toThrow(/tax ledger is append-only/);
+    await expect(
+      admin.taxLedgerAmount.delete({
+        where: { id: originalLedger.body.data[0].amounts[0].id },
+      }),
+    ).rejects.toThrow(/tax ledger is append-only/);
+    await authed(accountB.accessToken, tenantB)
+      .get(`/v1/tax-ledger/${originalLedger.body.data[0].id}`)
+      .expect(404);
     const issuedSchedule = await authed(accountA.accessToken, tenantA)
       .get(`/v1/invoices/${invoiceDraft.body.id}/payment-schedule`)
       .expect(200);
@@ -359,6 +431,21 @@ describe("platform integrity", () => {
       .send({ sequenceId: creditSequence.body.id })
       .expect(200);
     expect(issuedRectification.body.fullNumber).toBe("R2026-00001");
+    const rectificationLedger = await authed(accountA.accessToken, tenantA)
+      .get("/v1/tax-ledger")
+      .expect(200);
+    expect(rectificationLedger.body.data).toHaveLength(2);
+    expect(rectificationLedger.body.data[0]).toMatchObject({
+      invoiceId: rectification.body.id,
+      documentNumber: "R2026-00001",
+      correctionOfId: originalLedger.body.data[0].id,
+      rectificationImpact: "DECREASE",
+    });
+    expect(rectificationLedger.body.data[0].amounts[0]).toMatchObject({
+      taxableBase: "-100",
+      rate: "21",
+      taxAmount: "-21",
+    });
     await authed(accountA.accessToken, tenantA)
       .get(`/v1/invoices/${rectification.body.id}/pdf`)
       .expect("content-type", /application\/pdf/)

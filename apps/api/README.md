@@ -31,6 +31,12 @@ Contact and catalog list endpoints return `{ data, nextCursor }`. Provide `curso
 
 `/v1/invoices` supports draft creation, atomic issuance through a company document sequence, official PDF download, and transactional email enqueueing. Issuance and email requests require an `Idempotency-Key` header. Once issued, invoice headers and lines are immutable at the database layer.
 
+Invoice lines resolve a versioned fiscal rule for their issue date and persist an immutable tax snapshot. The common Spanish VAT rates of 21%, 10%, and 4% remain backwards-compatible through `taxRate`; zero-rated, exempt, and non-subject operations require an explicit `taxRuleId` because they are legally distinct. Exempt operations also require `exemptionReason`.
+
+`GET /v1/tax-rules?effectiveOn=YYYY-MM-DD` returns the rules applicable on a date. Rules are append-versioned: existing versions cannot be edited or deleted.
+
+Issuing an invoice posts its frozen breakdown to the append-only Tax Ledger in the same transaction. `GET /v1/tax-ledger` supports date, direction, book, and cursor filters; `GET /v1/tax-ledger/:id` returns one entry. Decreasing rectifications post negative bases and quotas linked to the corrected entry. Both endpoints are company-scoped and protected by RLS.
+
 `POST /v1/invoices/:id/rectifications` creates a rectifying draft linked to an issued standard invoice. Total rectifications copy the frozen original lines; partial and difference rectifications require explicit lines. Rectifications record their reason and increase/decrease impact, use a `CREDIT_NOTE` sequence at issuance, and are included in the same PDF, email, tenant, audit, idempotency, and immutability guarantees. Concurrent issuance is serialized against the original invoice so decreases cannot exceed its corrected balance.
 
 `PUT /v1/invoices/:id/payment-schedule` replaces the installments of a standard invoice draft; installment amounts must add up exactly to the invoice total. Issuance creates one default installment when no custom schedule exists and then freezes its commercial fields. `POST /v1/invoices/:id/payments` records an idempotent manual collection, allocates it to the oldest open installments, rejects overpayment, and atomically updates the invoice balance and `PARTIALLY_PAID`/`PAID` status. `GET /v1/invoices/:id/payment-schedule` and `GET /v1/invoices/:id/payments` expose the resulting detail. Recorded payments and allocations are append-only.
@@ -53,6 +59,6 @@ npm run test:integration
 npm audit --audit-level=high
 ```
 
-The integration suite requires PostgreSQL with all migrations applied. CI provisions PostgreSQL, deploys migrations, exercises tenant isolation, quotation persistence and races, refresh-token concurrency, revocation, and audit visibility.
+The integration suite requires PostgreSQL with all migrations applied. CI provisions PostgreSQL, deploys migrations, and exercises tenant isolation, quotation persistence and races, refresh-token concurrency, revocation, invoice issuance concurrency, fiscal snapshot immutability, Tax Ledger posting, and audit visibility.
 
 OpenAPI is served at `/docs` and Prometheus-format metrics at `/v1/metrics`. Every response receives an `x-request-id`; errors include the same identifier.

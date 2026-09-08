@@ -17,6 +17,8 @@ import { IsCurrencyCode, IsNotBlank } from "../../common/validation";
 
 export class InvoiceLineDto {
   @IsOptional() @IsUUID() catalogItemId?: string;
+  @IsOptional() @IsUUID() taxRuleId?: string;
+  @IsOptional() @IsString() @MaxLength(100) exemptionReason?: string;
   @IsString() @MaxLength(2000) @IsNotBlank() description!: string;
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 3 })
