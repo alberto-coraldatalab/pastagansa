@@ -132,7 +132,11 @@ export class QuotesService {
     return this.get(id);
   }
 
-  async changeStatus(id: string, status: QuoteStatus) {
+  async changeStatus(
+    id: string,
+    status: QuoteStatus,
+    expectedStatus: QuoteStatus,
+  ) {
     const transitions: Partial<Record<QuoteStatus, QuoteStatus[]>> = {
       [QuoteStatus.SENT]: [QuoteStatus.DRAFT],
       [QuoteStatus.CANCELLED]: [QuoteStatus.DRAFT, QuoteStatus.SENT],
@@ -141,24 +145,16 @@ export class QuotesService {
       [QuoteStatus.EXPIRED]: [QuoteStatus.SENT],
     };
     const allowedFrom = transitions[status];
-    if (!allowedFrom)
+    if (!allowedFrom || !allowedFrom.includes(expectedStatus))
       throw new BadRequestException(`Cannot transition a quote to ${status}`);
-    const previous = await this.tenant.db.quote.findFirst({
-      where: { id, ...this.scope(), status: { in: allowedFrom } },
-      select: { status: true },
-    });
-    if (!previous)
-      throw new ConflictException(
-        "Invalid or concurrent quote status transition",
-      );
     const changed = await this.tenant.db.quote.updateMany({
-      where: { id, ...this.scope(), status: previous.status },
+      where: { id, ...this.scope(), status: expectedStatus },
       data: { status },
     });
     if (changed.count !== 1)
       throw new ConflictException("Quote status changed concurrently");
     await this.audit.record("quote.status_changed", "quote", id, {
-      from: previous.status,
+      from: expectedStatus,
       to: status,
     });
     return this.get(id);

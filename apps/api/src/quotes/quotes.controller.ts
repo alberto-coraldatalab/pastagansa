@@ -59,6 +59,6 @@ export class QuotesController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() input: ChangeQuoteStatusDto,
   ) {
-    return this.quotes.changeStatus(id, input.status);
+    return this.quotes.changeStatus(id, input.status, input.expectedStatus);
   }
 }

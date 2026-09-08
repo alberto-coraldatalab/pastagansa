@@ -151,10 +151,10 @@ describe("platform integrity", () => {
     const transitions = await Promise.all([
       authed(accountA.accessToken, tenantA)
         .post(`/v1/quotes/${createdQuote.body.id}/status`)
-        .send({ status: "SENT" }),
+        .send({ expectedStatus: "DRAFT", status: "SENT" }),
       authed(accountA.accessToken, tenantA)
         .post(`/v1/quotes/${createdQuote.body.id}/status`)
-        .send({ status: "CANCELLED" }),
+        .send({ expectedStatus: "DRAFT", status: "CANCELLED" }),
     ]);
     expect(transitions.map(({ status }) => status).sort()).toEqual([200, 409]);
 
@@ -228,7 +228,8 @@ describe("platform integrity", () => {
       get: (path: string) => apply(request(app.getHttpServer()).get(path)),
       post: (path: string) => apply(request(app.getHttpServer()).post(path)),
       patch: (path: string) => apply(request(app.getHttpServer()).patch(path)),
-      delete: (path: string) => apply(request(app.getHttpServer()).delete(path)),
+      delete: (path: string) =>
+        apply(request(app.getHttpServer()).delete(path)),
     };
   }
   function quote(contactId: string, catalogItemId?: string) {

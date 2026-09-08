@@ -56,5 +56,6 @@ export class CreateQuoteDto {
 }
 export class UpdateQuoteDto extends CreateQuoteDto {}
 export class ChangeQuoteStatusDto {
+  @IsEnum(QuoteStatus) expectedStatus!: QuoteStatus;
   @IsEnum(QuoteStatus) status!: QuoteStatus;
 }
