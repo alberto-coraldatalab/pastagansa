@@ -30,6 +30,7 @@ export class IdentityService {
         ['catalog.create', 'Create catalog items'],
         ['catalog.update', 'Update catalog items'],
         ['catalog.archive', 'Archive catalog items'],
+        ['quote.read', 'Read quotations'], ['quote.create', 'Create quotations'], ['quote.update', 'Update quotations'], ['quote.change_status', 'Change quotation status'],
       ].map(([code, name]) => tx.permission.upsert({ where: { code }, update: {}, create: { code, name } })));
       await Promise.all(permissions.map(({ id: permissionId }) => tx.rolePermission.upsert({ where: { roleId_permissionId: { roleId: role.id, permissionId } }, update: {}, create: { roleId: role.id, permissionId } })));
       const organization = await tx.organization.create({ data: { name: input.organizationName.trim() } });

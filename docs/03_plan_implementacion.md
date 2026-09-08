@@ -391,6 +391,8 @@ Datos listos para crear documentos comerciales.
 
 **Duración:** 3 sprints.
 
+**Estado real:** En curso. Implementados presupuestos con líneas, totales y estados en API. Pendientes PDF, factura borrador, series/numeración, emisión, email, rectificativas, recurrentes, vencimientos y pagos.
+
 ## Sprint A
 
 - presupuesto;

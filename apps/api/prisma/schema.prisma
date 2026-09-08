@@ -53,6 +53,15 @@ enum AddressType {
   OTHER
 }
 
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
 model Organization {
   id          String       @id @default(uuid()) @db.Uuid
   name        String
@@ -61,6 +70,7 @@ model Organization {
   memberships Membership[]
   auditEvents AuditEvent[]
   contacts    Contact[]
+  quotes      Quote[]
   contactAddresses ContactAddress[]
   catalogItems CatalogItem[]
   @@map("organizations")
@@ -79,6 +89,7 @@ model Company {
   memberships    Membership[]
   auditEvents    AuditEvent[]
   contacts       Contact[]
+  quotes         Quote[]
   contactAddresses ContactAddress[]
   catalogItems   CatalogItem[]
   @@unique([organizationId, taxId])
@@ -106,6 +117,7 @@ model CatalogItem {
   updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company               Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  quoteLines            QuoteLine[]
   @@unique([companyId, sku])
   @@index([companyId, status, name])
   @@map("catalog_items")
@@ -130,9 +142,57 @@ model Contact {
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company        Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   addresses      ContactAddress[]
+  quotes         Quote[]
   @@unique([companyId, taxId])
   @@index([companyId, status, legalName])
   @@map("contacts")
+}
+
+model Quote {
+  id             String      @id @default(uuid()) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  companyId      String      @map("company_id") @db.Uuid
+  contactId      String      @map("contact_id") @db.Uuid
+  code           String      @default(cuid()) @db.VarChar(40)
+  status         QuoteStatus @default(DRAFT)
+  issueDate      DateTime    @map("issue_date") @db.Date
+  validUntil     DateTime?   @map("valid_until") @db.Date
+  currency       String      @default("EUR") @db.Char(3)
+  notes          String?
+  subtotal       Decimal     @db.Decimal(14, 2)
+  discountTotal  Decimal     @map("discount_total") @db.Decimal(14, 2)
+  taxTotal       Decimal     @map("tax_total") @db.Decimal(14, 2)
+  total          Decimal     @db.Decimal(14, 2)
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  contact        Contact     @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  lines          QuoteLine[]
+  @@unique([companyId, code])
+  @@index([companyId, status, issueDate])
+  @@map("quotes")
+}
+
+model QuoteLine {
+  id            String    @id @default(uuid()) @db.Uuid
+  quoteId       String    @map("quote_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  position      Int
+  catalogItemId String?   @map("catalog_item_id") @db.Uuid
+  description   String
+  quantity      Decimal   @db.Decimal(14, 3)
+  unitPrice     Decimal   @map("unit_price") @db.Decimal(14, 2)
+  discountPct   Decimal   @default(0) @map("discount_pct") @db.Decimal(5, 2)
+  taxRate       Decimal   @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  netAmount     Decimal   @map("net_amount") @db.Decimal(14, 2)
+  taxAmount     Decimal   @map("tax_amount") @db.Decimal(14, 2)
+  totalAmount   Decimal   @map("total_amount") @db.Decimal(14, 2)
+  quote         Quote     @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  catalogItem   CatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
+  @@unique([quoteId, position])
+  @@map("quote_lines")
 }
 
 model ContactAddress {
