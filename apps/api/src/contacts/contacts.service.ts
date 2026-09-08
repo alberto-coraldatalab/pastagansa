@@ -8,6 +8,8 @@ import { ListContactsDto } from './dto/list-contacts.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { ImportContactsDto } from './dto/import-contacts.dto';
 import { parseContactCsv } from './csv';
+import { CreateContactAddressDto } from './dto/create-contact-address.dto';
+import { UpdateContactAddressDto } from './dto/update-contact-address.dto';
 
 @Injectable()
 export class ContactsService {
@@ -83,6 +85,58 @@ export class ContactsService {
     return archived;
   }
 
+  async listAddresses(contactId: string) {
+    await this.findActive(contactId);
+    return this.prisma.contactAddress.findMany({ where: { contactId, ...this.scope(), archivedAt: null }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }] });
+  }
+
+  async addAddress(contactId: string, input: CreateContactAddressDto) {
+    await this.findActive(contactId);
+    const scope = this.scope();
+    const address = await this.prisma.$transaction(async (tx) => {
+      if (input.isDefault) await tx.contactAddress.updateMany({ where: { contactId, ...scope, archivedAt: null }, data: { isDefault: false } });
+      return tx.contactAddress.create({
+        data: {
+          contactId,
+          ...scope,
+          type: input.type,
+          label: input.label?.trim() || null,
+          line1: input.line1.trim(),
+          line2: input.line2?.trim() || null,
+          postalCode: input.postalCode.trim().toUpperCase(),
+          city: input.city.trim(),
+          province: input.province?.trim() || null,
+          country: input.country?.toUpperCase() ?? 'ES',
+          isDefault: input.isDefault ?? false,
+        },
+      });
+    });
+    await this.audit.record('contact.address_created', 'contact_address', address.id, { contactId });
+    return address;
+  }
+
+  async updateAddress(contactId: string, addressId: string, input: UpdateContactAddressDto) {
+    await this.findActive(contactId);
+    const scope = this.scope();
+    const existing = await this.prisma.contactAddress.findFirst({ where: { id: addressId, contactId, ...scope, archivedAt: null } });
+    if (!existing) throw new NotFoundException('Contact address not found');
+    const address = await this.prisma.$transaction(async (tx) => {
+      if (input.isDefault) await tx.contactAddress.updateMany({ where: { contactId, ...scope, archivedAt: null, id: { not: addressId } }, data: { isDefault: false } });
+      return tx.contactAddress.update({ where: { id: addressId }, data: normaliseAddress(input) });
+    });
+    await this.audit.record('contact.address_updated', 'contact_address', address.id, { contactId, changedFields: Object.keys(input) });
+    return address;
+  }
+
+  async archiveAddress(contactId: string, addressId: string) {
+    await this.findActive(contactId);
+    const address = await this.prisma.contactAddress.findFirst({ where: { id: addressId, contactId, ...this.scope(), archivedAt: null } });
+    if (!address) throw new NotFoundException('Contact address not found');
+    const archived = await this.prisma.contactAddress.update({ where: { id: address.id }, data: { archivedAt: new Date(), isDefault: false } });
+    await this.audit.record('contact.address_archived', 'contact_address', address.id, { contactId });
+    return archived;
+  }
+
   private scope() {
     const { organizationId, companyId } = this.tenant.required;
     if (!companyId) throw new BadRequestException('x-company-id is required');
@@ -109,5 +163,18 @@ function normalize(input: CreateContactDto | UpdateContactDto) {
     ...(input.taxId !== undefined ? { taxId: input.taxId.trim().toUpperCase() || null } : {}),
     ...(input.email !== undefined ? { email: input.email.trim().toLowerCase() || null } : {}),
     ...(input.phone !== undefined ? { phone: input.phone.trim() || null } : {}),
+  };
+}
+
+function normaliseAddress(input: CreateContactAddressDto | UpdateContactAddressDto) {
+  return {
+    ...input,
+    ...(input.label !== undefined ? { label: input.label.trim() || null } : {}),
+    ...(input.line1 !== undefined ? { line1: input.line1.trim() } : {}),
+    ...(input.line2 !== undefined ? { line2: input.line2.trim() || null } : {}),
+    ...(input.postalCode !== undefined ? { postalCode: input.postalCode.trim().toUpperCase() } : {}),
+    ...(input.city !== undefined ? { city: input.city.trim() } : {}),
+    ...(input.province !== undefined ? { province: input.province.trim() || null } : {}),
+    ...(input.country !== undefined ? { country: input.country.toUpperCase() } : {}),
   };
 }

@@ -39,6 +39,20 @@ enum CatalogItemStatus {
   ARCHIVED
 }
 
+enum PaymentMethod {
+  BANK_TRANSFER
+  DIRECT_DEBIT
+  CASH
+  CARD
+  OTHER
+}
+
+enum AddressType {
+  BILLING
+  SHIPPING
+  OTHER
+}
+
 model Organization {
   id          String       @id @default(uuid()) @db.Uuid
   name        String
@@ -47,6 +61,7 @@ model Organization {
   memberships Membership[]
   auditEvents AuditEvent[]
   contacts    Contact[]
+  contactAddresses ContactAddress[]
   catalogItems CatalogItem[]
   @@map("organizations")
 }
@@ -64,6 +79,7 @@ model Company {
   memberships    Membership[]
   auditEvents    AuditEvent[]
   contacts       Contact[]
+  contactAddresses ContactAddress[]
   catalogItems   CatalogItem[]
   @@unique([organizationId, taxId])
   @@index([organizationId])
@@ -104,6 +120,8 @@ model Contact {
   taxId          String?       @map("tax_id") @db.VarChar(40)
   email          String?       @db.VarChar(320)
   phone          String?       @db.VarChar(40)
+  paymentTermsDays Int?        @map("payment_terms_days")
+  paymentMethod  PaymentMethod? @map("payment_method")
   isCustomer     Boolean       @default(false) @map("is_customer")
   isSupplier     Boolean       @default(false) @map("is_supplier")
   status         ContactStatus @default(ACTIVE)
@@ -111,9 +129,34 @@ model Contact {
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company        Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  addresses      ContactAddress[]
   @@unique([companyId, taxId])
   @@index([companyId, status, legalName])
   @@map("contacts")
+}
+
+model ContactAddress {
+  id             String      @id @default(uuid()) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  companyId      String      @map("company_id") @db.Uuid
+  contactId      String      @map("contact_id") @db.Uuid
+  type           AddressType @default(BILLING)
+  label          String?     @db.VarChar(120)
+  line1          String      @db.VarChar(240)
+  line2          String?     @db.VarChar(240)
+  postalCode     String      @map("postal_code") @db.VarChar(20)
+  city           String      @db.VarChar(120)
+  province       String?     @db.VarChar(120)
+  country        String      @default("ES") @db.Char(2)
+  isDefault      Boolean     @default(false) @map("is_default")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt     DateTime?   @map("archived_at") @db.Timestamptz(6)
+  contact        Contact     @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  @@index([companyId, contactId, archivedAt])
+  @@map("contact_addresses")
 }
 
 model User {

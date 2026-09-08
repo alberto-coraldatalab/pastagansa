@@ -1,4 +1,6 @@
-import { IsBoolean, IsEmail, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { PaymentMethod } from '@prisma/client';
 
 export class CreateContactDto {
   @IsString()
@@ -23,6 +25,9 @@ export class CreateContactDto {
   @IsString()
   @MaxLength(40)
   phone?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(365) paymentTermsDays?: number;
+  @IsOptional() @IsEnum(PaymentMethod) paymentMethod?: PaymentMethod;
 
   @IsBoolean()
   isCustomer!: boolean;
