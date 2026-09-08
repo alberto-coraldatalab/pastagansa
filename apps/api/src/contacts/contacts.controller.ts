@@ -5,6 +5,7 @@ import { ContactsService } from './contacts.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { ListContactsDto } from './dto/list-contacts.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
+import { ImportContactsDto } from './dto/import-contacts.dto';
 
 @Controller('contacts')
 @TenantProtected()
@@ -22,6 +23,10 @@ export class ContactsController {
   @Post()
   @RequirePermissions('contact.create')
   create(@Body() input: CreateContactDto) { return this.contacts.create(input); }
+
+  @Post('import')
+  @RequirePermissions('contact.create')
+  importCsv(@Body() input: ImportContactsDto) { return this.contacts.importCsv(input); }
 
   @Patch(':id')
   @RequirePermissions('contact.update')

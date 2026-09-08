@@ -6,6 +6,8 @@ import { TenantContextService } from '../tenancy/tenant-context.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { ListContactsDto } from './dto/list-contacts.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
+import { ImportContactsDto } from './dto/import-contacts.dto';
+import { parseContactCsv } from './csv';
 
 @Injectable()
 export class ContactsService {
@@ -39,6 +41,20 @@ export class ContactsService {
     });
     await this.audit.record('contact.created', 'contact', contact.id, { isCustomer: contact.isCustomer, isSupplier: contact.isSupplier });
     return contact;
+  }
+
+  async importCsv(input: ImportContactsDto) {
+    const rows = parseContactCsv(input.csv);
+    if (rows.length > 1_000) throw new BadRequestException('A contact import cannot contain more than 1,000 rows');
+    const scope = this.scope();
+    const taxIds = rows.flatMap(({ taxId }) => taxId ? [taxId] : []);
+    if (taxIds.length) {
+      const existing = await this.prisma.contact.findFirst({ where: { ...scope, taxId: { in: taxIds } }, select: { taxId: true } });
+      if (existing?.taxId) throw new ConflictException(`A contact with tax ID ${existing.taxId} already exists`);
+    }
+    const contacts = await this.prisma.$transaction((tx) => Promise.all(rows.map((row) => tx.contact.create({ data: { ...scope, legalName: row.legalName, tradeName: row.tradeName, taxId: row.taxId, email: row.email, phone: row.phone, isCustomer: row.isCustomer, isSupplier: row.isSupplier } }))));
+    await this.audit.record('contact.imported', 'contact_import', undefined, { count: contacts.length });
+    return { imported: contacts.length, contacts };
   }
 
   async update(id: string, input: UpdateContactDto) {

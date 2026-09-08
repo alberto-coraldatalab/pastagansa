@@ -21,6 +21,8 @@ Future business controllers must use `@TenantProtected()`; the authentication an
 
 `/v1/contacts` provides company-scoped customer/supplier master data. Contact deletion is an archive operation; all writes carry tenant, permission, and audit enforcement.
 
+`POST /v1/contacts/import` accepts an object with a `csv` string. Required headers are `legal_name,trade_name,tax_id,email,phone,is_customer,is_supplier`; the import validates every row, rejects duplicate tax IDs, and executes atomically.
+
 `/v1/catalog-items` manages products and services, including commercial defaults used when document lines are created. Tax codes are suggestions only; they will be resolved by the versioned fiscal engine, not trusted as tax calculations.
 
 Tenant selection headers (`x-organization-id`, `x-company-id`) are never authorization. They are only candidates validated against the database membership.
