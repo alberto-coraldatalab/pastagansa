@@ -11,6 +11,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
+import { AccountingService } from "../accounting/accounting.service";
 import { AuditService } from "../audit/audit.service";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 import { RecordPaymentDto } from "./dto/record-payment.dto";
@@ -21,6 +22,7 @@ export class PaymentsService {
   constructor(
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
+    private readonly accounting: AccountingService,
   ) {}
 
   async getSchedule(invoiceId: string) {
@@ -115,7 +117,10 @@ export class PaymentsService {
       include: { allocations: true },
     });
     if (existing) {
-      if (this.matches(existing, invoiceId, input)) return existing;
+      if (this.matches(existing, invoiceId, input)) {
+        await this.accounting.postPayment(existing.id);
+        return existing;
+      }
       throw new ConflictException(
         "Idempotency-Key has already been used for another payment",
       );
@@ -197,6 +202,7 @@ export class PaymentsService {
             : InvoiceStatus.PARTIALLY_PAID,
         },
       });
+      await this.accounting.postPayment(payment.id);
       await this.audit.record("payment.created", "payment", payment.id, {
         invoiceId,
         amount: amount.toFixed(2),

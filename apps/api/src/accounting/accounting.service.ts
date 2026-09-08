@@ -473,6 +473,72 @@ export class AccountingService {
     });
   }
 
+  async postPayment(paymentId: string) {
+    const existing = await this.tenant.db.journalEntry.findFirst({
+      where: {
+        ...this.scope(),
+        sourceType: JournalSourceType.PAYMENT,
+        sourceId: paymentId,
+      },
+    });
+    if (existing) return this.getEntry(existing.id);
+    const payment = await this.tenant.db.payment.findFirst({
+      where: { id: paymentId, ...this.scope() },
+      include: {
+        allocations: {
+          include: {
+            invoice: {
+              select: { contactId: true, fullNumber: true },
+            },
+          },
+        },
+      },
+    });
+    if (!payment || !payment.allocations.length)
+      throw new ConflictException(
+        "Only allocated customer payments can be posted",
+      );
+    const accounts = await this.accountsByRole();
+    const receivables = new Map<string, Decimal>();
+    for (const allocation of payment.allocations) {
+      const current = receivables.get(allocation.invoice.contactId);
+      receivables.set(
+        allocation.invoice.contactId,
+        (current ?? new Decimal(0)).plus(allocation.amount),
+      );
+    }
+    const allocated = [...receivables.values()].reduce(
+      (sum, amount) => sum.plus(amount),
+      new Decimal(0),
+    );
+    if (!allocated.equals(payment.amount))
+      throw new ConflictException(
+        "Payment allocations must equal the payment amount before posting",
+      );
+    const documents = [
+      ...new Set(
+        payment.allocations
+          .map(({ invoice }) => invoice.fullNumber)
+          .filter((number): number is string => Boolean(number)),
+      ),
+    ];
+    return this.createPostedEntry({
+      entryDate: payment.paidAt,
+      description: `Customer receipt${documents.length ? ` ${documents.join(", ")}` : ""}`.slice(
+        0,
+        1000,
+      ),
+      sourceType: JournalSourceType.PAYMENT,
+      sourceId: payment.id,
+      lines: [
+        posting(accounts.BANK, payment.amount, false),
+        ...[...receivables.entries()].map(([contactId, amount]) =>
+          posting(accounts.CUSTOMER_RECEIVABLE, amount, true, contactId),
+        ),
+      ],
+    });
+  }
+
   private async createPostedEntry(input: {
     entryDate: Date;
     description: string;
@@ -568,6 +634,7 @@ export class AccountingService {
       AccountingRole.PURCHASE_EXPENSE,
       AccountingRole.OUTPUT_VAT,
       AccountingRole.INPUT_VAT,
+      AccountingRole.BANK,
     ];
     for (const role of required)
       if (!byRole.has(role))

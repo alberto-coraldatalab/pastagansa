@@ -377,6 +377,19 @@ describe("platform integrity", () => {
       .expect(201);
     expect(firstPayment.body.allocations).toHaveLength(1);
     expect(firstPayment.body.allocations[0].amount).toBe("60.5");
+    let paymentEntries = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/journal-entries?sourceType=PAYMENT")
+      .expect(200);
+    expect(paymentEntries.body.data).toHaveLength(1);
+    expect(paymentEntries.body.data[0]).toMatchObject({
+      sourceId: firstPayment.body.id,
+      status: "POSTED",
+      entryNumber: "2",
+    });
+    expect(accountingAmounts(paymentEntries.body.data[0])).toEqual({
+      "430000": { debit: "0", credit: "60.5" },
+      "572000": { debit: "60.5", credit: "0" },
+    });
     await expect(
       admin.payment.update({
         where: { id: firstPayment.body.id },
@@ -395,6 +408,10 @@ describe("platform integrity", () => {
       .send(firstPaymentInput)
       .expect(201);
     expect(retriedPayment.body.id).toBe(firstPayment.body.id);
+    paymentEntries = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/journal-entries?sourceType=PAYMENT")
+      .expect(200);
+    expect(paymentEntries.body.data).toHaveLength(1);
     const partlyPaidInvoice = await authed(accountA.accessToken, tenantA)
       .get(`/v1/invoices/${invoiceDraft.body.id}`)
       .expect(200);
@@ -436,6 +453,20 @@ describe("platform integrity", () => {
       .get(`/v1/invoices/${invoiceDraft.body.id}/payments`)
       .expect(200);
     expect(payments.body).toHaveLength(2);
+    paymentEntries = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/journal-entries?sourceType=PAYMENT")
+      .expect(200);
+    expect(paymentEntries.body.data).toHaveLength(2);
+    const finalPayment = payments.body.find(
+      ({ id }: { id: string }) => id !== firstPayment.body.id,
+    );
+    const finalPaymentEntry = paymentEntries.body.data.find(
+      ({ sourceId }: { sourceId: string }) => sourceId === finalPayment.id,
+    );
+    expect(accountingAmounts(finalPaymentEntry)).toEqual({
+      "430000": { debit: "0", credit: "60.5" },
+      "572000": { debit: "60.5", credit: "0" },
+    });
     const paidInvoice = await authed(accountA.accessToken, tenantA)
       .get(`/v1/invoices/${invoiceDraft.body.id}`)
       .expect(200);
@@ -630,7 +661,7 @@ describe("platform integrity", () => {
     expect(purchaseEntries.body.data[0]).toMatchObject({
       status: "POSTED",
       sourceId: purchaseDraft.body.id,
-      entryNumber: "3",
+      entryNumber: "5",
     });
     expect(accountingAmounts(purchaseEntries.body.data[0])).toEqual({
       "400000": { debit: "0", credit: "242" },
@@ -733,6 +764,15 @@ describe("platform integrity", () => {
     const fiscalYears = await authed(accountA.accessToken, tenantA)
       .get("/v1/accounting/fiscal-years")
       .expect(200);
+    const lockedPaymentDraft = await authed(accountA.accessToken, tenantA)
+      .post("/v1/invoices")
+      .send(invoice(contactA.body.id))
+      .expect(201);
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${lockedPaymentDraft.body.id}/issue`)
+      .set("idempotency-key", "issue-locked-payment-a")
+      .send({ sequenceId: sequence.body.id })
+      .expect(200);
     const november = fiscalYears.body[0].periods.find(
       ({ code }: { code: string }) => code === "2026-11",
     );
@@ -744,6 +784,27 @@ describe("platform integrity", () => {
       .set("idempotency-key", "manual-locked-a")
       .send({ ...manualInput, entryDate: "2026-11-07" })
       .expect(409);
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${lockedPaymentDraft.body.id}/payments`)
+      .set("idempotency-key", "payment-locked-period-a")
+      .send({
+        amount: 121,
+        paidAt: "2026-11-07T10:00:00.000Z",
+        method: "BANK_TRANSFER",
+      })
+      .expect(409);
+    const paymentRolledBack = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${lockedPaymentDraft.body.id}`)
+      .expect(200);
+    expect(paymentRolledBack.body).toMatchObject({
+      status: "ISSUED",
+      amountPaid: "0",
+      amountDue: "121",
+    });
+    const rolledBackPayments = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${lockedPaymentDraft.body.id}/payments`)
+      .expect(200);
+    expect(rolledBackPayments.body).toHaveLength(0);
 
     const disposableInvoice = await authed(accountA.accessToken, tenantA)
       .post("/v1/invoices")
