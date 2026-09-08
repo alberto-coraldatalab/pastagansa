@@ -16,12 +16,14 @@ import { TenantContextService } from "../tenancy/tenant-context.service";
 import { CreateQuoteDto, QuoteLineDto, UpdateQuoteDto } from "./dto/quote.dto";
 import { ListQuotesDto } from "./dto/list-quotes.dto";
 import { decodeCursor, encodeCursor } from "../common/cursor";
+import { QuotePdfService } from "./quote-pdf.service";
 
 @Injectable()
 export class QuotesService {
   constructor(
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
+    private readonly quotePdf: QuotePdfService,
   ) {}
 
   async list(query: ListQuotesDto) {
@@ -72,6 +74,20 @@ export class QuotesService {
     });
     if (!quote) throw new NotFoundException("Quote not found");
     return quote;
+  }
+
+  async downloadPdf(id: string) {
+    const quote = await this.get(id);
+    const { companyId } = this.scope();
+    const company = await this.tenant.db.company.findFirst({
+      where: { id: companyId },
+      select: { legalName: true, taxId: true },
+    });
+    if (!company) throw new NotFoundException("Company not found");
+    return {
+      content: await this.quotePdf.render({ company, quote }),
+      filename: `presupuesto-${safeFilename(quote.code)}.pdf`,
+    };
   }
 
   async create(input: CreateQuoteDto) {
@@ -277,4 +293,11 @@ function zeroTotals() {
     taxTotal: new Decimal(0),
     total: new Decimal(0),
   };
+}
+
+function safeFilename(value: string) {
+  return (
+    value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") ||
+    "sin-codigo"
+  );
 }

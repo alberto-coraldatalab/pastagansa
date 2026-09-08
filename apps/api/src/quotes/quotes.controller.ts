@@ -8,6 +8,7 @@ import {
   Post,
   ParseUUIDPipe,
   Query,
+  StreamableFile,
 } from "@nestjs/common";
 import { RequirePermissions } from "../authorization/permissions.decorator";
 import { TenantProtected } from "../tenancy/tenant.decorator";
@@ -29,6 +30,16 @@ export class QuotesController {
     @Param("id", ParseUUIDPipe) id: string,
   ) {
     return this.quotes.get(id);
+  }
+  @Get(":id/pdf")
+  @RequirePermissions("quote.read")
+  async pdf(@Param("id", ParseUUIDPipe) id: string) {
+    const file = await this.quotes.downloadPdf(id);
+    return new StreamableFile(file.content, {
+      type: "application/pdf",
+      disposition: `attachment; filename="${file.filename}"`,
+      length: file.content.length,
+    });
   }
   @Post() @RequirePermissions("quote.create") create(
     @Body() input: CreateQuoteDto,

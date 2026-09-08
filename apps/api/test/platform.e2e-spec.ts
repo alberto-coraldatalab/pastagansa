@@ -102,6 +102,16 @@ describe("platform integrity", () => {
       .expect(201);
     expect(createdQuote.body.customerLegalName).toBe("Customer A");
     expect(createdQuote.body.lines[0].totalAmount).toBe("121");
+    const quotePdf = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/quotes/${createdQuote.body.id}/pdf`)
+      .expect("content-type", /application\/pdf/)
+      .expect(
+        "content-disposition",
+        /attachment; filename="presupuesto-.+\.pdf"/,
+      )
+      .expect(200);
+    expect(Buffer.isBuffer(quotePdf.body)).toBe(true);
+    expect(quotePdf.body.subarray(0, 5).toString()).toBe("%PDF-");
 
     const transitions = await Promise.all([
       authed(accountA.accessToken, tenantA)

@@ -15,10 +15,10 @@
 
 | Fase | Estado | Alcance implementado / pendiente relevante |
 |---|---|---|
-| Fase 0 — Descubrimiento y arquitectura | En curso | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local y CI verde con PostgreSQL 17, migraciones, lint, build, 13 pruebas unitarias, prueba integral de aislamiento/concurrencia y auditoría de dependencias. Runtime Node 22, wiring DI, adaptador HTTP e interoperabilidad CommonJS validados. Pendientes ADRs, despliegue staging y matriz normativa validada. |
+| Fase 0 — Descubrimiento y arquitectura | En curso | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local y CI verde con PostgreSQL 17, migraciones, lint, build, 14 pruebas unitarias, prueba integral de aislamiento/concurrencia y auditoría de dependencias. Runtime Node 22, wiring DI, adaptador HTTP e interoperabilidad CommonJS validados. Pendientes ADRs, despliegue staging y matriz normativa validada. |
 | Fase 1 — Plataforma base | En curso | Registro y login; tokens con sesiones revocables y refresh rotativo protegido contra concurrencia; organización/empresa inicial; RBAC; transacciones por request con contexto RLS forzado; audit log transaccional y append-only; headers de seguridad, rate limit, request IDs, errores/logs estructurados, métricas y OpenAPI. Pendientes recuperación de contraseña, MFA, gestión completa de organizaciones/membresías/roles, archivos/antivirus, trazas distribuidas y backups. |
 | Fase 2 — Maestros | En curso | CRUD con archivado, permisos, auditoría y scope de empresa para contactos cliente/proveedor y catálogo de productos/servicios; direcciones y condiciones comerciales de contacto; importación CSV validada para contactos y catálogo; búsqueda y paginación por cursor en ambos listados. Pendientes filtros avanzados, UX web y configuración fiscal/contable validada. |
-| Fase 3 — Ventas | En curso | Presupuestos con snapshots, cálculo decimal, integridad de catálogo/cliente, límites de líneas y transiciones de estado atómicas; contrato HTTP de cambio de estado normalizado a `200`. Pendientes numeración legal, pedidos, albaranes, facturas, rectificativas, recurrencia, PDF/email y UX web. |
+| Fase 3 — Ventas | En curso | Presupuestos con snapshots, cálculo decimal, integridad de catálogo/cliente, límites de líneas, transiciones de estado atómicas y descarga PDF A4 multipágina protegida por tenant/RBAC. Pendientes numeración legal, pedidos, albaranes, facturas, rectificativas, recurrencia, email y UX web. |
 | Fases 4–14 | No iniciadas | No existe todavía implementación de compras, contabilidad, fiscalidad, tesorería, SIF/VERI*FACTU, reporting, webhooks, hardening, piloto o GA. |
 
 ### Regla operativa de commits
@@ -392,7 +392,7 @@ Datos listos para crear documentos comerciales.
 
 **Duración:** 3 sprints.
 
-**Estado real:** En curso. Implementados presupuestos con líneas persistibles, totales decimales, snapshot de cliente/dirección, paginación opaca, validación de referencias por tenant y transiciones de estado resistentes a concurrencia. Pendientes PDF, factura borrador, series/numeración, emisión, email, rectificativas, recurrentes, vencimientos y pagos.
+**Estado real:** En curso. Implementados presupuestos con líneas persistibles, totales decimales, snapshot de cliente/dirección, paginación opaca, validación de referencias por tenant, transiciones de estado resistentes a concurrencia y PDF A4 multipágina con metadatos, tabla paginada, totales, notas y endpoint autenticado. Pendientes factura borrador, series/numeración, emisión, email, rectificativas, recurrentes, vencimientos y pagos.
 
 ## Sprint A
 
