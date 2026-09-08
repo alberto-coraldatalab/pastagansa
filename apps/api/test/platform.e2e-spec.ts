@@ -1029,7 +1029,7 @@ describe("platform integrity", () => {
     );
     const manualInput = {
       entryDate: "2026-11-05",
-      description: "Manual bank adjustment",
+      description: '=Manual; "bank" adjustment',
       lines: [
         { accountId: bankAccount.id, debit: 10 },
         { accountId: customerAccount.id, credit: 10 },
@@ -1067,6 +1067,78 @@ describe("platform integrity", () => {
       "430000": { debit: "10", credit: "0" },
       "572000": { debit: "0", credit: "10" },
     });
+    const journalReport = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/reports/journal?from=2026-01-01&to=2026-12-31")
+      .expect(200);
+    expect(journalReport.body).toMatchObject({
+      from: "2026-01-01",
+      to: "2026-12-31",
+      totalDebit: "867",
+      totalCredit: "867",
+    });
+    expect(journalReport.body.lines).toHaveLength(21);
+    const paymentJournalReport = await authed(accountA.accessToken, tenantA)
+      .get(
+        "/v1/accounting/reports/journal?from=2026-09-01&to=2026-10-31&sourceType=PAYMENT",
+      )
+      .expect(200);
+    expect(paymentJournalReport.body).toMatchObject({
+      sourceType: "PAYMENT",
+      totalDebit: "121",
+      totalCredit: "121",
+    });
+    expect(paymentJournalReport.body.lines).toHaveLength(4);
+    await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/reports/journal?from=2026-12-31&to=2026-01-01")
+      .expect(400);
+    await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/reports/journal?from=2025-01-01&to=2026-12-31")
+      .expect(400);
+    const journalCsv = await authed(accountA.accessToken, tenantA)
+      .get(
+        "/v1/accounting/reports/journal.csv?from=2026-01-01&to=2026-12-31",
+      )
+      .expect("content-type", /text\/csv/)
+      .expect(
+        "content-disposition",
+        'attachment; filename="journal-2026-01-01-2026-12-31.csv"',
+      )
+      .expect(200);
+    expect(journalCsv.text).toContain(
+      `"'=Manual; ""bank"" adjustment"`,
+    );
+    const bankLedger = await authed(accountA.accessToken, tenantA)
+      .get(
+        `/v1/accounting/reports/general-ledger?accountId=${bankAccount.id}&from=2026-01-01&to=2026-12-31`,
+      )
+      .expect(200);
+    expect(bankLedger.body).toMatchObject({
+      account: { id: bankAccount.id, code: "572000" },
+      openingBalance: "0",
+      totalDebit: "131",
+      totalCredit: "252",
+      closingBalance: "-121",
+    });
+    expect(bankLedger.body.lines).toHaveLength(6);
+    expect(bankLedger.body.lines.at(-1).runningBalance).toBe("-121");
+    await authed(accountB.accessToken, tenantB)
+      .get(
+        `/v1/accounting/reports/general-ledger?accountId=${bankAccount.id}&from=2026-01-01&to=2026-12-31`,
+      )
+      .expect(404);
+    const ledgerCsv = await authed(accountA.accessToken, tenantA)
+      .get(
+        `/v1/accounting/reports/general-ledger.csv?accountId=${bankAccount.id}&from=2026-01-01&to=2026-12-31`,
+      )
+      .expect("content-type", /text\/csv/)
+      .expect(
+        "content-disposition",
+        'attachment; filename="general-ledger-572000-2026-01-01-2026-12-31.csv"',
+      )
+      .expect(200);
+    expect(ledgerCsv.text).toContain(
+      "TOTAL;;2026-12-31;Closing balance 572000;;131;252;-121",
+    );
     const trialBalance = await authed(accountA.accessToken, tenantA)
       .get("/v1/accounting/trial-balance?from=2026-01-01&to=2026-12-31")
       .expect(200);
