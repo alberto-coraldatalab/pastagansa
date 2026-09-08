@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditService } from "../audit/audit.service";
+import { AccountingService } from "../accounting/accounting.service";
 import { decodeCursor, encodeCursor } from "../common/cursor";
 import { calculateInvoiceLine } from "../invoices/invoices.service";
 import { TaxService } from "../tax/tax.service";
@@ -32,6 +33,7 @@ export class PurchasesService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     private readonly tax: TaxService,
+    private readonly accounting: AccountingService,
   ) {}
 
   async list(query: ListPurchaseInvoicesDto) {
@@ -233,6 +235,7 @@ export class PurchasesService {
       },
     });
     await this.tax.postPurchaseInvoice(id);
+    await this.accounting.postPurchaseInvoice(id);
     await this.audit.record(
       "purchase_invoice.approved",
       "purchase_invoice",

@@ -18,6 +18,7 @@ import { InvoicesModule } from "./invoices/invoices.module";
 import { PaymentsModule } from "./payments/payments.module";
 import { TaxModule } from "./tax/tax.module";
 import { PurchasesModule } from "./purchases/purchases.module";
+import { AccountingModule } from "./accounting/accounting.module";
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { PurchasesModule } from "./purchases/purchases.module";
     PaymentsModule,
     TaxModule,
     PurchasesModule,
+    AccountingModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

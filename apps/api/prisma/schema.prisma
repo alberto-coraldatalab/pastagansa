@@ -123,6 +123,46 @@ enum PurchaseInvoiceStatus {
   CANCELLED
 }
 
+enum AccountClass {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum AccountingRole {
+  CUSTOMER_RECEIVABLE
+  SUPPLIER_PAYABLE
+  SALES_REVENUE
+  PURCHASE_EXPENSE
+  OUTPUT_VAT
+  INPUT_VAT
+  BANK
+}
+
+enum FiscalYearStatus {
+  OPEN
+  CLOSED
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  LOCKED
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+}
+
+enum JournalSourceType {
+  MANUAL
+  SALES_INVOICE
+  PURCHASE_INVOICE
+  PAYMENT
+}
+
 model Organization {
   id                   String                 @id @default(uuid()) @db.Uuid
   name                 String
@@ -146,6 +186,11 @@ model Organization {
   purchaseInvoices     PurchaseInvoice[]
   purchaseInvoiceLines PurchaseInvoiceLine[]
   purchaseTaxLines     PurchaseTaxLine[]
+  accounts             Account[]
+  fiscalYears          FiscalYear[]
+  accountingPeriods    AccountingPeriod[]
+  journalEntries       JournalEntry[]
+  journalLines         JournalLine[]
 
   @@map("organizations")
 }
@@ -178,6 +223,11 @@ model Company {
   purchaseInvoices     PurchaseInvoice[]
   purchaseInvoiceLines PurchaseInvoiceLine[]
   purchaseTaxLines     PurchaseTaxLine[]
+  accounts             Account[]
+  fiscalYears          FiscalYear[]
+  accountingPeriods    AccountingPeriod[]
+  journalEntries       JournalEntry[]
+  journalLines         JournalLine[]
 
   @@unique([organizationId, taxId])
   @@index([organizationId])
@@ -236,6 +286,7 @@ model Contact {
   invoices         Invoice[]
   taxLedgerEntries TaxLedgerEntry[]
   purchaseInvoices PurchaseInvoice[]
+  journalLines     JournalLine[]
 
   @@unique([companyId, taxId])
   @@unique([id, organizationId, companyId])
@@ -546,6 +597,132 @@ model PurchaseTaxLine {
   @@unique([id, organizationId, companyId])
   @@index([purchaseInvoiceId])
   @@map("purchase_tax_lines")
+}
+
+model Account {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  companyId      String          @map("company_id") @db.Uuid
+  code           String          @db.VarChar(20)
+  name           String          @db.VarChar(240)
+  accountClass   AccountClass    @map("account_class")
+  systemRole     AccountingRole? @map("system_role")
+  parentId       String?         @map("parent_id") @db.Uuid
+  isReconcilable Boolean         @default(false) @map("is_reconcilable")
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  parent         Account?        @relation("AccountHierarchy", fields: [parentId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  children       Account[]       @relation("AccountHierarchy")
+  journalLines   JournalLine[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, systemRole])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, accountClass, active])
+  @@map("accounts")
+}
+
+model FiscalYear {
+  id              String             @id @default(uuid()) @db.Uuid
+  organizationId  String             @map("organization_id") @db.Uuid
+  companyId       String             @map("company_id") @db.Uuid
+  code            String             @db.VarChar(20)
+  startDate       DateTime           @map("start_date") @db.Date
+  endDate         DateTime           @map("end_date") @db.Date
+  status          FiscalYearStatus   @default(OPEN)
+  nextEntryNumber BigInt             @default(1) @map("next_entry_number")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  periods         AccountingPeriod[]
+  entries         JournalEntry[]
+
+  @@unique([companyId, code])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, startDate, endDate])
+  @@map("fiscal_years")
+}
+
+model AccountingPeriod {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @map("organization_id") @db.Uuid
+  companyId      String                 @map("company_id") @db.Uuid
+  fiscalYearId   String                 @map("fiscal_year_id") @db.Uuid
+  code           String                 @db.VarChar(20)
+  startDate      DateTime               @map("start_date") @db.Date
+  endDate        DateTime               @map("end_date") @db.Date
+  status         AccountingPeriodStatus @default(OPEN)
+  lockedAt       DateTime?              @map("locked_at") @db.Timestamptz(6)
+  lockedById     String?                @map("locked_by_id") @db.Uuid
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company                @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  fiscalYear     FiscalYear             @relation(fields: [fiscalYearId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+
+  @@unique([fiscalYearId, code])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, startDate, endDate, status])
+  @@map("accounting_periods")
+}
+
+model JournalEntry {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  companyId      String             @map("company_id") @db.Uuid
+  fiscalYearId   String             @map("fiscal_year_id") @db.Uuid
+  entryNumber    BigInt             @map("entry_number")
+  entryDate      DateTime           @map("entry_date") @db.Date
+  description    String             @db.VarChar(1000)
+  sourceType     JournalSourceType  @map("source_type")
+  sourceId       String?            @map("source_id") @db.Uuid
+  idempotencyKey String?            @map("idempotency_key") @db.VarChar(128)
+  status         JournalEntryStatus @default(DRAFT)
+  reversalOfId   String?            @map("reversal_of_id") @db.Uuid
+  createdById    String?            @map("created_by_id") @db.Uuid
+  postedAt       DateTime?          @map("posted_at") @db.Timestamptz(6)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  fiscalYear     FiscalYear         @relation(fields: [fiscalYearId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  reversalOf     JournalEntry?      @relation("JournalReversals", fields: [reversalOfId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  reversedBy     JournalEntry?      @relation("JournalReversals")
+  lines          JournalLine[]
+
+  @@unique([companyId, fiscalYearId, entryNumber])
+  @@unique([companyId, sourceType, sourceId])
+  @@unique([companyId, idempotencyKey])
+  @@unique([reversalOfId, organizationId, companyId])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, entryDate, entryNumber])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  companyId      String       @map("company_id") @db.Uuid
+  journalEntryId String       @map("journal_entry_id") @db.Uuid
+  accountId      String       @map("account_id") @db.Uuid
+  contactId      String?      @map("contact_id") @db.Uuid
+  position       Int
+  description    String?      @db.VarChar(1000)
+  debit          Decimal      @default(0) @db.Decimal(19, 4)
+  credit         Decimal      @default(0) @db.Decimal(19, 4)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  entry          JournalEntry @relation(fields: [journalEntryId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  account        Account      @relation(fields: [accountId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  contact        Contact?     @relation(fields: [contactId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+
+  @@unique([journalEntryId, position])
+  @@index([companyId, accountId, createdAt])
+  @@map("journal_lines")
 }
 
 model InvoiceInstallment {

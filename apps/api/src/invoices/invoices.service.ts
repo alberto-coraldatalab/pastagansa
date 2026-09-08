@@ -19,6 +19,7 @@ import { AuditService } from "../audit/audit.service";
 import { decodeCursor, encodeCursor } from "../common/cursor";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 import { TaxService } from "../tax/tax.service";
+import { AccountingService } from "../accounting/accounting.service";
 import {
   CreateInvoiceDto,
   InvoiceLineDto,
@@ -36,6 +37,7 @@ export class InvoicesService {
     private readonly audit: AuditService,
     private readonly pdf: InvoicePdfService,
     private readonly tax: TaxService,
+    private readonly accounting: AccountingService,
   ) {}
 
   async list(query: ListInvoicesDto) {
@@ -442,6 +444,7 @@ export class InvoicesService {
       idempotencyKey,
     });
     await this.tax.postInvoice(id);
+    await this.accounting.postSalesInvoice(id);
     if (
       invoice.documentType === DocumentType.CREDIT_NOTE &&
       invoice.rectificationKind === RectificationKind.TOTAL &&

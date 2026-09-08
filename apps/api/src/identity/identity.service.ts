@@ -69,6 +69,14 @@ export class IdentityService {
           ["purchase_invoice.update", "Update purchase invoices"],
           ["purchase_invoice.approve", "Approve purchase invoices"],
           ["purchase_invoice.delete", "Delete purchase invoice drafts"],
+          ["account.read", "Read chart of accounts"],
+          ["account.manage", "Manage chart of accounts"],
+          ["fiscal_year.read", "Read fiscal years and periods"],
+          ["fiscal_year.manage", "Manage fiscal years"],
+          ["accounting_period.lock", "Lock accounting periods"],
+          ["journal_entry.read", "Read journal entries"],
+          ["journal_entry.create", "Create manual journal entries"],
+          ["journal_entry.reverse", "Reverse journal entries"],
         ].map(([code, name]) =>
           tx.permission.upsert({
             where: { code },

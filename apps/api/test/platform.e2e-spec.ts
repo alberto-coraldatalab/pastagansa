@@ -256,6 +256,24 @@ describe("platform integrity", () => {
       rate: "21",
       taxAmount: "21",
     });
+    const salesEntries = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/journal-entries?sourceType=SALES_INVOICE")
+      .expect(200);
+    expect(salesEntries.body.data).toHaveLength(1);
+    const originalSalesEntry = salesEntries.body.data[0];
+    expect(originalSalesEntry).toMatchObject({
+      status: "POSTED",
+      sourceId: invoiceDraft.body.id,
+      entryNumber: "1",
+    });
+    expect(accountingAmounts(originalSalesEntry)).toEqual({
+      "430000": { debit: "121", credit: "0" },
+      "477000": { debit: "0", credit: "21" },
+      "700000": { debit: "0", credit: "100" },
+    });
+    await authed(accountB.accessToken, tenantB)
+      .get(`/v1/accounting/journal-entries/${originalSalesEntry.id}`)
+      .expect(404);
     await expect(
       admin.taxRule.update({
         where: { id: taxRules.body[0].id },
@@ -279,6 +297,18 @@ describe("platform integrity", () => {
         where: { id: originalLedger.body.data[0].amounts[0].id },
       }),
     ).rejects.toThrow(/tax ledger is append-only/);
+    await expect(
+      admin.journalEntry.update({
+        where: { id: originalSalesEntry.id },
+        data: { description: "Tampered" },
+      }),
+    ).rejects.toThrow(/posted journal entries are immutable/);
+    await expect(
+      admin.journalLine.update({
+        where: { id: originalSalesEntry.lines[0].id },
+        data: { debit: "999" },
+      }),
+    ).rejects.toThrow(/posted journal lines are immutable/);
     await authed(accountB.accessToken, tenantB)
       .get(`/v1/tax-ledger/${originalLedger.body.data[0].id}`)
       .expect(404);
@@ -467,6 +497,19 @@ describe("platform integrity", () => {
       rate: "21",
       taxAmount: "-21",
     });
+    const rectificationEntries = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/journal-entries?sourceType=SALES_INVOICE")
+      .expect(200);
+    expect(rectificationEntries.body.data).toHaveLength(2);
+    const rectificationEntry = rectificationEntries.body.data.find(
+      ({ sourceId }: { sourceId: string }) =>
+        sourceId === rectification.body.id,
+    );
+    expect(accountingAmounts(rectificationEntry)).toEqual({
+      "430000": { debit: "0", credit: "121" },
+      "477000": { debit: "21", credit: "0" },
+      "700000": { debit: "100", credit: "0" },
+    });
     await authed(accountA.accessToken, tenantA)
       .get(`/v1/invoices/${rectification.body.id}/pdf`)
       .expect("content-type", /application\/pdf/)
@@ -580,6 +623,20 @@ describe("platform integrity", () => {
       taxAmount: "42",
       deductibleAmount: "21",
     });
+    const purchaseEntries = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/journal-entries?sourceType=PURCHASE_INVOICE")
+      .expect(200);
+    expect(purchaseEntries.body.data).toHaveLength(1);
+    expect(purchaseEntries.body.data[0]).toMatchObject({
+      status: "POSTED",
+      sourceId: purchaseDraft.body.id,
+      entryNumber: "3",
+    });
+    expect(accountingAmounts(purchaseEntries.body.data[0])).toEqual({
+      "400000": { debit: "0", credit: "242" },
+      "472000": { debit: "21", credit: "0" },
+      "600000": { debit: "221", credit: "0" },
+    });
     await expect(
       admin.purchaseInvoice.update({
         where: { id: purchaseDraft.body.id },
@@ -612,6 +669,81 @@ describe("platform integrity", () => {
     await authed(accountA.accessToken, tenantA)
       .get(`/v1/purchase-invoices/${disposablePurchase.body.id}`)
       .expect(404);
+
+    const accounts = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/accounts")
+      .expect(200);
+    expect(accounts.body).toHaveLength(7);
+    const bankAccount = accounts.body.find(
+      ({ code }: { code: string }) => code === "572000",
+    );
+    const customerAccount = accounts.body.find(
+      ({ code }: { code: string }) => code === "430000",
+    );
+    const manualInput = {
+      entryDate: "2026-11-05",
+      description: "Manual bank adjustment",
+      lines: [
+        { accountId: bankAccount.id, debit: 10 },
+        { accountId: customerAccount.id, credit: 10 },
+      ],
+    };
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/accounting/journal-entries")
+      .set("idempotency-key", "manual-unbalanced-a")
+      .send({
+        ...manualInput,
+        lines: [
+          { accountId: bankAccount.id, debit: 10 },
+          { accountId: customerAccount.id, credit: 9 },
+        ],
+      })
+      .expect(400);
+    const manualEntry = await authed(accountA.accessToken, tenantA)
+      .post("/v1/accounting/journal-entries")
+      .set("idempotency-key", "manual-balanced-a")
+      .send(manualInput)
+      .expect(201);
+    const retriedManual = await authed(accountA.accessToken, tenantA)
+      .post("/v1/accounting/journal-entries")
+      .set("idempotency-key", "manual-balanced-a")
+      .send(manualInput)
+      .expect(201);
+    expect(retriedManual.body.id).toBe(manualEntry.body.id);
+    const reversal = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/accounting/journal-entries/${manualEntry.body.id}/reverse`)
+      .set("idempotency-key", "reverse-manual-a")
+      .send({ entryDate: "2026-11-06", reason: "Acceptance test" })
+      .expect(201);
+    expect(reversal.body.reversalOfId).toBe(manualEntry.body.id);
+    expect(accountingAmounts(reversal.body)).toEqual({
+      "430000": { debit: "10", credit: "0" },
+      "572000": { debit: "0", credit: "10" },
+    });
+    const trialBalance = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/trial-balance?from=2026-01-01&to=2026-12-31")
+      .expect(200);
+    expect(
+      trialBalance.body.reduce(
+        (sum: number, row: { balance: string }) =>
+          sum + Number(row.balance),
+        0,
+      ),
+    ).toBe(0);
+    const fiscalYears = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/fiscal-years")
+      .expect(200);
+    const november = fiscalYears.body[0].periods.find(
+      ({ code }: { code: string }) => code === "2026-11",
+    );
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/accounting/periods/${november.id}/lock`)
+      .expect(200);
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/accounting/journal-entries")
+      .set("idempotency-key", "manual-locked-a")
+      .send({ ...manualInput, entryDate: "2026-11-07" })
+      .expect(409);
 
     const disposableInvoice = await authed(accountA.accessToken, tenantA)
       .post("/v1/invoices")
@@ -722,6 +854,21 @@ describe("platform integrity", () => {
         },
       ],
     };
+  }
+
+  function accountingAmounts(entry: {
+    lines: Array<{
+      account: { code: string };
+      debit: string;
+      credit: string;
+    }>;
+  }) {
+    return Object.fromEntries(
+      entry.lines.map((line) => [
+        line.account.code,
+        { debit: line.debit, credit: line.credit },
+      ]),
+    );
   }
   function invoice(contactId: string) {
     return {
