@@ -43,7 +43,7 @@ describe("platform integrity", () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
     await prisma.$disconnect();
     await admin.$disconnect();
   });

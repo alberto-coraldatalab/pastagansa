@@ -1,11 +1,12 @@
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 import { AuthenticationGuard } from "../identity/authentication.guard";
 import { IdentityModule } from "../identity/identity.module";
 import { TenantContextInterceptor } from "./tenant-context.interceptor";
 import { TenantContextService } from "./tenant-context.service";
 import { TenantGuard } from "./tenant.guard";
 
+@Global()
 @Module({
   imports: [IdentityModule],
   providers: [
