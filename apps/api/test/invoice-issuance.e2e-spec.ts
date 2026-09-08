@@ -78,7 +78,11 @@ describe("invoice issuance concurrency", () => {
     };
     const contact = await tenantRequest(account.body.accessToken, tenant)
       .post("/v1/contacts")
-      .send({ legalName: "Concurrency Customer", isCustomer: true })
+      .send({
+        legalName: "Concurrency Customer",
+        isCustomer: true,
+        isSupplier: false,
+      })
       .expect(201);
     const sequence = await tenantRequest(account.body.accessToken, tenant)
       .post("/v1/document-sequences")
