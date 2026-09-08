@@ -1,0 +1,38 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: pastagansa
+          POSTGRES_USER: pastagansa_admin
+          POSTGRES_PASSWORD: pastagansa_admin
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pastagansa_admin" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://pastagansa_app:pastagansa_app@localhost:5432/pastagansa?schema=public
+      DIRECT_DATABASE_URL: postgresql://pastagansa_admin:pastagansa_admin@localhost:5432/pastagansa?schema=public
+      JWT_SECRET: ci-only-secret-with-at-least-32-characters
+      JWT_ISSUER: pastagansa
+      JWT_AUDIENCE: pastagansa-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run db:deploy
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm audit --audit-level=high

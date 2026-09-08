@@ -1,2 +1,49 @@
-import { Body, Controller, Get, Param, Patch, Post, ParseUUIDPipe } from '@nestjs/common'; import { RequirePermissions } from '../authorization/permissions.decorator'; import { TenantProtected } from '../tenancy/tenant.decorator'; import { ChangeQuoteStatusDto, CreateQuoteDto, UpdateQuoteDto } from './dto/quote.dto'; import { QuotesService } from './quotes.service';
-@Controller('quotes') @TenantProtected() export class QuotesController { constructor(private readonly quotes: QuotesService) {} @Get() @RequirePermissions('quote.read') list() { return this.quotes.list(); } @Get(':id') @RequirePermissions('quote.read') get(@Param('id', ParseUUIDPipe) id: string) { return this.quotes.get(id); } @Post() @RequirePermissions('quote.create') create(@Body() input: CreateQuoteDto) { return this.quotes.create(input); } @Patch(':id') @RequirePermissions('quote.update') update(@Param('id', ParseUUIDPipe) id: string, @Body() input: UpdateQuoteDto) { return this.quotes.update(id, input); } @Post(':id/status') @RequirePermissions('quote.change_status') status(@Param('id', ParseUUIDPipe) id: string, @Body() input: ChangeQuoteStatusDto) { return this.quotes.changeStatus(id, input.status); } }
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  ParseUUIDPipe,
+  Query,
+} from "@nestjs/common";
+import { RequirePermissions } from "../authorization/permissions.decorator";
+import { TenantProtected } from "../tenancy/tenant.decorator";
+import {
+  ChangeQuoteStatusDto,
+  CreateQuoteDto,
+  UpdateQuoteDto,
+} from "./dto/quote.dto";
+import { QuotesService } from "./quotes.service";
+import { ListQuotesDto } from "./dto/list-quotes.dto";
+@Controller("quotes")
+@TenantProtected()
+export class QuotesController {
+  constructor(private readonly quotes: QuotesService) {}
+  @Get() @RequirePermissions("quote.read") list(@Query() query: ListQuotesDto) {
+    return this.quotes.list(query);
+  }
+  @Get(":id") @RequirePermissions("quote.read") get(
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.quotes.get(id);
+  }
+  @Post() @RequirePermissions("quote.create") create(
+    @Body() input: CreateQuoteDto,
+  ) {
+    return this.quotes.create(input);
+  }
+  @Patch(":id") @RequirePermissions("quote.update") update(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: UpdateQuoteDto,
+  ) {
+    return this.quotes.update(id, input);
+  }
+  @Post(":id/status") @RequirePermissions("quote.change_status") status(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: ChangeQuoteStatusDto,
+  ) {
+    return this.quotes.changeStatus(id, input.status);
+  }
+}

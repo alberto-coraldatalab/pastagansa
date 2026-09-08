@@ -1,10 +1,23 @@
-import { Type } from 'class-transformer';
-import { IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { PaymentMethod } from '@prisma/client';
+import { Type } from "class-transformer";
+import {
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from "class-validator";
+import { PaymentMethod } from "@prisma/client";
+import { IsNotBlank, IsSpanishTaxId } from "../../common/validation";
 
 export class CreateContactDto {
   @IsString()
   @MaxLength(240)
+  @IsNotBlank()
   legalName!: string;
 
   @IsOptional()
@@ -13,7 +26,7 @@ export class CreateContactDto {
   tradeName?: string;
 
   @IsOptional()
-  @Matches(/^[A-Za-z0-9][A-Za-z0-9 -]{1,38}[A-Za-z0-9]$/)
+  @IsSpanishTaxId()
   taxId?: string;
 
   @IsOptional()
@@ -26,7 +39,12 @@ export class CreateContactDto {
   @MaxLength(40)
   phone?: string;
 
-  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(365) paymentTermsDays?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  paymentTermsDays?: number;
   @IsOptional() @IsEnum(PaymentMethod) paymentMethod?: PaymentMethod;
 
   @IsBoolean()

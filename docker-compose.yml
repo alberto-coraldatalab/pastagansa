@@ -3,16 +3,17 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: pastagansa
-      POSTGRES_USER: pastagansa
-      POSTGRES_PASSWORD: pastagansa
+      POSTGRES_USER: pastagansa_admin
+      POSTGRES_PASSWORD: pastagansa_admin
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pastagansa -d pastagansa"]
+      test: ["CMD-SHELL", "pg_isready -U pastagansa_admin -d pastagansa"]
       interval: 5s
       timeout: 5s
       retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/001-roles.sql:ro
 volumes:
   postgres_data:

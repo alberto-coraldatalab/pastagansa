@@ -33,4 +33,18 @@ Tenant selection headers (`x-organization-id`, `x-company-id`) are never authori
 
 ## Database safety
 
-The first migration applies organization row-level-security policies to tenant-bearing tables as a second barrier. Production requests must use a non-owner application database role and issue `SET LOCAL app.organization_id` for every tenant-bound transaction; PostgreSQL table owners bypass RLS unless `FORCE ROW LEVEL SECURITY` is applied.
+Tenant-protected requests run inside one database transaction. The request interceptor sets `app.organization_id` on that transaction before domain work starts, and the database forces row-level security even for the table owner. Domain writes and their audit event therefore commit or roll back together.
+
+## Verification
+
+```bash
+npm run lint
+npm run build
+npm test
+npm run test:integration
+npm audit --audit-level=high
+```
+
+The integration suite requires PostgreSQL with all migrations applied. CI provisions PostgreSQL, deploys migrations, exercises tenant isolation, quotation persistence and races, refresh-token concurrency, revocation, and audit visibility.
+
+OpenAPI is served at `/docs` and Prometheus-format metrics at `/v1/metrics`. Every response receives an `x-request-id`; errors include the same identifier.

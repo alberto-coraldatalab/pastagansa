@@ -1,5 +1,12 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { Type } from "class-transformer";
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from "class-validator";
 
 export class ListContactsDto {
   @IsOptional()
@@ -8,7 +15,8 @@ export class ListContactsDto {
   search?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @MaxLength(500)
   cursor?: string;
 
   @IsOptional()

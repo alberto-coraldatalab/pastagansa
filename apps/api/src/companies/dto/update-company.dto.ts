@@ -1,13 +1,15 @@
-import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsOptional, IsString, Matches, MaxLength } from "class-validator";
+import { IsCurrencyCode, IsNotBlank } from "../../common/validation";
 
 export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
   @MaxLength(240)
+  @IsNotBlank()
   legalName?: string;
 
   @IsOptional()
-  @Matches(/^[A-Z]{3}$/)
+  @IsCurrencyCode()
   baseCurrency?: string;
 
   @IsOptional()

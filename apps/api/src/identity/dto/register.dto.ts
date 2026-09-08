@@ -1,4 +1,5 @@
-import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsString, MaxLength, MinLength } from "class-validator";
+import { IsNotBlank, IsSpanishTaxId } from "../../common/validation";
 
 export class RegisterDto {
   @IsEmail()
@@ -11,12 +12,14 @@ export class RegisterDto {
 
   @IsString()
   @MaxLength(160)
+  @IsNotBlank()
   organizationName!: string;
 
   @IsString()
   @MaxLength(240)
+  @IsNotBlank()
   legalName!: string;
 
-  @Matches(/^[A-Za-z0-9][A-Za-z0-9 -]{1,38}[A-Za-z0-9]$/)
+  @IsSpanishTaxId()
   taxId!: string;
 }

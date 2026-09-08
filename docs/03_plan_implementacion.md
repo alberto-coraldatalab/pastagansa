@@ -15,8 +15,8 @@
 
 | Fase | Estado | Alcance implementado / pendiente relevante |
 |---|---|---|
-| Fase 0 — Descubrimiento y arquitectura | En curso | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local y tooling de build/lint/test. Pendientes ADRs, CI/CD y matriz normativa validada. |
-| Fase 1 — Plataforma base | En curso | Registro, login, tokens de acceso, sesiones con refresh rotativo, organizaciones/empresa iniciales, RBAC por permisos, aislamiento por organización/empresa en la aplicación, políticas RLS iniciales y audit log para las operaciones implementadas. Pendientes recuperación de contraseña, MFA, gestión completa de organizaciones/membresías/roles, archivos, antivirus, trazas, métricas y gestión de errores de producción. |
+| Fase 0 — Descubrimiento y arquitectura | En curso | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local, CI con PostgreSQL y tooling de build/lint/test/audit. Pendientes ADRs, despliegue staging y matriz normativa validada. |
+| Fase 1 — Plataforma base | En curso | Registro y login; tokens con sesiones revocables y refresh rotativo protegido contra concurrencia; organización/empresa inicial; RBAC; transacciones por request con contexto RLS forzado; audit log transaccional y append-only; headers de seguridad, rate limit, request IDs, errores/logs estructurados, métricas y OpenAPI. Pendientes recuperación de contraseña, MFA, gestión completa de organizaciones/membresías/roles, archivos/antivirus, trazas distribuidas y backups. |
 | Fase 2 — Maestros | En curso | CRUD con archivado, permisos, auditoría y scope de empresa para contactos cliente/proveedor y catálogo de productos/servicios; direcciones y condiciones comerciales de contacto; importación CSV validada para contactos y catálogo; búsqueda y paginación por cursor en ambos listados. Pendientes filtros avanzados, UX web y configuración fiscal/contable validada. |
 | Fases 3–14 | No iniciadas | No existe todavía implementación de ventas, compras, contabilidad, fiscalidad, tesorería, SIF/VERI*FACTU, reporting, webhooks, hardening, piloto o GA. |
 
@@ -391,7 +391,7 @@ Datos listos para crear documentos comerciales.
 
 **Duración:** 3 sprints.
 
-**Estado real:** En curso. Implementados presupuestos con líneas, totales y estados en API. Pendientes PDF, factura borrador, series/numeración, emisión, email, rectificativas, recurrentes, vencimientos y pagos.
+**Estado real:** En curso. Implementados presupuestos con líneas persistibles, totales decimales, snapshot de cliente/dirección, paginación opaca, validación de referencias por tenant y transiciones de estado resistentes a concurrencia. Pendientes PDF, factura borrador, series/numeración, emisión, email, rectificativas, recurrentes, vencimientos y pagos.
 
 ## Sprint A
 

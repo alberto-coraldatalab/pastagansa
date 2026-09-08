@@ -63,158 +63,168 @@ enum QuoteStatus {
 }
 
 model Organization {
-  id          String       @id @default(uuid()) @db.Uuid
-  name        String
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  companies   Company[]
-  memberships Membership[]
-  auditEvents AuditEvent[]
-  contacts    Contact[]
-  quotes      Quote[]
+  id               String           @id @default(uuid()) @db.Uuid
+  name             String
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  companies        Company[]
+  memberships      Membership[]
+  auditEvents      AuditEvent[]
+  contacts         Contact[]
+  quotes           Quote[]
   contactAddresses ContactAddress[]
-  catalogItems CatalogItem[]
+  catalogItems     CatalogItem[]
+
   @@map("organizations")
 }
 
 model Company {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  legalName      String       @map("legal_name")
-  taxId          String       @map("tax_id") @db.VarChar(40)
-  country        String       @default("ES") @db.Char(2)
-  baseCurrency   String       @default("EUR") @map("base_currency") @db.Char(3)
-  timezone       String       @default("Europe/Madrid") @db.VarChar(64)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  memberships    Membership[]
-  auditEvents    AuditEvent[]
-  contacts       Contact[]
-  quotes         Quote[]
+  id               String           @id @default(uuid()) @db.Uuid
+  organizationId   String           @map("organization_id") @db.Uuid
+  legalName        String           @map("legal_name")
+  taxId            String           @map("tax_id") @db.VarChar(40)
+  country          String           @default("ES") @db.Char(2)
+  baseCurrency     String           @default("EUR") @map("base_currency") @db.Char(3)
+  timezone         String           @default("Europe/Madrid") @db.VarChar(64)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships      Membership[]
+  auditEvents      AuditEvent[]
+  contacts         Contact[]
+  quotes           Quote[]
   contactAddresses ContactAddress[]
-  catalogItems   CatalogItem[]
+  catalogItems     CatalogItem[]
+
   @@unique([organizationId, taxId])
   @@index([organizationId])
   @@map("companies")
 }
 
 model CatalogItem {
-  id                    String            @id @default(uuid()) @db.Uuid
-  organizationId        String            @map("organization_id") @db.Uuid
-  companyId             String            @map("company_id") @db.Uuid
-  type                  CatalogItemType
-  sku                   String?           @db.VarChar(80)
-  name                  String            @db.VarChar(240)
-  description           String?
-  unit                  String            @default("unit") @db.VarChar(30)
-  salesPrice            Decimal?          @map("sales_price") @db.Decimal(14, 2)
-  currency              String            @default("EUR") @db.Char(3)
-  suggestedTaxCode      String?           @map("suggested_tax_code") @db.VarChar(80)
-  revenueAccountCode    String?           @map("revenue_account_code") @db.VarChar(20)
-  expenseAccountCode    String?           @map("expense_account_code") @db.VarChar(20)
-  trackInventory        Boolean           @default(false) @map("track_inventory")
-  status                CatalogItemStatus @default(ACTIVE)
-  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company               Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  quoteLines            QuoteLine[]
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @map("organization_id") @db.Uuid
+  companyId          String            @map("company_id") @db.Uuid
+  type               CatalogItemType
+  sku                String?           @db.VarChar(80)
+  name               String            @db.VarChar(240)
+  description        String?
+  unit               String            @default("unit") @db.VarChar(30)
+  salesPrice         Decimal?          @map("sales_price") @db.Decimal(14, 2)
+  currency           String            @default("EUR") @db.Char(3)
+  suggestedTaxCode   String?           @map("suggested_tax_code") @db.VarChar(80)
+  revenueAccountCode String?           @map("revenue_account_code") @db.VarChar(20)
+  expenseAccountCode String?           @map("expense_account_code") @db.VarChar(20)
+  trackInventory     Boolean           @default(false) @map("track_inventory")
+  status             CatalogItemStatus @default(ACTIVE)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company            Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  quoteLines         QuoteLine[]
+
   @@unique([companyId, sku])
   @@index([companyId, status, name])
   @@map("catalog_items")
 }
 
 model Contact {
-  id             String        @id @default(uuid()) @db.Uuid
-  organizationId String        @map("organization_id") @db.Uuid
-  companyId      String        @map("company_id") @db.Uuid
-  legalName      String        @map("legal_name") @db.VarChar(240)
-  tradeName      String?       @map("trade_name") @db.VarChar(240)
-  taxId          String?       @map("tax_id") @db.VarChar(40)
-  email          String?       @db.VarChar(320)
-  phone          String?       @db.VarChar(40)
-  paymentTermsDays Int?        @map("payment_terms_days")
-  paymentMethod  PaymentMethod? @map("payment_method")
-  isCustomer     Boolean       @default(false) @map("is_customer")
-  isSupplier     Boolean       @default(false) @map("is_supplier")
-  status         ContactStatus @default(ACTIVE)
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company        Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  addresses      ContactAddress[]
-  quotes         Quote[]
+  id               String           @id @default(uuid()) @db.Uuid
+  organizationId   String           @map("organization_id") @db.Uuid
+  companyId        String           @map("company_id") @db.Uuid
+  legalName        String           @map("legal_name") @db.VarChar(240)
+  tradeName        String?          @map("trade_name") @db.VarChar(240)
+  taxId            String?          @map("tax_id") @db.VarChar(40)
+  email            String?          @db.VarChar(320)
+  phone            String?          @db.VarChar(40)
+  paymentTermsDays Int?             @map("payment_terms_days")
+  paymentMethod    PaymentMethod?   @map("payment_method")
+  isCustomer       Boolean          @default(false) @map("is_customer")
+  isSupplier       Boolean          @default(false) @map("is_supplier")
+  status           ContactStatus    @default(ACTIVE)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company          Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  addresses        ContactAddress[]
+  quotes           Quote[]
+
   @@unique([companyId, taxId])
   @@index([companyId, status, legalName])
   @@map("contacts")
 }
 
 model Quote {
-  id             String      @id @default(uuid()) @db.Uuid
-  organizationId String      @map("organization_id") @db.Uuid
-  companyId      String      @map("company_id") @db.Uuid
-  contactId      String      @map("contact_id") @db.Uuid
-  code           String      @default(cuid()) @db.VarChar(40)
-  status         QuoteStatus @default(DRAFT)
-  issueDate      DateTime    @map("issue_date") @db.Date
-  validUntil     DateTime?   @map("valid_until") @db.Date
-  currency       String      @default("EUR") @db.Char(3)
-  notes          String?
-  subtotal       Decimal     @db.Decimal(14, 2)
-  discountTotal  Decimal     @map("discount_total") @db.Decimal(14, 2)
-  taxTotal       Decimal     @map("tax_total") @db.Decimal(14, 2)
-  total          Decimal     @db.Decimal(14, 2)
-  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company        Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  contact        Contact     @relation(fields: [contactId], references: [id], onDelete: Restrict)
-  lines          QuoteLine[]
+  id                String       @id @default(uuid()) @db.Uuid
+  organizationId    String       @map("organization_id") @db.Uuid
+  companyId         String       @map("company_id") @db.Uuid
+  contactId         String       @map("contact_id") @db.Uuid
+  customerLegalName String       @map("customer_legal_name") @db.VarChar(240)
+  customerTaxId     String?      @map("customer_tax_id") @db.VarChar(40)
+  billingAddress    Json?        @map("billing_address")
+  code              String       @default(cuid()) @db.VarChar(40)
+  status            QuoteStatus  @default(DRAFT)
+  issueDate         DateTime     @map("issue_date") @db.Date
+  validUntil        DateTime?    @map("valid_until") @db.Date
+  currency          String       @default("EUR") @db.Char(3)
+  notes             String?
+  subtotal          Decimal      @db.Decimal(14, 2)
+  discountTotal     Decimal      @map("discount_total") @db.Decimal(14, 2)
+  taxTotal          Decimal      @map("tax_total") @db.Decimal(14, 2)
+  total             Decimal      @db.Decimal(14, 2)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  contact           Contact      @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  lines             QuoteLine[]
+
   @@unique([companyId, code])
   @@index([companyId, status, issueDate])
   @@map("quotes")
 }
 
 model QuoteLine {
-  id            String    @id @default(uuid()) @db.Uuid
-  quoteId       String    @map("quote_id") @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  companyId     String    @map("company_id") @db.Uuid
-  position      Int
-  catalogItemId String?   @map("catalog_item_id") @db.Uuid
-  description   String
-  quantity      Decimal   @db.Decimal(14, 3)
-  unitPrice     Decimal   @map("unit_price") @db.Decimal(14, 2)
-  discountPct   Decimal   @default(0) @map("discount_pct") @db.Decimal(5, 2)
-  taxRate       Decimal   @default(0) @map("tax_rate") @db.Decimal(5, 2)
-  netAmount     Decimal   @map("net_amount") @db.Decimal(14, 2)
-  taxAmount     Decimal   @map("tax_amount") @db.Decimal(14, 2)
-  totalAmount   Decimal   @map("total_amount") @db.Decimal(14, 2)
-  quote         Quote     @relation(fields: [quoteId], references: [id], onDelete: Restrict)
-  catalogItem   CatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
+  id             String       @id @default(uuid()) @db.Uuid
+  quoteId        String       @map("quote_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  companyId      String       @map("company_id") @db.Uuid
+  position       Int
+  catalogItemId  String?      @map("catalog_item_id") @db.Uuid
+  description    String
+  quantity       Decimal      @db.Decimal(14, 3)
+  unitPrice      Decimal      @map("unit_price") @db.Decimal(14, 2)
+  discountPct    Decimal      @default(0) @map("discount_pct") @db.Decimal(5, 2)
+  taxRate        Decimal      @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  netAmount      Decimal      @map("net_amount") @db.Decimal(14, 2)
+  taxAmount      Decimal      @map("tax_amount") @db.Decimal(14, 2)
+  totalAmount    Decimal      @map("total_amount") @db.Decimal(14, 2)
+  quote          Quote        @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  catalogItem    CatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
+
   @@unique([quoteId, position])
   @@map("quote_lines")
 }
 
 model ContactAddress {
-  id             String      @id @default(uuid()) @db.Uuid
-  organizationId String      @map("organization_id") @db.Uuid
-  companyId      String      @map("company_id") @db.Uuid
-  contactId      String      @map("contact_id") @db.Uuid
-  type           AddressType @default(BILLING)
-  label          String?     @db.VarChar(120)
-  line1          String      @db.VarChar(240)
-  line2          String?     @db.VarChar(240)
-  postalCode     String      @map("postal_code") @db.VarChar(20)
-  city           String      @db.VarChar(120)
-  province       String?     @db.VarChar(120)
-  country        String      @default("ES") @db.Char(2)
-  isDefault      Boolean     @default(false) @map("is_default")
-  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
-  archivedAt     DateTime?   @map("archived_at") @db.Timestamptz(6)
-  contact        Contact     @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  companyId      String       @map("company_id") @db.Uuid
+  contactId      String       @map("contact_id") @db.Uuid
+  type           AddressType  @default(BILLING)
+  label          String?      @db.VarChar(120)
+  line1          String       @db.VarChar(240)
+  line2          String?      @db.VarChar(240)
+  postalCode     String       @map("postal_code") @db.VarChar(20)
+  city           String       @db.VarChar(120)
+  province       String?      @db.VarChar(120)
+  country        String       @default("ES") @db.Char(2)
+  isDefault      Boolean      @default(false) @map("is_default")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt     DateTime?    @map("archived_at") @db.Timestamptz(6)
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Restrict)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company        Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
   @@index([companyId, contactId, archivedAt])
   @@map("contact_addresses")
 }
@@ -228,6 +238,7 @@ model User {
   memberships  Membership[]
   auditEvents  AuditEvent[] @relation("actor_audit_events")
   sessions     Session[]
+
   @@map("users")
 }
 
@@ -235,22 +246,25 @@ model Session {
   id           String        @id @default(uuid()) @db.Uuid
   userId       String        @map("user_id") @db.Uuid
   refreshHash  String        @map("refresh_hash")
+  tokenVersion Int           @default(0) @map("token_version")
   status       SessionStatus @default(ACTIVE)
   expiresAt    DateTime      @map("expires_at") @db.Timestamptz(6)
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   lastUsedAt   DateTime?     @map("last_used_at") @db.Timestamptz(6)
   revokedAt    DateTime?     @map("revoked_at") @db.Timestamptz(6)
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, status])
   @@map("sessions")
 }
 
 model Role {
-  id          String       @id @default(uuid()) @db.Uuid
-  code        String       @unique @db.VarChar(80)
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique @db.VarChar(80)
   name        String
   memberships Membership[]
   permissions RolePermission[]
+
   @@map("roles")
 }
 
@@ -259,6 +273,7 @@ model Permission {
   code  String           @unique @db.VarChar(120)
   name  String
   roles RolePermission[]
+
   @@map("permissions")
 }
 
@@ -267,6 +282,7 @@ model RolePermission {
   permissionId String     @map("permission_id") @db.Uuid
   role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
   @@id([roleId, permissionId])
   @@map("role_permissions")
 }
@@ -282,6 +298,7 @@ model Membership {
   company        Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   role           Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
   @@unique([organizationId, companyId, userId, roleId])
   @@index([userId, organizationId, companyId])
   @@map("memberships")
@@ -300,6 +317,7 @@ model AuditEvent {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company        Company?     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   actor          User?        @relation("actor_audit_events", fields: [actorUserId], references: [id], onDelete: SetNull)
+
   @@index([organizationId, companyId, occurredAt])
   @@map("audit_events")
 }
