@@ -14,6 +14,7 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
 import { PlatformModule } from "./platform/platform.module";
 import { validateConfiguration } from "./configuration";
+import { InvoicesModule } from "./invoices/invoices.module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { validateConfiguration } from "./configuration";
     ContactsModule,
     CatalogModule,
     QuotesModule,
+    InvoicesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

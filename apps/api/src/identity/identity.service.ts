@@ -52,6 +52,14 @@ export class IdentityService {
           ["quote.create", "Create quotations"],
           ["quote.update", "Update quotations"],
           ["quote.change_status", "Change quotation status"],
+          ["document_sequence.read", "Read document sequences"],
+          ["document_sequence.manage", "Manage document sequences"],
+          ["invoice.read", "Read invoices"],
+          ["invoice.create", "Create invoice drafts"],
+          ["invoice.update", "Update invoice drafts"],
+          ["invoice.delete", "Delete invoice drafts"],
+          ["invoice.issue", "Issue invoices"],
+          ["invoice.send", "Send invoices"],
         ].map(([code, name]) =>
           tx.permission.upsert({
             where: { code },

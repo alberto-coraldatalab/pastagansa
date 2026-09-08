@@ -69,6 +69,7 @@ describe("platform integrity", () => {
       .post("/v1/contacts")
       .send({
         legalName: "Customer A",
+        email: "billing-a@example.com",
         isCustomer: true,
         isSupplier: false,
         paymentTermsDays: 30,
@@ -112,6 +113,40 @@ describe("platform integrity", () => {
       .expect(200);
     expect(Buffer.isBuffer(quotePdf.body)).toBe(true);
     expect(quotePdf.body.subarray(0, 5).toString()).toBe("%PDF-");
+
+    const sequence = await authed(accountA.accessToken, tenantA)
+      .post("/v1/document-sequences")
+      .send({ documentType: "INVOICE", series: "F2026", padding: 5 })
+      .expect(201);
+    expect(sequence.body.nextNumber).toBe("1");
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/document-sequences")
+      .send({ documentType: "INVOICE", series: "F2026" })
+      .expect(409);
+
+    const invoiceDraft = await authed(accountA.accessToken, tenantA)
+      .post("/v1/invoices")
+      .send(invoice(contactA.body.id))
+      .expect(201);
+    expect(invoiceDraft.body.status).toBe("DRAFT");
+    expect(invoiceDraft.body.number).toBeNull();
+    expect(invoiceDraft.body.customerEmail).toBe("billing-a@example.com");
+    expect(invoiceDraft.body.total).toBe("121");
+    await authed(accountB.accessToken, tenantB)
+      .get(`/v1/invoices/${invoiceDraft.body.id}`)
+      .expect(404);
+    const updatedInvoice = await authed(accountA.accessToken, tenantA)
+      .patch(`/v1/invoices/${invoiceDraft.body.id}`)
+      .send({ ...invoice(contactA.body.id), notes: "Updated draft" })
+      .expect(200);
+    expect(updatedInvoice.body.notes).toBe("Updated draft");
+    const disposableInvoice = await authed(accountA.accessToken, tenantA)
+      .post("/v1/invoices")
+      .send(invoice(contactA.body.id))
+      .expect(201);
+    await authed(accountA.accessToken, tenantA)
+      .delete(`/v1/invoices/${disposableInvoice.body.id}`)
+      .expect(204);
 
     const transitions = await Promise.all([
       authed(accountA.accessToken, tenantA)
@@ -193,6 +228,7 @@ describe("platform integrity", () => {
       get: (path: string) => apply(request(app.getHttpServer()).get(path)),
       post: (path: string) => apply(request(app.getHttpServer()).post(path)),
       patch: (path: string) => apply(request(app.getHttpServer()).patch(path)),
+      delete: (path: string) => apply(request(app.getHttpServer()).delete(path)),
     };
   }
   function quote(contactId: string, catalogItemId?: string) {
@@ -204,6 +240,22 @@ describe("platform integrity", () => {
       lines: [
         {
           ...(catalogItemId ? { catalogItemId } : {}),
+          description: "Consulting",
+          quantity: 1,
+          unitPrice: 100,
+          taxRate: 21,
+        },
+      ],
+    };
+  }
+  function invoice(contactId: string) {
+    return {
+      contactId,
+      issueDate: "2026-09-08",
+      dueDate: "2026-10-08",
+      currency: "EUR",
+      lines: [
+        {
           description: "Consulting",
           quantity: 1,
           unitPrice: 100,
