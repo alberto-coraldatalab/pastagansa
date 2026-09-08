@@ -1,0 +1,1880 @@
+# Plan de implementación
+## ERP SaaS de gestión, contabilidad y fiscalidad para España
+
+**Versión:** 1.0  
+**Fecha de referencia:** 8 de septiembre de 2026  
+**Unidad de planificación:** sprints de 2 semanas  
+**Objetivo:** entregar un P0 comercial con núcleo de facturación, contabilidad, IVA/IRPF, libros, modelos principales, bancos y SIF/VERI*FACTU, con arquitectura preparada para crecimiento.
+
+> Los tiempos se expresan como referencia de planificación y dependen del tamaño, experiencia y dedicación del equipo. La prioridad del plan es el orden de dependencias y los criterios de calidad, no prometer una fecha fija.
+
+---
+
+# 1. Objetivos del programa
+
+1. Construir un ERP multiempresa.
+2. Conseguir flujo completo de venta y compra.
+3. Automatizar contabilidad.
+4. Implementar motor fiscal español.
+5. Generar libros y modelos principales.
+6. Integrar tesorería.
+7. Adaptar el sistema a SIF/VERI*FACTU.
+8. Tener auditoría y seguridad suficientes para producción.
+9. Pilotar con empresas reales.
+10. Preparar extensiones CRM, proyectos, inventario y e-factura.
+
+---
+
+# 2. Principio de entrega
+
+No desarrollar “pantallas aisladas”.
+
+Cada vertical se entrega de extremo a extremo:
+
+```text
+UI
+→ API
+→ dominio
+→ persistencia
+→ auditoría
+→ tests
+```
+
+Y si tiene impacto fiscal:
+
+```text
+documento
+→ Tax Ledger
+→ asiento
+→ libro
+→ modelo
+```
+
+---
+
+# 3. Equipo de referencia
+
+Equipo recomendable para P0:
+
+## Producto
+
+- 1 Product Manager / Product Owner.
+
+## Ingeniería
+
+- 1 Tech Lead / arquitecto;
+- 2 backend senior;
+- 1 backend/full-stack;
+- 2 frontend/full-stack;
+- 1 QA automation.
+
+## Especialistas
+
+- 0,5–1 DevOps/SRE;
+- 0,5 UX/UI;
+- asesor contable/fiscal recurrente;
+- apoyo legal/protección de datos;
+- especialista seguridad en hitos.
+
+Un equipo más pequeño puede ejecutar el plan, pero deberá reducir alcance o aumentar el número de sprints.
+
+---
+
+# 4. Gobernanza
+
+## 4.1 Comité semanal de producto
+
+Revisa:
+
+- alcance;
+- bloqueos;
+- decisiones;
+- riesgos;
+- métricas.
+
+## 4.2 Revisión fiscal quincenal
+
+Participantes:
+
+- product;
+- backend;
+- contable/fiscal.
+
+Revisar:
+
+- casos nuevos;
+- cambios normativos;
+- fixtures;
+- modelos;
+- SIF.
+
+## 4.3 Arquitectura
+
+Toda decisión estructural relevante crea ADR.
+
+---
+
+# 5. Herramientas de proyecto
+
+Recomendación:
+
+- GitHub/GitLab;
+- CI/CD;
+- issue tracker;
+- documentación versionada;
+- ADRs en repo;
+- OpenAPI;
+- Sentry;
+- OpenTelemetry;
+- dashboard de métricas;
+- feature flags.
+
+---
+
+# 6. Convención de backlog
+
+Jerarquía:
+
+```text
+Initiative
+→ Epic
+→ Story
+→ Task
+```
+
+Ejemplo:
+
+```text
+INIT: Fiscalidad España
+  EPIC: IVA
+    STORY: Venta nacional 21 %
+      TASK: tax rule
+      TASK: ledger
+      TASK: accounting fixture
+      TASK: book mapping
+      TASK: 303 mapping
+```
+
+---
+
+# 7. Definition of Ready
+
+Una story entra en sprint si tiene:
+
+- objetivo;
+- actor;
+- reglas;
+- casos borde;
+- diseño UX cuando proceda;
+- impacto fiscal;
+- datos;
+- permisos;
+- criterio de aceptación;
+- dependencias.
+
+---
+
+# 8. Definition of Done
+
+Una story está terminada si:
+
+- código revisado;
+- tests;
+- permisos;
+- auditoría;
+- migración;
+- observabilidad;
+- documentación;
+- API documentada;
+- accesibilidad básica;
+- error handling;
+- aceptación producto;
+- aceptación fiscal si aplica.
+
+---
+
+# 9. Estrategia general por fases
+
+Plan de referencia:
+
+```text
+Fase 0  Descubrimiento y arquitectura
+Fase 1  Plataforma base
+Fase 2  Maestro + ventas/compras
+Fase 3  Contabilidad
+Fase 4  Motor fiscal
+Fase 5  Tesorería
+Fase 6  SIF/VERI*FACTU
+Fase 7  Reporting + declaraciones
+Fase 8  Hardening y piloto
+Fase 9  GA
+Fase 10 P1/P2
+```
+
+Varias líneas pueden solaparse, pero las dependencias del dominio deben respetarse.
+
+---
+
+# 10. Fase 0 — Descubrimiento y arquitectura
+
+**Duración de referencia:** 2 sprints.
+
+## Objetivos
+
+- cerrar alcance P0;
+- validar modelo fiscal;
+- definir arquitectura;
+- preparar repositorios;
+- crear matriz normativa.
+
+## Entregables
+
+- PRD funcional;
+- especificación técnica;
+- ADRs 001–010;
+- modelo conceptual;
+- arquitectura;
+- catálogo de permisos;
+- catálogo de eventos;
+- casos fiscales;
+- backlog inicial;
+- matriz de riesgos.
+
+## Tareas
+
+### Producto
+
+- personas;
+- journeys;
+- prioridades;
+- flujos.
+
+### Fiscal
+
+Definir fixtures para:
+
+- venta 21/10/4/0;
+- exenta;
+- no sujeta;
+- compra;
+- profesional 15/7;
+- alquiler;
+- intracomunitaria;
+- inversión sujeto pasivo;
+- rectificativa.
+
+### Técnico
+
+- repo;
+- monorepo/multirepo;
+- CI;
+- lint;
+- test;
+- Docker;
+- staging skeleton.
+
+## Gate de salida
+
+No comenzar fiscalidad sin casos de aceptación aprobados por especialista.
+
+---
+
+# 11. Fase 1 — Plataforma base
+
+**Duración:** 2–3 sprints.
+
+## Epics
+
+### Identity
+
+- registro;
+- login;
+- recuperación;
+- MFA;
+- sesiones.
+
+### Organizations
+
+- organización;
+- empresa;
+- configuración.
+
+### Permissions
+
+- roles;
+- scopes;
+- middleware.
+
+### Audit
+
+- audit log.
+
+### Files
+
+- upload;
+- object storage;
+- antivirus.
+
+### Platform
+
+- logging;
+- tracing;
+- metrics;
+- errors.
+
+## Criterios
+
+- un usuario de empresa A no accede a B;
+- tests de aislamiento;
+- auditoría;
+- backups iniciales.
+
+---
+
+# 12. Fase 2 — Maestros
+
+**Duración:** 1–2 sprints.
+
+## Contacts
+
+- CRUD;
+- NIF;
+- direcciones;
+- cliente/proveedor;
+- condiciones.
+
+## Catalog
+
+- producto;
+- servicio;
+- precio;
+- impuesto sugerido;
+- cuenta.
+
+## Import
+
+- CSV contactos;
+- CSV productos.
+
+## UX
+
+- búsqueda;
+- tablas;
+- filtros;
+- selección empresa.
+
+## Gate
+
+Datos listos para crear documentos comerciales.
+
+---
+
+# 13. Fase 3 — Ventas
+
+**Duración:** 3 sprints.
+
+## Sprint A
+
+- presupuesto;
+- líneas;
+- totales;
+- PDF;
+- estados.
+
+## Sprint B
+
+- factura borrador;
+- series;
+- numeración;
+- emisión;
+- PDF;
+- email.
+
+## Sprint C
+
+- rectificativas;
+- recurrentes;
+- vencimientos;
+- pagos manuales.
+
+## Casos de concurrencia
+
+Probar:
+
+- 100 emisiones simultáneas misma serie;
+- retry;
+- crash entre numeración y commit.
+
+## Gate
+
+Nunca debe duplicarse serie+número.
+
+---
+
+# 14. Fase 4 — Compras y gastos
+
+**Duración:** 2 sprints.
+
+## Funciones
+
+- alta manual;
+- upload;
+- documento proveedor;
+- aprobación;
+- vencimientos;
+- adjuntos.
+
+## OCR inicial
+
+- proveedor;
+- fecha;
+- número;
+- totales;
+- confianza;
+- revisión humana.
+
+## Gate
+
+Documento aprobado preparado para Tax/Accounting.
+
+---
+
+# 15. Fase 5 — Motor contable
+
+**Duración:** 3–4 sprints.
+
+## Sprint A — Foundation
+
+- accounts;
+- fiscal years;
+- journals;
+- entries;
+- lines;
+- balances.
+
+## Sprint B — Rules
+
+- accounting rules;
+- venta;
+- compra;
+- cobro;
+- pago.
+
+## Sprint C — Controls
+
+- posting;
+- reversal;
+- period lock;
+- reconcile;
+- journal/mayor.
+
+## Sprint D opcional
+
+- balance;
+- PyG;
+- cierre básico;
+- centros.
+
+## Golden cases
+
+Todos los casos deben comprobar debe=haber.
+
+## Gate
+
+- asientos posted inmutables;
+- reversión funcional;
+- periodo cerrado protegido.
+
+---
+
+# 16. Fase 6 — Motor fiscal foundation
+
+**Duración:** 4 sprints.
+
+Esta fase es núcleo del producto.
+
+## Sprint A — Tax Rules
+
+- tax profile;
+- tax rules;
+- vigencias;
+- IVA sujeto/exento/no sujeto;
+- 21/10/4/0.
+
+## Sprint B — Tax Ledger
+
+- ledger;
+- amounts;
+- emitted/received;
+- deduction date;
+- deducibilidad.
+
+## Sprint C — Withholding
+
+- practised;
+- suffered;
+- professional;
+- rental;
+- claves.
+
+## Sprint D — Special cases
+
+- intracomunitaria;
+- inversión sujeto pasivo;
+- exportación;
+- rectificativa;
+- bienes inversión foundation.
+
+## Gate
+
+Cada factura de fixture genera ledger esperado.
+
+---
+
+# 17. Fase 7 — Libros IVA/IRPF
+
+**Duración:** 2–3 sprints.
+
+## IVA
+
+- expedidas;
+- recibidas;
+- bienes inversión;
+- determinadas intracomunitarias.
+
+## IRPF
+
+- ingresos;
+- gastos;
+- bienes;
+- provisiones/suplidos.
+
+## Export
+
+- CSV;
+- XLSX;
+- formato normalizado compatible con especificación anual.
+
+## Validation
+
+Crear validador interno basado en campos requeridos.
+
+## Gate
+
+Fixtures aceptados por especialista y exportables.
+
+---
+
+# 18. Fase 8 — Modelos fiscales
+
+**Duración:** 4 sprints.
+
+## Sprint A — Framework
+
+- form version;
+- box definition;
+- expressions;
+- snapshot;
+- explainability.
+
+## Sprint B — IVA
+
+- 303;
+- validaciones;
+- reconciliación.
+
+## Sprint C — Retenciones
+
+- 111;
+- 115;
+- 180;
+- 190.
+
+## Sprint D — Autónomos y terceros
+
+- 130;
+- 347;
+- 349.
+
+## Principio
+
+No crear un controller distinto con reglas hardcodeadas para cada año.
+
+## Gate
+
+Cada casilla puede explicar qué registros la componen.
+
+---
+
+# 19. Fase 9 — Tesorería
+
+**Duración:** 2–3 sprints.
+
+## Sprint A
+
+- cuentas;
+- import CSV;
+- Norma 43;
+- transacciones.
+
+## Sprint B
+
+- pagos/cobros;
+- matching;
+- conciliación.
+
+## Sprint C
+
+- proveedor Open Banking inicial;
+- sync;
+- errores;
+- reconexión.
+
+## Gate
+
+No crear IVA desde extracto.
+
+---
+
+# 20. Fase 10 — SIF/VERI*FACTU
+
+**Duración:** 3–4 sprints más validación.
+
+## Sprint A — Modelo
+
+- SIF record;
+- alta;
+- anulación;
+- cadena;
+- versioning.
+
+## Sprint B — QR/huella
+
+- hash según especificación;
+- QR;
+- factura visual;
+- fixtures.
+
+## Sprint C — VERI*FACTU
+
+- sender;
+- batching;
+- response;
+- retry;
+- queue;
+- monitoring.
+
+## Sprint D — Compliance
+
+- declaración responsable;
+- UI de estado;
+- errores;
+- runbook;
+- auditoría.
+
+## Gate
+
+Validación contra documentación técnica y entorno de pruebas disponible.
+
+---
+
+# 21. Fase 11 — Reporting y dashboards
+
+**Duración:** 2 sprints.
+
+## Reporting
+
+- ventas;
+- compras;
+- tesorería;
+- diario;
+- mayor;
+- balance;
+- PyG;
+- IVA;
+- retenciones.
+
+## Dashboard
+
+- KPIs;
+- alertas;
+- drilldown.
+
+No ejecutar agregaciones costosas sin optimización.
+
+---
+
+# 22. Fase 12 — API y webhooks
+
+**Duración:** 1–2 sprints.
+
+## API
+
+- OAuth/API keys;
+- OpenAPI;
+- contacts;
+- products;
+- invoices;
+- payments.
+
+## Webhooks
+
+- firma;
+- retries;
+- logs;
+- portal developer.
+
+## Gate
+
+Security review.
+
+---
+
+# 23. Fase 13 — Hardening
+
+**Duración:** 2–3 sprints.
+
+## Seguridad
+
+- pentest;
+- tenant review;
+- authorization tests;
+- secret review.
+
+## Performance
+
+- carga;
+- concurrency;
+- DB indexes;
+- reporting.
+
+## Reliability
+
+- restore test;
+- failover;
+- queue recovery;
+- AEAT outage simulation.
+
+## UX
+
+- accessibility;
+- keyboard;
+- error messages.
+
+---
+
+# 24. Fase 14 — Migración piloto
+
+**Duración:** 2–3 sprints.
+
+Seleccionar cohortes:
+
+1. autónomo profesional;
+2. pyme servicios;
+3. pyme con compras/ventas;
+4. asesoría con varias empresas.
+
+## Migrar
+
+- contactos;
+- productos;
+- facturas abiertas;
+- saldos;
+- plan;
+- asientos de apertura;
+- bancos.
+
+No intentar migrar todo histórico si no aporta valor; definir estrategia por cliente.
+
+---
+
+# 25. Pilot checklist
+
+Por empresa:
+
+- NIF;
+- perfil fiscal;
+- series;
+- saldo de apertura;
+- impuestos;
+- banco;
+- usuarios;
+- permisos;
+- documentos;
+- libro;
+- conciliación;
+- modelo paralelo.
+
+Ejecutar al menos un cierre paralelo contra el sistema anterior/asesoría.
+
+---
+
+# 26. Parallel run
+
+Durante piloto fiscal:
+
+```text
+Nuevo ERP
+vs
+sistema/asesoría existente
+```
+
+Comparar:
+
+- ventas;
+- bases;
+- IVA;
+- retenciones;
+- asientos;
+- balances;
+- modelos.
+
+Toda diferencia requiere clasificación:
+
+- bug;
+- dato migrado;
+- criterio;
+- redondeo;
+- configuración.
+
+---
+
+# 27. GA — criterios de lanzamiento
+
+No lanzar GA si falta alguno de los críticos:
+
+## Producto
+
+- flujo venta;
+- compra;
+- banco;
+- contabilidad;
+- fiscal.
+
+## Fiscal
+
+- golden suite;
+- revisión externa;
+- SIF válido;
+- libros;
+- modelos.
+
+## Seguridad
+
+- pentest sin críticos;
+- MFA;
+- audit;
+- backups.
+
+## Operaciones
+
+- monitoring;
+- alertas;
+- runbooks;
+- soporte;
+- incident response.
+
+---
+
+# 28. Backlog P0 por prioridad
+
+## P0.0 — Crítico
+
+- tenant isolation;
+- auth;
+- invoice issuance;
+- numbering;
+- Tax Ledger;
+- accounting;
+- audit;
+- SIF.
+
+## P0.1
+
+- purchases;
+- banks;
+- 303;
+- 111;
+- 115;
+- 130;
+- books.
+
+## P0.2
+
+- 180;
+- 190;
+- 347;
+- 349;
+- recurring;
+- OCR.
+
+## P0.3
+
+- polish;
+- analytics;
+- API.
+
+---
+
+# 29. Matriz de dependencias
+
+```text
+Identity
+  ↓
+Company
+  ↓
+Contacts/Catalog
+  ↓
+Sales/Purchases
+  ├───────────┐
+  ↓           ↓
+Tax Rules   Accounting Foundation
+  ↓           ↓
+Tax Ledger  Accounting Rules
+  └─────┬─────┘
+        ↓
+     Books
+        ↓
+     Forms
+```
+
+SIF depende de factura estable, pero puede desarrollarse en paralelo al motor de modelos.
+
+---
+
+# 30. Casos fiscales mínimos de aceptación
+
+## IVA nacional
+
+1. Venta 21 %.
+2. Venta 10 %.
+3. Venta 4 %.
+4. Venta 0 %.
+5. Exenta.
+6. No sujeta.
+7. Compra 21 %.
+8. IVA 50 % deducible.
+9. Rectificativa.
+
+## Intracomunitario
+
+10. Adquisición de bienes.
+11. Servicio recibido.
+12. Entrega.
+13. Servicio prestado.
+
+## Otros
+
+14. Inversión sujeto pasivo.
+15. Exportación.
+16. Importación base.
+
+## Retenciones
+
+17. Profesional 15 %.
+18. Profesional 7 % cuando aplique.
+19. Alquiler.
+20. Retención soportada.
+
+Cada caso incluye:
+
+```text
+document
+tax ledger
+journal
+book
+form
+```
+
+---
+
+# 31. Caso de prueba detallado — profesional
+
+Entrada:
+
+```text
+Proveedor profesional
+Base: 1.000
+IVA: 21 %
+Retención: 15 %
+```
+
+Esperado:
+
+```text
+IVA: 210
+Retención: 150
+Pago: 1.060
+```
+
+Asiento:
+
+```text
+623  1.000 D
+472    210 D
+410          1.060 H
+4751           150 H
+```
+
+Fiscal:
+
+- libro recibidas;
+- cuota soportada/deducible según configuración;
+- 303;
+- 111;
+- 190.
+
+---
+
+# 32. Caso — autónomo emisor con retención
+
+Entrada:
+
+```text
+Base: 1.000
+IVA: 210
+Retención soportada: 150
+Cobro: 1.060
+```
+
+Esperado:
+
+- ingreso IRPF: 1.000;
+- IVA devengado: 210;
+- retención soportada: 150;
+- libro ingresos;
+- 303;
+- datos para 130;
+- saldo cliente/cobro.
+
+---
+
+# 33. Caso — adquisición intracomunitaria
+
+Base:
+
+```text
+1.000
+```
+
+Efecto:
+
+- proveedor 1.000;
+- IVA devengado 210;
+- IVA soportado 210;
+- deducible según derecho;
+- 303;
+- 349 si corresponde;
+- libro.
+
+---
+
+# 34. Casos de fallo
+
+Probar explícitamente:
+
+- NIF inválido;
+- serie cerrada;
+- periodo bloqueado;
+- regla fiscal sin vigencia;
+- factura con total inconsistente;
+- asiento no equilibrado;
+- SIF chain corrupta;
+- webhook duplicado;
+- bank transaction duplicada;
+- import duplicate;
+- cross-tenant IDOR.
+
+---
+
+# 35. Estrategia de automatización QA
+
+Pirámide:
+
+```text
+muchos unit
+muchos integration
+golden fiscal
+menos E2E
+security/performance
+```
+
+Pipeline bloquea merge si falla fixture fiscal crítico.
+
+---
+
+# 36. Gestión del cambio normativo
+
+Proceso:
+
+```text
+Nueva norma/cambio AEAT
+→ issue compliance
+→ análisis
+→ fecha efectiva
+→ nueva rule version
+→ fixtures
+→ migration si procede
+→ release notes
+→ despliegue
+```
+
+Nunca alterar registros históricos para adoptar norma futura.
+
+---
+
+# 37. Calendario de revisión normativa
+
+## Mensual
+
+- AEAT;
+- BOE;
+- incidencias técnicas.
+
+## Antes de cada campaña/año
+
+- retenciones;
+- 303;
+- modelos;
+- libros;
+- SII;
+- algoritmos.
+
+## Antes de release fiscal
+
+- revisión externa.
+
+---
+
+# 38. Estrategia de ramas/releases
+
+Recomendación trunk-based.
+
+Releases frecuentes.
+
+Versionado:
+
+```text
+application version
+tax rules package version
+SIF adapter version
+```
+
+Permitir saber exactamente con qué lógica se creó cada registro.
+
+---
+
+# 39. Feature flags
+
+Usos:
+
+- beta;
+- nuevos modelos;
+- piloto SII;
+- banco;
+- e-invoice.
+
+Activar por empresa.
+
+---
+
+# 40. Migraciones de datos
+
+Fases:
+
+1. extract;
+2. normalize;
+3. map;
+4. validate;
+5. dry-run;
+6. reconcile;
+7. production import;
+8. sign-off.
+
+Crear reporte:
+
+```text
+source count
+imported count
+rejected count
+warnings
+financial totals
+```
+
+---
+
+# 41. Integridad de migración contable
+
+Comparar antes/después:
+
+- saldo clientes;
+- proveedores;
+- bancos;
+- IVA;
+- retenciones;
+- balance;
+- PyG si se migra ejercicio.
+
+No basta con comparar número de filas.
+
+---
+
+# 42. Observabilidad desde primera fase
+
+Dashboards:
+
+- app errors;
+- DB;
+- queue;
+- auth;
+- invoices;
+- SIF;
+- bank;
+- fiscal calculations.
+
+Alertas de negocio:
+
+- secuencia fallida;
+- emisión bloqueada;
+- diferencia contable;
+- fallo SIF.
+
+---
+
+# 43. Soporte operativo
+
+Niveles:
+
+## L1
+
+- usuario;
+- configuración;
+- imports.
+
+## L2
+
+- contabilidad/fiscal;
+- integraciones.
+
+## L3
+
+- ingeniería;
+- defectos;
+- datos.
+
+Crear herramienta interna de diagnóstico sin permitir edición destructiva.
+
+---
+
+# 44. Runbooks esenciales
+
+1. factura emitida con error detectado;
+2. rectificación;
+3. fallo de AEAT;
+4. SIF queue bloqueada;
+5. importación fallida;
+6. conciliación incorrecta;
+7. reapertura;
+8. restore;
+9. acceso comprometido;
+10. proveedor bancario caído.
+
+---
+
+# 45. Seguridad — hitos
+
+## Pre-pilot
+
+- threat model;
+- code scanning;
+- tenant tests.
+
+## Pre-GA
+
+- pentest externo;
+- remediation;
+- incident drill.
+
+## Post-GA
+
+- vulnerabilidades;
+- rotación;
+- revisiones periódicas.
+
+---
+
+# 46. Modelo de amenazas prioritario
+
+Activos:
+
+- datos fiscales;
+- facturas;
+- asientos;
+- certificados;
+- bancos;
+- usuarios.
+
+Amenazas:
+
+- IDOR;
+- account takeover;
+- ransomware;
+- secrets leak;
+- malicious upload;
+- fraudulent invoice edits;
+- internal misuse.
+
+Controles explícitos para cada uno.
+
+---
+
+# 47. Plan de performance
+
+## Fase piloto
+
+Dataset sintético:
+
+- 100 empresas;
+- 100k documentos.
+
+## Pre-GA
+
+- 10k empresas simuladas;
+- tenant grande;
+- concurrencia emisión.
+
+## Post-GA
+
+basado en telemetría.
+
+---
+
+# 48. Índices iniciales críticos
+
+Analizar:
+
+- invoices(company_id, issue_date);
+- invoices(company_id, series, number);
+- tax_ledger(company_id, tax_point_date);
+- journal_entries(company_id, entry_date);
+- bank_transactions(company_id, date);
+- contacts(company_id, tax_id).
+
+Revisar mediante EXPLAIN real.
+
+---
+
+# 49. Plan P1
+
+Tras estabilizar P0:
+
+## Contabilidad
+
+- activos avanzados;
+- amortizaciones;
+- cierres;
+- cuentas anuales.
+
+## Fiscal
+
+- SII;
+- prorrata;
+- bienes inversión;
+- criterio caja;
+- regímenes;
+- 390;
+- IS.
+
+## Producto
+
+- inventario;
+- CRM;
+- proyectos;
+- portal.
+
+## Integraciones
+
+- e-factura;
+- e-commerce;
+- más bancos.
+
+---
+
+# 50. Plan P2
+
+- RR. HH./nómina;
+- TPV;
+- fabricación;
+- IGIC;
+- IPSI;
+- forales;
+- BI;
+- marketplace;
+- automatización avanzada;
+- mobile.
+
+---
+
+# 51. Riesgos del programa
+
+| Riesgo | Probabilidad | Impacto | Acción |
+|---|---|---|---|
+| Alcance excesivo | Alta | Alto | P0 estricto |
+| Error fiscal | Media | Crítico | golden tests + revisión |
+| Cambio normativo | Alta | Alto | versionado |
+| SIF tardío | Media | Crítico | iniciar en paralelo |
+| Falta experto contable | Media | Alto | contratación temprana |
+| Migraciones | Alta | Alto | dry-runs |
+| Multi-tenancy defectuoso | Baja/media | Crítico | tests + RLS |
+| UX contable lenta | Media | Alto | usuarios piloto |
+| Vendor banking | Media | Medio | adapter |
+| OCR sobreconfiado | Media | Medio | human review |
+
+---
+
+# 52. Registro de decisiones
+
+Cada ADR debe incluir:
+
+- contexto;
+- decisión;
+- alternativas;
+- consecuencias;
+- fecha;
+- owner.
+
+No depender de conocimiento oral del equipo.
+
+---
+
+# 53. Documentación entregable por fase
+
+## Producto
+
+- stories;
+- journeys;
+- criteria.
+
+## Técnico
+
+- OpenAPI;
+- schema;
+- ADR;
+- runbook.
+
+## Fiscal
+
+- regla;
+- referencia;
+- fixture;
+- mapping.
+
+## QA
+
+- tests;
+- evidence.
+
+---
+
+# 54. KPIs de delivery
+
+- lead time;
+- deploy frequency;
+- escaped defects;
+- fiscal defect count;
+- flaky tests;
+- MTTR;
+- sprint predictability;
+- code review latency.
+
+---
+
+# 55. KPIs de calidad fiscal
+
+- diferencias 303;
+- diferencias 111/190;
+- diferencias 115/180;
+- documentos sin clasificación;
+- ledger exceptions;
+- SIF rejects;
+- libros con validaciones fallidas.
+
+Objetivo: cero diferencias inexplicadas.
+
+---
+
+# 56. KPIs de producto post-GA
+
+- activación;
+- tiempo hasta primera factura;
+- conciliación automática;
+- tiempo cierre;
+- retención;
+- churn;
+- soporte;
+- NPS/CSAT;
+- documentos por empresa.
+
+---
+
+# 57. Acceptance gate fiscal
+
+Un release que modifica impuestos requiere:
+
+1. referencia normativa;
+2. regla versionada;
+3. test;
+4. comparación;
+5. code review;
+6. review fiscal;
+7. staging;
+8. release notes.
+
+---
+
+# 58. Acceptance gate SIF
+
+Requiere:
+
+- estructura;
+- hash/chain;
+- QR;
+- alta/anulación;
+- sender;
+- retries;
+- audit;
+- declaración responsable;
+- pruebas de proveedor/AEAT según medios disponibles;
+- revisión de especificación vigente.
+
+---
+
+# 59. Go-live checklist
+
+## Plataforma
+
+- [ ] producción creada;
+- [ ] backups;
+- [ ] restore probado;
+- [ ] monitoring;
+- [ ] alerts.
+
+## Seguridad
+
+- [ ] MFA;
+- [ ] secrets;
+- [ ] pentest;
+- [ ] roles;
+- [ ] audit.
+
+## Producto
+
+- [ ] onboarding;
+- [ ] invoices;
+- [ ] purchases;
+- [ ] banking.
+
+## Contabilidad
+
+- [ ] PGC;
+- [ ] diario;
+- [ ] mayor;
+- [ ] balance.
+
+## Fiscal
+
+- [ ] tax rules;
+- [ ] books;
+- [ ] 303;
+- [ ] 111/115/130;
+- [ ] annual information models;
+- [ ] SIF.
+
+## Operaciones
+
+- [ ] support;
+- [ ] runbooks;
+- [ ] status page/process;
+- [ ] incident contacts.
+
+---
+
+# 60. Plan de piloto recomendado
+
+Cohorte inicial:
+
+- 5–10 autónomos;
+- 5–10 pymes de servicios;
+- 2–3 asesorías;
+- evitar al principio operaciones extremadamente especiales.
+
+Duración basada en al menos:
+
+- un ciclo completo de facturación;
+- una conciliación;
+- un cierre fiscal paralelo.
+
+No usar piloto para ocultar falta de pruebas normativas.
+
+---
+
+# 61. Criterios para ampliar cohortes
+
+- cero defectos críticos;
+- diferencias fiscales explicadas;
+- tiempos aceptables;
+- soporte controlado;
+- remisiones estables;
+- migración repetible.
+
+---
+
+# 62. Estrategia de rollout
+
+```text
+internal
+→ design partners
+→ closed beta
+→ open beta / limited GA
+→ GA
+```
+
+Feature flags por empresa.
+
+---
+
+# 63. Plan de e-factura B2B
+
+Trabajo preparatorio P1:
+
+1. modelo canónico;
+2. formato/adapters;
+3. estados;
+4. recepción;
+5. interoperabilidad;
+6. plataforma pública/privada;
+7. cambios de Reglamento;
+8. calendario efectivo.
+
+No bloquear P0 si la obligación efectiva todavía requiere desarrollos normativos posteriores, pero mantener arquitectura preparada.
+
+---
+
+# 64. Gestión de deuda técnica
+
+Presupuesto por sprint:
+
+- 10–20 % en refactor/hardening según fase.
+
+No aplazar:
+
+- tenant isolation;
+- idempotencia;
+- auditoría;
+- versionado fiscal.
+
+Estos no son deuda aceptable.
+
+---
+
+# 65. Qué puede aplazarse
+
+- microservicios;
+- data warehouse;
+- app nativa;
+- IA avanzada;
+- custom BI;
+- marketplace;
+- fabricación.
+
+---
+
+# 66. Qué no debe aplazarse
+
+- correcta numeración;
+- inmutabilidad;
+- period locks;
+- audit;
+- tax versioning;
+- golden tests;
+- backup restore;
+- access control;
+- SIF en el calendario requerido.
+
+---
+
+# 67. Dependencia con expertos externos
+
+Revisiones requeridas:
+
+## Contable
+
+- PGC;
+- asientos;
+- cierres.
+
+## Fiscal
+
+- IVA;
+- IRPF;
+- modelos;
+- libros.
+
+## Legal/privacidad
+
+- RGPD;
+- contratos;
+- retención.
+
+## Seguridad
+
+- pentest;
+- threat model.
+
+La ingeniería implementa reglas; no debe inventarlas.
+
+---
+
+# 68. Matriz RACI resumida
+
+| Entregable | Product | Tech | Fiscal | QA | DevOps |
+|---|---|---|---|---|---|
+| Journey | A/R | C | C | C | I |
+| Tax rule | C | R | A | C | I |
+| Accounting rule | C | R | A | C | I |
+| SIF adapter | C | R/A | C | R | C |
+| Security | I | A/R | I | C | R |
+| Release | A | R | C | R | R |
+| Tax sign-off | I | C | A/R | C | I |
+
+---
+
+# 69. Estimación de referencia
+
+Un P0 serio como el descrito no es un “MVP de pocas pantallas”.
+
+Con un equipo experimentado de aproximadamente 7–10 personas, una planificación razonable es pensar en **varias decenas de sprints-persona y alrededor de 9–12 meses de trabajo calendario**, dependiendo de cuánto pueda paralelizarse, del grado de automatización fiscal exigido y de las integraciones.
+
+No debe comprimirse sacrificando:
+
+- pruebas;
+- seguridad;
+- integridad;
+- revisión normativa.
+
+---
+
+# 70. Hitos ejecutivos
+
+## Hito A — Platform Ready
+
+Auth + tenant + audit.
+
+## Hito B — Commercial Loop
+
+Contacto → factura → pago.
+
+## Hito C — Accounting Loop
+
+Factura → asiento → balance.
+
+## Hito D — Fiscal Loop
+
+Factura → ledger → libro → modelo.
+
+## Hito E — Treasury Loop
+
+Banco → pago → conciliación.
+
+## Hito F — SIF Ready
+
+Factura → registro → QR → remisión cuando aplique.
+
+## Hito G — Pilot Ready
+
+Hardening + migrations.
+
+## Hito H — GA
+
+Criterios de producción cumplidos.
+
+---
+
+# 71. Entregable final P0
+
+El producto debe demostrar en vivo:
+
+```text
+Cliente
+→ Presupuesto
+→ Factura
+→ SIF
+→ Asiento
+→ Cobro
+→ Banco
+→ Conciliación
+→ Libro IVA
+→ 303
+```
+
+Y:
+
+```text
+Proveedor profesional
+→ Factura recibida
+→ IVA
+→ Retención
+→ Asiento
+→ Pago
+→ Banco
+→ 303
+→ 111
+→ 190
+```
+
+Además, para autónomo:
+
+```text
+Ingreso/gasto
+→ libros IRPF
+→ retenciones soportadas
+→ 130
+```
+
+---
+
+# 72. Referencias oficiales a mantener en el proyecto
+
+- PGC: https://www.boe.es/buscar/act.php?id=BOE-A-2007-19884
+- PGC-Pymes: https://www.boe.es/buscar/act.php?id=BOE-A-2007-19966
+- Reglamento facturación: https://www.boe.es/buscar/act.php?id=BOE-A-2012-14696
+- SIF RD 1007/2023: https://www.boe.es/buscar/doc.php?id=BOE-A-2023-24840
+- Orden HAC/1177/2024: https://www.boe.es/buscar/act.php?id=BOE-A-2024-22138
+- VERI*FACTU AEAT: https://sede.agenciatributaria.gob.es/Sede/iva/sistemas-informaticos-facturacion-verifactu/preguntas-frecuentes.html
+- Libros IVA: https://sede.agenciatributaria.gob.es/Sede/iva/libros-registro.html
+- Libros electrónicos 2026: https://sede.agenciatributaria.gob.es/Sede/iva/facturacion-registro/libros-registro-iva/libro-registro-soporte-electronico.html
+- Modelo 303 2026: https://sede.agenciatributaria.gob.es/Sede/todas-gestiones/impuestos-tasas/iva/modelo-303-iva-autoliquidacion_/instrucciones-2026/instrucciones-02-12-2t-4t-2026.html
+- Obligaciones IRPF: https://sede.agenciatributaria.gob.es/Sede/irpf/Obligaciones.html
+- Retenciones 2026: https://sede.agenciatributaria.gob.es/Sede/Retenciones.shtml
+- SII: https://sede.agenciatributaria.gob.es/Sede/procedimientoini/G417.shtml
+- Factura electrónica B2B RD 238/2026: https://www.boe.es/diario_boe/txt.php?id=BOE-A-2026-7295
+
+---
+
+# 73. Conclusión
+
+La estrategia de implementación debe priorizar el núcleo de integridad por encima de la amplitud superficial de módulos.
+
+Orden correcto:
+
+```text
+Plataforma
+→ documentos
+→ contabilidad
+→ fiscalidad
+→ tesorería
+→ compliance
+→ expansión
+```
+
+Una vez estable esa base, CRM, proyectos, inventario, RR. HH., TPV y analítica avanzada pueden incorporarse sin rehacer el núcleo.

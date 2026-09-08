@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+model Organization {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  companies   Company[]
+  memberships Membership[]
+  auditEvents AuditEvent[]
+  @@map("organizations")
+}
+
+model Company {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  legalName      String       @map("legal_name")
+  taxId          String       @map("tax_id") @db.VarChar(40)
+  country        String       @default("ES") @db.Char(2)
+  baseCurrency   String       @default("EUR") @map("base_currency") @db.Char(3)
+  timezone       String       @default("Europe/Madrid") @db.VarChar(64)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships    Membership[]
+  auditEvents    AuditEvent[]
+  @@unique([organizationId, taxId])
+  @@index([organizationId])
+  @@map("companies")
+}
+
+model User {
+  id           String       @id @default(uuid()) @db.Uuid
+  email        String       @unique @db.Citext
+  passwordHash String?      @map("password_hash")
+  status       UserStatus   @default(ACTIVE)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  memberships  Membership[]
+  auditEvents  AuditEvent[] @relation("actor_audit_events")
+  @@map("users")
+}
+
+model Role {
+  id          String       @id @default(uuid()) @db.Uuid
+  code        String       @unique @db.VarChar(80)
+  name        String
+  memberships Membership[]
+  @@map("roles")
+}
+
+model Membership {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  companyId      String?          @map("company_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  roleId         String           @map("role_id") @db.Uuid
+  status         MembershipStatus @default(ACTIVE)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role           Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  @@unique([organizationId, companyId, userId, roleId])
+  @@index([userId, organizationId, companyId])
+  @@map("memberships")
+}
+
+model AuditEvent {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  companyId      String?      @map("company_id") @db.Uuid
+  actorUserId    String?      @map("actor_user_id") @db.Uuid
+  action         String       @db.VarChar(160)
+  entityType     String       @map("entity_type") @db.VarChar(100)
+  entityId       String?      @map("entity_id") @db.Uuid
+  metadata       Json         @default("{}")
+  occurredAt     DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company?     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  actor          User?        @relation("actor_audit_events", fields: [actorUserId], references: [id], onDelete: SetNull)
+  @@index([organizationId, companyId, occurredAt])
+  @@map("audit_events")
+}

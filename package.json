@@ -1,0 +1,16 @@
+{
+  "name": "pastagansa",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "npm@11.12.1",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "npm run dev --workspace=@pastagansa/api",
+    "build": "npm run build --workspace=@pastagansa/api",
+    "lint": "npm run lint --workspace=@pastagansa/api",
+    "test": "npm run test --workspace=@pastagansa/api",
+    "db:generate": "npm run db:generate --workspace=@pastagansa/api",
+    "db:migrate": "npm run db:migrate --workspace=@pastagansa/api"
+  },
+  "engines": { "node": ">=22.0.0" }
+}
