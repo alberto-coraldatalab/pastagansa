@@ -8,6 +8,11 @@ interface DecimalValue {
 export interface InvoicePdfInput {
   fullNumber: string;
   status: string;
+  documentType?: string;
+  rectificationKind?: string | null;
+  rectificationImpact?: string | null;
+  rectificationReason?: string | null;
+  originalInvoice?: { id: string; fullNumber: string | null } | null;
   issuerLegalName: string;
   issuerTaxId: string;
   customerLegalName: string;
@@ -45,12 +50,13 @@ const COLOR = {
 @Injectable()
 export class InvoicePdfService {
   async render(invoice: InvoicePdfInput): Promise<Buffer> {
+    const isRectification = invoice.documentType === "CREDIT_NOTE";
     const document = new PDFDocument({
       size: "A4",
       margins: { top: PAGE.top, right: 48, bottom: 48, left: PAGE.left },
       bufferPages: true,
       info: {
-        Title: `Factura ${invoice.fullNumber}`,
+        Title: `${isRectification ? "Factura rectificativa" : "Factura"} ${invoice.fullNumber}`,
         Author: invoice.issuerLegalName,
         Subject: `Factura para ${invoice.customerLegalName}`,
         Creator: "Pastagansa",
@@ -65,6 +71,7 @@ export class InvoicePdfService {
 
     this.header(document, invoice);
     this.parties(document, invoice);
+    if (isRectification) this.rectification(document, invoice);
     let y = this.tableHeader(document, document.y + 22);
     for (const line of invoice.lines) {
       const height = Math.max(
@@ -110,6 +117,10 @@ export class InvoicePdfService {
   }
 
   private header(document: PDFKit.PDFDocument, invoice: InvoicePdfInput) {
+    const title =
+      invoice.documentType === "CREDIT_NOTE"
+        ? "FACTURA RECTIFICATIVA"
+        : "FACTURA";
     document.roundedRect(PAGE.left, PAGE.top, 42, 42, 8).fill(COLOR.primary);
     document
       .font("Helvetica-Bold")
@@ -128,9 +139,9 @@ export class InvoicePdfService {
       .text(`NIF: ${invoice.issuerTaxId}`, 104, PAGE.top + 25);
     document
       .font("Helvetica-Bold")
-      .fontSize(21)
+      .fontSize(title.length > 12 ? 14 : 21)
       .fillColor(COLOR.primary)
-      .text("FACTURA", 360, PAGE.top, { width: 187, align: "right" });
+      .text(title, 330, PAGE.top + 2, { width: 217, align: "right" });
     document
       .font("Helvetica")
       .fontSize(10)
@@ -140,6 +151,49 @@ export class InvoicePdfService {
         align: "right",
       });
     document.y = 116;
+  }
+
+  private rectification(
+    document: PDFKit.PDFDocument,
+    invoice: InvoicePdfInput,
+  ) {
+    const top = document.y + 12;
+    const reason = invoice.rectificationReason ?? "-";
+    const height = Math.max(
+      62,
+      document.heightOfString(reason, { width: 475, lineGap: 2 }) + 42,
+    );
+    document
+      .roundedRect(PAGE.left, top, PAGE.right - PAGE.left, height, 8)
+      .strokeColor(COLOR.primary)
+      .lineWidth(1)
+      .stroke();
+    document
+      .font("Helvetica-Bold")
+      .fontSize(8)
+      .fillColor(COLOR.primary)
+      .text("RECTIFICA", PAGE.left + 14, top + 11);
+    document
+      .font("Helvetica")
+      .fontSize(8.5)
+      .fillColor(COLOR.ink)
+      .text(
+        invoice.originalInvoice?.fullNumber ?? "-",
+        PAGE.left + 82,
+        top + 10,
+      )
+      .text(
+        `${rectificationKind(invoice.rectificationKind)} · ${rectificationImpact(invoice.rectificationImpact)}`,
+        345,
+        top + 10,
+        { width: 188, align: "right" },
+      )
+      .font("Helvetica-Bold")
+      .text("Motivo", PAGE.left + 14, top + 30)
+      .font("Helvetica")
+      .fillColor(COLOR.muted)
+      .text(reason, PAGE.left + 62, top + 30, { width: 471, lineGap: 2 });
+    document.y = top + height;
   }
 
   private parties(document: PDFKit.PDFDocument, invoice: InvoicePdfInput) {
@@ -260,7 +314,7 @@ export class InvoicePdfService {
     let y = document.y;
     const rows = [
       ["Subtotal", money(invoice.subtotal, invoice.currency)],
-      ["Descuentos", `-${money(invoice.discountTotal, invoice.currency)}`],
+      ["Descuentos", discountMoney(invoice.discountTotal, invoice.currency)],
       ["IVA", money(invoice.taxTotal, invoice.currency)],
     ];
     rows.forEach(([label, value]) => {
@@ -352,6 +406,25 @@ function money(value: DecimalValue, currency: string) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(value.toString()))} ${currency}`;
+}
+
+function discountMoney(value: DecimalValue, currency: string) {
+  const formatted = money(value, currency);
+  return Number(value.toString()) === 0 ? formatted : `-${formatted}`;
+}
+
+function rectificationKind(value: string | null | undefined) {
+  return (
+    {
+      TOTAL: "Total",
+      PARTIAL: "Parcial",
+      DIFFERENCE: "Por diferencias",
+    }[value ?? ""] ?? "Rectificación"
+  );
+}
+
+function rectificationImpact(value: string | null | undefined) {
+  return value === "INCREASE" ? "Aumento" : "Disminución";
 }
 
 function addressLines(value: unknown): string[] {

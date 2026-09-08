@@ -15,6 +15,7 @@ import {
 } from "@nestjs/common";
 import { RequirePermissions } from "../authorization/permissions.decorator";
 import { TenantProtected } from "../tenancy/tenant.decorator";
+import { CreateRectificationDto } from "./dto/create-rectification.dto";
 import { CreateInvoiceDto, UpdateInvoiceDto } from "./dto/invoice.dto";
 import { ListInvoicesDto } from "./dto/list-invoices.dto";
 import { IssueInvoiceDto } from "./dto/issue-invoice.dto";
@@ -63,6 +64,15 @@ export class InvoicesController {
   @RequirePermissions("invoice.create")
   create(@Body() input: CreateInvoiceDto) {
     return this.invoices.create(input);
+  }
+
+  @Post(":id/rectifications")
+  @RequirePermissions("invoice.create")
+  createRectification(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: CreateRectificationDto,
+  ) {
+    return this.invoices.createRectification(id, input);
   }
 
   @Patch(":id")

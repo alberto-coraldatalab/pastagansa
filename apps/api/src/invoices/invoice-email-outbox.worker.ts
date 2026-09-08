@@ -124,7 +124,12 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
         return db.invoiceEmailDelivery.findUniqueOrThrow({
           where: { id: deliveryId },
           include: {
-            invoice: { include: { lines: { orderBy: { position: "asc" } } } },
+            invoice: {
+              include: {
+                lines: { orderBy: { position: "asc" } },
+                originalInvoice: { select: { id: true, fullNumber: true } },
+              },
+            },
           },
         });
       });

@@ -78,6 +78,17 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum RectificationKind {
+  TOTAL
+  PARTIAL
+  DIFFERENCE
+}
+
+enum RectificationImpact {
+  DECREASE
+  INCREASE
+}
+
 enum InvoiceEmailStatus {
   PENDING
   PROCESSING
@@ -205,46 +216,54 @@ model DocumentSequence {
 }
 
 model Invoice {
-  id                String                 @id @default(uuid()) @db.Uuid
-  organizationId    String                 @map("organization_id") @db.Uuid
-  companyId         String                 @map("company_id") @db.Uuid
-  contactId         String                 @map("contact_id") @db.Uuid
-  sequenceId        String?                @map("sequence_id") @db.Uuid
-  draftCode         String                 @default(cuid()) @map("draft_code") @db.VarChar(40)
-  series            String?                @db.VarChar(30)
-  number            BigInt?
-  fullNumber        String?                @map("full_number") @db.VarChar(80)
-  issuanceKey       String?                @map("issuance_key") @db.VarChar(128)
-  status            InvoiceStatus          @default(DRAFT)
-  issuerLegalName   String                 @map("issuer_legal_name") @db.VarChar(240)
-  issuerTaxId       String                 @map("issuer_tax_id") @db.VarChar(40)
-  customerLegalName String                 @map("customer_legal_name") @db.VarChar(240)
-  customerTaxId     String?                @map("customer_tax_id") @db.VarChar(40)
-  customerEmail     String?                @map("customer_email") @db.VarChar(320)
-  billingAddress    Json?                  @map("billing_address")
-  issueDate         DateTime               @map("issue_date") @db.Date
-  dueDate           DateTime?              @map("due_date") @db.Date
-  currency          String                 @default("EUR") @db.Char(3)
-  notes             String?
-  subtotal          Decimal                @db.Decimal(14, 2)
-  discountTotal     Decimal                @map("discount_total") @db.Decimal(14, 2)
-  taxTotal          Decimal                @map("tax_total") @db.Decimal(14, 2)
-  total             Decimal                @db.Decimal(14, 2)
-  issuedAt          DateTime?              @map("issued_at") @db.Timestamptz(6)
-  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company           Company                @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  contact           Contact                @relation(fields: [contactId], references: [id], onDelete: Restrict)
-  sequence          DocumentSequence?      @relation(fields: [sequenceId], references: [id], onDelete: Restrict)
-  lines             InvoiceLine[]
-  emailDeliveries   InvoiceEmailDelivery[]
+  id                  String                 @id @default(uuid()) @db.Uuid
+  organizationId      String                 @map("organization_id") @db.Uuid
+  companyId           String                 @map("company_id") @db.Uuid
+  contactId           String                 @map("contact_id") @db.Uuid
+  sequenceId          String?                @map("sequence_id") @db.Uuid
+  originalInvoiceId   String?                @map("original_invoice_id") @db.Uuid
+  documentType        DocumentType           @default(INVOICE) @map("document_type")
+  rectificationKind   RectificationKind?     @map("rectification_kind")
+  rectificationImpact RectificationImpact?   @map("rectification_impact")
+  rectificationReason String?                @map("rectification_reason") @db.VarChar(1000)
+  draftCode           String                 @default(cuid()) @map("draft_code") @db.VarChar(40)
+  series              String?                @db.VarChar(30)
+  number              BigInt?
+  fullNumber          String?                @map("full_number") @db.VarChar(80)
+  issuanceKey         String?                @map("issuance_key") @db.VarChar(128)
+  status              InvoiceStatus          @default(DRAFT)
+  issuerLegalName     String                 @map("issuer_legal_name") @db.VarChar(240)
+  issuerTaxId         String                 @map("issuer_tax_id") @db.VarChar(40)
+  customerLegalName   String                 @map("customer_legal_name") @db.VarChar(240)
+  customerTaxId       String?                @map("customer_tax_id") @db.VarChar(40)
+  customerEmail       String?                @map("customer_email") @db.VarChar(320)
+  billingAddress      Json?                  @map("billing_address")
+  issueDate           DateTime               @map("issue_date") @db.Date
+  dueDate             DateTime?              @map("due_date") @db.Date
+  currency            String                 @default("EUR") @db.Char(3)
+  notes               String?
+  subtotal            Decimal                @db.Decimal(14, 2)
+  discountTotal       Decimal                @map("discount_total") @db.Decimal(14, 2)
+  taxTotal            Decimal                @map("tax_total") @db.Decimal(14, 2)
+  total               Decimal                @db.Decimal(14, 2)
+  issuedAt            DateTime?              @map("issued_at") @db.Timestamptz(6)
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization        Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company             Company                @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  contact             Contact                @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  sequence            DocumentSequence?      @relation(fields: [sequenceId], references: [id], onDelete: Restrict)
+  originalInvoice     Invoice?               @relation("InvoiceRectifications", fields: [originalInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  rectifications      Invoice[]              @relation("InvoiceRectifications")
+  lines               InvoiceLine[]
+  emailDeliveries     InvoiceEmailDelivery[]
 
   @@unique([companyId, draftCode])
   @@unique([companyId, series, number])
   @@unique([companyId, issuanceKey])
   @@unique([id, organizationId, companyId])
   @@index([companyId, status, issueDate])
+  @@index([originalInvoiceId, createdAt])
   @@map("invoices")
 }
 

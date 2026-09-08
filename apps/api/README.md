@@ -31,6 +31,8 @@ Contact and catalog list endpoints return `{ data, nextCursor }`. Provide `curso
 
 `/v1/invoices` supports draft creation, atomic issuance through a company document sequence, official PDF download, and transactional email enqueueing. Issuance and email requests require an `Idempotency-Key` header. Once issued, invoice headers and lines are immutable at the database layer.
 
+`POST /v1/invoices/:id/rectifications` creates a rectifying draft linked to an issued standard invoice. Total rectifications copy the frozen original lines; partial and difference rectifications require explicit lines. Rectifications record their reason and increase/decrease impact, use a `CREDIT_NOTE` sequence at issuance, and are included in the same PDF, email, tenant, audit, idempotency, and immutability guarantees. Concurrent issuance is serialized against the original invoice so decreases cannot exceed its corrected balance.
+
 Invoice email delivery remains safely pending until SMTP is configured. Set `SMTP_HOST`, `SMTP_FROM`, and optionally `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, and `SMTP_PASSWORD`; authenticated SMTP requires both user and password. The outbox worker also requires `DIRECT_DATABASE_URL` so it can discover tenant queues before processing each delivery through an organization-scoped RLS transaction. Delivery is at-least-once and retries transient failures up to five attempts with exponential backoff.
 
 Tenant selection headers (`x-organization-id`, `x-company-id`) are never authorization. They are only candidates validated against the database membership.

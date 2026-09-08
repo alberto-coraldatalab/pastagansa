@@ -123,6 +123,10 @@ describe("platform integrity", () => {
       .post("/v1/document-sequences")
       .send({ documentType: "INVOICE", series: "F2026" })
       .expect(409);
+    const creditSequence = await authed(accountA.accessToken, tenantA)
+      .post("/v1/document-sequences")
+      .send({ documentType: "CREDIT_NOTE", series: "R2026", padding: 5 })
+      .expect(201);
 
     const invoiceDraft = await authed(accountA.accessToken, tenantA)
       .post("/v1/invoices")
@@ -200,6 +204,62 @@ describe("platform integrity", () => {
     await authed(accountB.accessToken, tenantB)
       .get(`/v1/invoices/${invoiceDraft.body.id}/email-deliveries`)
       .expect(404);
+    await authed(accountB.accessToken, tenantB)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/rectifications`)
+      .send({
+        kind: "TOTAL",
+        impact: "DECREASE",
+        reason: "Incorrect customer operation",
+        issueDate: "2026-09-09",
+      })
+      .expect(404);
+    const rectification = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/rectifications`)
+      .send({
+        kind: "TOTAL",
+        impact: "DECREASE",
+        reason: "Incorrect customer operation",
+        issueDate: "2026-09-09",
+      })
+      .expect(201);
+    expect(rectification.body).toMatchObject({
+      documentType: "CREDIT_NOTE",
+      rectificationKind: "TOTAL",
+      rectificationImpact: "DECREASE",
+      originalInvoiceId: invoiceDraft.body.id,
+      total: "121",
+      status: "DRAFT",
+    });
+    expect(rectification.body.originalInvoice.fullNumber).toBe("F2026-00001");
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${rectification.body.id}/issue`)
+      .set("idempotency-key", "issue-rectification-a")
+      .send({ sequenceId: sequence.body.id })
+      .expect(400);
+    const issuedRectification = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${rectification.body.id}/issue`)
+      .set("idempotency-key", "issue-rectification-a")
+      .send({ sequenceId: creditSequence.body.id })
+      .expect(200);
+    expect(issuedRectification.body.fullNumber).toBe("R2026-00001");
+    await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${rectification.body.id}/pdf`)
+      .expect("content-type", /application\/pdf/)
+      .expect(200);
+    const rectifiedOriginal = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${invoiceDraft.body.id}`)
+      .expect(200);
+    expect(rectifiedOriginal.body.status).toBe("RECTIFIED");
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/rectifications`)
+      .send({
+        kind: "PARTIAL",
+        impact: "DECREASE",
+        reason: "Second correction is not allowed",
+        issueDate: "2026-09-10",
+        lines: invoice(contactA.body.id).lines,
+      })
+      .expect(409);
     await authed(accountA.accessToken, tenantA)
       .patch(`/v1/invoices/${invoiceDraft.body.id}`)
       .send(invoice(contactA.body.id))

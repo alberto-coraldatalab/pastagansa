@@ -7,8 +7,11 @@ import {
 import {
   CatalogItemStatus,
   ContactStatus,
+  DocumentType,
   InvoiceStatus,
   Prisma,
+  RectificationImpact,
+  RectificationKind,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditService } from "../audit/audit.service";
@@ -19,6 +22,7 @@ import {
   InvoiceLineDto,
   UpdateInvoiceDto,
 } from "./dto/invoice.dto";
+import { CreateRectificationDto } from "./dto/create-rectification.dto";
 import { ListInvoicesDto } from "./dto/list-invoices.dto";
 import { IssueInvoiceDto } from "./dto/issue-invoice.dto";
 import { InvoicePdfService } from "./invoice-pdf.service";
@@ -32,7 +36,7 @@ export class InvoicesService {
   ) {}
 
   async list(query: ListInvoicesDto) {
-    const filter = query.status ?? "";
+    const filter = `${query.status ?? ""}:${query.documentType ?? ""}`;
     const cursor = query.cursor
       ? decodeCursor(query.cursor, filter)
       : undefined;
@@ -42,6 +46,8 @@ export class InvoicesService {
           id: cursor.id,
           createdAt: new Date(cursor.sort),
           ...this.scope(),
+          ...(query.status ? { status: query.status } : {}),
+          ...(query.documentType ? { documentType: query.documentType } : {}),
         },
         select: { id: true },
       });
@@ -54,6 +60,7 @@ export class InvoicesService {
       where: {
         ...this.scope(),
         ...(query.status ? { status: query.status } : {}),
+        ...(query.documentType ? { documentType: query.documentType } : {}),
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       ...(cursor ? { cursor: { id: cursor.id }, skip: 1 } : {}),
@@ -75,7 +82,10 @@ export class InvoicesService {
   async get(id: string) {
     const invoice = await this.tenant.db.invoice.findFirst({
       where: { id, ...this.scope() },
-      include: { lines: { orderBy: { position: "asc" } } },
+      include: {
+        lines: { orderBy: { position: "asc" } },
+        originalInvoice: { select: { id: true, fullNumber: true } },
+      },
     });
     if (!invoice) throw new NotFoundException("Invoice not found");
     return presentInvoice(invoice);
@@ -111,11 +121,143 @@ export class InvoicesService {
     return presentInvoice(invoice);
   }
 
+  async createRectification(
+    originalInvoiceId: string,
+    input: CreateRectificationDto,
+  ) {
+    const scope = this.scope();
+    const locked = await this.tenant.db.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "invoices"
+      WHERE "id" = CAST(${originalInvoiceId} AS uuid)
+        AND "organization_id" = CAST(${scope.organizationId} AS uuid)
+        AND "company_id" = CAST(${scope.companyId} AS uuid)
+      FOR UPDATE
+    `;
+    if (!locked.length) throw new NotFoundException("Invoice not found");
+    const original = await this.tenant.db.invoice.findFirstOrThrow({
+      where: { id: originalInvoiceId, ...scope },
+      include: { lines: { orderBy: { position: "asc" } } },
+    });
+    if (
+      original.documentType !== DocumentType.INVOICE ||
+      original.status === InvoiceStatus.DRAFT ||
+      original.status === InvoiceStatus.CANCELLED
+    )
+      throw new ConflictException(
+        "Only an issued standard invoice can be rectified",
+      );
+    if (original.status === InvoiceStatus.RECTIFIED)
+      throw new ConflictException("Invoice has already been fully rectified");
+    if (input.issueDate < original.issueDate.toISOString().slice(0, 10))
+      throw new BadRequestException(
+        "Rectification issueDate cannot precede the original invoice issueDate",
+      );
+    if (input.dueDate && input.dueDate < input.issueDate)
+      throw new BadRequestException("dueDate cannot precede issueDate");
+    if (
+      input.kind === RectificationKind.TOTAL &&
+      input.impact !== RectificationImpact.DECREASE
+    )
+      throw new BadRequestException(
+        "A total rectification must decrease the original invoice",
+      );
+    if (input.kind === RectificationKind.TOTAL && input.lines)
+      throw new BadRequestException(
+        "A total rectification copies the original lines; lines must be omitted",
+      );
+    if (input.kind !== RectificationKind.TOTAL && !input.lines?.length)
+      throw new BadRequestException(
+        "Partial and difference rectifications require at least one line",
+      );
+
+    const lines = input.lines
+      ? input.lines.map((line, index) => calculateInvoiceLine(line, index + 1))
+      : original.lines.map((line) => ({
+          gross: line.quantity.mul(line.unitPrice).toDecimalPlaces(2),
+          discount: line.quantity
+            .mul(line.unitPrice)
+            .toDecimalPlaces(2)
+            .minus(line.netAmount),
+          persisted: {
+            position: line.position,
+            catalogItemId: line.catalogItemId ?? undefined,
+            description: line.description,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            discountPct: line.discountPct,
+            taxRate: line.taxRate,
+            netAmount: line.netAmount,
+            taxAmount: line.taxAmount,
+            totalAmount: line.totalAmount,
+          },
+        }));
+    if (input.lines) await this.validateCatalogItems(input.lines);
+    const totals = sumInvoiceLines(lines);
+
+    try {
+      const rectification = await this.tenant.db.invoice.create({
+        data: {
+          ...scope,
+          contactId: original.contactId,
+          originalInvoiceId: original.id,
+          documentType: DocumentType.CREDIT_NOTE,
+          rectificationKind: input.kind,
+          rectificationImpact: input.impact,
+          rectificationReason: input.reason.trim(),
+          issuerLegalName: original.issuerLegalName,
+          issuerTaxId: original.issuerTaxId,
+          customerLegalName: original.customerLegalName,
+          customerTaxId: original.customerTaxId,
+          customerEmail: original.customerEmail,
+          billingAddress: original.billingAddress ?? Prisma.JsonNull,
+          issueDate: new Date(input.issueDate),
+          dueDate: input.dueDate ? new Date(input.dueDate) : null,
+          currency: original.currency,
+          notes: input.notes?.trim() || null,
+          ...totals,
+          lines: {
+            create: lines.map(({ persisted }) => ({ ...persisted, ...scope })),
+          },
+        },
+        include: {
+          lines: { orderBy: { position: "asc" } },
+          originalInvoice: { select: { id: true, fullNumber: true } },
+        },
+      });
+      await this.audit.record(
+        "invoice.rectification_draft_created",
+        "invoice",
+        rectification.id,
+        {
+          originalInvoiceId: original.id,
+          kind: input.kind,
+          impact: input.impact,
+        },
+      );
+      return presentInvoice(rectification);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        input.kind === RectificationKind.TOTAL
+      )
+        throw new ConflictException(
+          "A total rectification already exists for this invoice",
+        );
+      throw error;
+    }
+  }
+
   async update(id: string, input: UpdateInvoiceDto) {
     const scope = this.scope();
     const data = await this.build(input);
     const changed = await this.tenant.db.invoice.updateMany({
-      where: { id, ...scope, status: InvoiceStatus.DRAFT },
+      where: {
+        id,
+        ...scope,
+        status: InvoiceStatus.DRAFT,
+        documentType: DocumentType.INVOICE,
+      },
       data: data.document,
     });
     if (changed.count !== 1)
@@ -176,17 +318,19 @@ export class InvoicesService {
       throw new ConflictException(
         "Idempotency-Key has already been used for another invoice",
       );
+    if (invoice.documentType === DocumentType.CREDIT_NOTE)
+      await this.validateRectificationForIssue(invoice);
     const sequence = await this.tenant.db.documentSequence.findFirst({
       where: {
         id: input.sequenceId,
         ...scope,
-        documentType: "INVOICE",
+        documentType: invoice.documentType,
         active: true,
       },
     });
     if (!sequence)
       throw new BadRequestException(
-        "An active invoice sequence from this company is required",
+        `An active ${invoice.documentType} sequence from this company is required`,
       );
     const [allocated] = await this.tenant.db.$queryRaw<
       Array<{ number: bigint }>
@@ -239,7 +383,102 @@ export class InvoicesService {
       fullNumber,
       idempotencyKey,
     });
+    if (
+      invoice.documentType === DocumentType.CREDIT_NOTE &&
+      invoice.rectificationKind === RectificationKind.TOTAL &&
+      invoice.originalInvoiceId
+    ) {
+      await this.tenant.db.invoice.updateMany({
+        where: {
+          id: invoice.originalInvoiceId,
+          ...scope,
+          status: { notIn: [InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED] },
+        },
+        data: { status: InvoiceStatus.RECTIFIED },
+      });
+      await this.audit.record(
+        "invoice.rectified",
+        "invoice",
+        invoice.originalInvoiceId,
+        { rectificationInvoiceId: id, kind: invoice.rectificationKind },
+      );
+    }
     return this.get(id);
+  }
+
+  private async validateRectificationForIssue(invoice: {
+    id: string;
+    originalInvoiceId: string | null;
+    rectificationKind: RectificationKind | null;
+    rectificationImpact: RectificationImpact | null;
+    total: Decimal;
+  }) {
+    if (
+      !invoice.originalInvoiceId ||
+      !invoice.rectificationKind ||
+      !invoice.rectificationImpact
+    )
+      throw new ConflictException("Rectification metadata is incomplete");
+    const scope = this.scope();
+    const locked = await this.tenant.db.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "invoices"
+      WHERE "id" = CAST(${invoice.originalInvoiceId} AS uuid)
+        AND "organization_id" = CAST(${scope.organizationId} AS uuid)
+        AND "company_id" = CAST(${scope.companyId} AS uuid)
+      FOR UPDATE
+    `;
+    if (!locked.length)
+      throw new ConflictException("Original invoice no longer exists");
+    const original = await this.tenant.db.invoice.findFirstOrThrow({
+      where: { id: invoice.originalInvoiceId, ...scope },
+      select: { status: true, documentType: true, total: true },
+    });
+    if (
+      original.documentType !== DocumentType.INVOICE ||
+      original.status === InvoiceStatus.DRAFT ||
+      original.status === InvoiceStatus.CANCELLED ||
+      original.status === InvoiceStatus.RECTIFIED
+    )
+      throw new ConflictException(
+        "Original invoice is not eligible for rectification",
+      );
+    const prior = await this.tenant.db.invoice.findMany({
+      where: {
+        ...scope,
+        originalInvoiceId: invoice.originalInvoiceId,
+        id: { not: invoice.id },
+        documentType: DocumentType.CREDIT_NOTE,
+        status: { not: InvoiceStatus.DRAFT },
+      },
+      select: {
+        rectificationKind: true,
+        rectificationImpact: true,
+        total: true,
+      },
+    });
+    if (
+      invoice.rectificationKind === RectificationKind.TOTAL &&
+      prior.length > 0
+    )
+      throw new ConflictException(
+        "A total rectification cannot follow another issued rectification",
+      );
+    if (
+      invoice.rectificationImpact === RectificationImpact.DECREASE &&
+      invoice.rectificationKind !== RectificationKind.TOTAL
+    ) {
+      const correctedBalance = prior.reduce(
+        (balance, item) =>
+          item.rectificationImpact === RectificationImpact.INCREASE
+            ? balance.plus(item.total)
+            : balance.minus(item.total),
+        original.total,
+      );
+      if (invoice.total.greaterThan(correctedBalance))
+        throw new ConflictException(
+          "Rectifications cannot decrease more than the original invoice total",
+        );
+    }
   }
 
   private async build(input: CreateInvoiceDto) {
@@ -272,38 +511,11 @@ export class InvoicesService {
       throw new BadRequestException(
         "Invoice contact must be an active customer in this company",
       );
-    const catalogIds = [
-      ...new Set(
-        input.lines.flatMap(({ catalogItemId }) =>
-          catalogItemId ? [catalogItemId] : [],
-        ),
-      ),
-    ];
-    if (catalogIds.length) {
-      const count = await this.tenant.db.catalogItem.count({
-        where: {
-          id: { in: catalogIds },
-          ...scope,
-          status: CatalogItemStatus.ACTIVE,
-        },
-      });
-      if (count !== catalogIds.length)
-        throw new BadRequestException(
-          "Every catalog item must be active and belong to the selected company",
-        );
-    }
+    await this.validateCatalogItems(input.lines);
     const lines = input.lines.map((line, index) =>
       calculateInvoiceLine(line, index + 1),
     );
-    const totals = lines.reduce(
-      (sum, line) => ({
-        subtotal: sum.subtotal.plus(line.gross),
-        discountTotal: sum.discountTotal.plus(line.discount),
-        taxTotal: sum.taxTotal.plus(line.persisted.taxAmount),
-        total: sum.total.plus(line.persisted.totalAmount),
-      }),
-      zeroTotals(),
-    );
+    const totals = sumInvoiceLines(lines);
     const address = contact.addresses[0];
     return {
       document: {
@@ -333,6 +545,30 @@ export class InvoicesService {
       },
       lines: lines.map(({ persisted }) => persisted),
     };
+  }
+
+  private async validateCatalogItems(lines: InvoiceLineDto[]) {
+    const scope = this.scope();
+    const catalogIds = [
+      ...new Set(
+        lines.flatMap(({ catalogItemId }) =>
+          catalogItemId ? [catalogItemId] : [],
+        ),
+      ),
+    ];
+    if (catalogIds.length) {
+      const count = await this.tenant.db.catalogItem.count({
+        where: {
+          id: { in: catalogIds },
+          ...scope,
+          status: CatalogItemStatus.ACTIVE,
+        },
+      });
+      if (count !== catalogIds.length)
+        throw new BadRequestException(
+          "Every catalog item must be active and belong to the selected company",
+        );
+    }
   }
 
   private scope() {
@@ -380,6 +616,20 @@ function zeroTotals() {
     taxTotal: new Decimal(0),
     total: new Decimal(0),
   };
+}
+
+function sumInvoiceLines(
+  lines: Array<ReturnType<typeof calculateInvoiceLine>>,
+) {
+  return lines.reduce(
+    (sum, line) => ({
+      subtotal: sum.subtotal.plus(line.gross),
+      discountTotal: sum.discountTotal.plus(line.discount),
+      taxTotal: sum.taxTotal.plus(line.persisted.taxAmount),
+      total: sum.total.plus(line.persisted.totalAmount),
+    }),
+    zeroTotals(),
+  );
 }
 
 function presentInvoice<T extends { number: bigint | null }>(invoice: T) {
