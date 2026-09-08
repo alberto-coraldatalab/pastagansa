@@ -72,6 +72,10 @@ describe("platform integrity", () => {
     expect(taxRules.body.map(({ code }: { code: string }) => code)).toContain(
       "ES_VAT_GENERAL_21",
     );
+    const generalTaxRule = taxRules.body.find(
+      ({ code }: { code: string }) => code === "ES_VAT_GENERAL_21",
+    );
+    expect(generalTaxRule).toBeDefined();
 
     const contactA = await authed(accountA.accessToken, tenantA)
       .post("/v1/contacts")
@@ -88,6 +92,15 @@ describe("platform integrity", () => {
     const contactB = await authed(accountB.accessToken, tenantB)
       .post("/v1/contacts")
       .send({ legalName: "Customer B", isCustomer: true, isSupplier: false })
+      .expect(201);
+    const supplierA = await authed(accountA.accessToken, tenantA)
+      .post("/v1/contacts")
+      .send({
+        legalName: "Supplier A",
+        taxId: "A58818501",
+        isCustomer: false,
+        isSupplier: true,
+      })
       .expect(201);
     const itemB = await authed(accountB.accessToken, tenantB)
       .post("/v1/catalog-items")
@@ -134,6 +147,14 @@ describe("platform integrity", () => {
     const creditSequence = await authed(accountA.accessToken, tenantA)
       .post("/v1/document-sequences")
       .send({ documentType: "CREDIT_NOTE", series: "R2026", padding: 5 })
+      .expect(201);
+    const purchaseSequence = await authed(accountA.accessToken, tenantA)
+      .post("/v1/document-sequences")
+      .send({
+        documentType: "PURCHASE_INVOICE",
+        series: "REC2026",
+        padding: 5,
+      })
       .expect(201);
 
     const invoiceDraft = await authed(accountA.accessToken, tenantA)
@@ -471,6 +492,127 @@ describe("platform integrity", () => {
     await authed(accountA.accessToken, tenantA)
       .delete(`/v1/invoices/${invoiceDraft.body.id}`)
       .expect(409);
+
+    const purchaseInput = {
+      supplierId: supplierA.body.id,
+      supplierInvoiceNumber: "PROV-2026-0042",
+      issueDate: "2026-09-01",
+      operationDate: "2026-08-31",
+      receivedDate: "2026-09-05",
+      deductionDate: "2026-10-01",
+      currency: "EUR",
+      lines: [
+        {
+          description: "Professional services",
+          quantity: 1,
+          unitPrice: 200,
+          taxRuleId: generalTaxRule.id,
+          taxRate: 21,
+          deductiblePct: 50,
+        },
+      ],
+    };
+    const purchaseDraft = await authed(accountA.accessToken, tenantA)
+      .post("/v1/purchase-invoices")
+      .send(purchaseInput)
+      .expect(201);
+    expect(purchaseDraft.body).toMatchObject({
+      status: "DRAFT",
+      supplierInvoiceNumber: "PROV-2026-0042",
+      supplierLegalName: "Supplier A",
+      subtotal: "200",
+      taxTotal: "42",
+      deductibleTaxTotal: "21",
+      total: "242",
+    });
+    expect(purchaseDraft.body.lines[0].taxLines[0]).toMatchObject({
+      taxCode: "ES_VAT_GENERAL_21",
+      deductiblePct: "50",
+      deductibleAmount: "21",
+    });
+    await authed(accountB.accessToken, tenantB)
+      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}`)
+      .expect(404);
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/purchase-invoices")
+      .send(purchaseInput)
+      .expect(409);
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/approve`)
+      .set("idempotency-key", "approve-purchase-a")
+      .send({ sequenceId: sequence.body.id })
+      .expect(400);
+    const approvedPurchase = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/approve`)
+      .set("idempotency-key", "approve-purchase-a")
+      .send({ sequenceId: purchaseSequence.body.id })
+      .expect(200);
+    expect(approvedPurchase.body).toMatchObject({
+      status: "APPROVED",
+      receptionNumber: "1",
+      receptionFullNumber: "REC2026-00001",
+    });
+    const retriedPurchaseApproval = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/approve`)
+      .set("idempotency-key", "approve-purchase-a")
+      .send({ sequenceId: purchaseSequence.body.id })
+      .expect(200);
+    expect(retriedPurchaseApproval.body.receptionFullNumber).toBe(
+      "REC2026-00001",
+    );
+    const purchaseLedger = await authed(accountA.accessToken, tenantA)
+      .get("/v1/tax-ledger?direction=PURCHASES")
+      .expect(200);
+    expect(purchaseLedger.body.data).toHaveLength(1);
+    expect(purchaseLedger.body.data[0]).toMatchObject({
+      purchaseInvoiceId: purchaseDraft.body.id,
+      invoiceId: null,
+      direction: "PURCHASES",
+      bookType: "RECEIVED_INVOICES",
+      documentNumber: "PROV-2026-0042",
+      registrationNumber: "REC2026-00001",
+      receivedDate: "2026-09-05T00:00:00.000Z",
+      taxPointDate: "2026-10-01T00:00:00.000Z",
+    });
+    expect(purchaseLedger.body.data[0].amounts[0]).toMatchObject({
+      taxableBase: "200",
+      rate: "21",
+      taxAmount: "42",
+      deductibleAmount: "21",
+    });
+    await expect(
+      admin.purchaseInvoice.update({
+        where: { id: purchaseDraft.body.id },
+        data: { supplierInvoiceNumber: "TAMPERED" },
+      }),
+    ).rejects.toThrow(/approved purchase invoices are immutable/);
+    await authed(accountA.accessToken, tenantA)
+      .delete(`/v1/purchase-invoices/${purchaseDraft.body.id}`)
+      .expect(409);
+    const disposablePurchase = await authed(accountA.accessToken, tenantA)
+      .post("/v1/purchase-invoices")
+      .send({ ...purchaseInput, supplierInvoiceNumber: "PROV-2026-0043" })
+      .expect(201);
+    const updatedPurchase = await authed(accountA.accessToken, tenantA)
+      .patch(`/v1/purchase-invoices/${disposablePurchase.body.id}`)
+      .send({
+        ...purchaseInput,
+        supplierInvoiceNumber: "PROV-2026-0044",
+        notes: "Reviewed before approval",
+      })
+      .expect(200);
+    expect(updatedPurchase.body.notes).toBe("Reviewed before approval");
+    const searchedPurchases = await authed(accountA.accessToken, tenantA)
+      .get("/v1/purchase-invoices?search=0044")
+      .expect(200);
+    expect(searchedPurchases.body.data).toHaveLength(1);
+    await authed(accountA.accessToken, tenantA)
+      .delete(`/v1/purchase-invoices/${disposablePurchase.body.id}`)
+      .expect(204);
+    await authed(accountA.accessToken, tenantA)
+      .get(`/v1/purchase-invoices/${disposablePurchase.body.id}`)
+      .expect(404);
+
     const disposableInvoice = await authed(accountA.accessToken, tenantA)
       .post("/v1/invoices")
       .send(invoice(contactA.body.id))

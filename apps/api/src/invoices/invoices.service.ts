@@ -180,7 +180,7 @@ export class InvoicesService {
       );
 
     const rules = input.lines
-      ? await this.resolveTaxRules(input.lines, input.issueDate)
+      ? await this.tax.resolveRules(input.lines, input.issueDate)
       : [];
     const lines: BuiltInvoiceLine[] = input.lines
       ? input.lines.map((line, index) => {
@@ -574,7 +574,7 @@ export class InvoicesService {
         "Invoice contact must be an active customer in this company",
       );
     await this.validateCatalogItems(input.lines);
-    const rules = await this.resolveTaxRules(input.lines, input.issueDate);
+    const rules = await this.tax.resolveRules(input.lines, input.issueDate);
     const lines: BuiltInvoiceLine[] = input.lines.map((line, index) => {
       const calculation = calculateInvoiceLine(
         { ...line, taxRate: Number(rules[index].rate ?? 0) },
@@ -617,78 +617,6 @@ export class InvoicesService {
       },
       lines,
     };
-  }
-
-  private async resolveTaxRules(lines: InvoiceLineDto[], issueDate: string) {
-    const effectiveOn = new Date(issueDate);
-    const ids = [
-      ...new Set(
-        lines.flatMap(({ taxRuleId }) => (taxRuleId ? [taxRuleId] : [])),
-      ),
-    ];
-    const rules = await this.tenant.db.taxRule.findMany({
-      where: {
-        effectiveFrom: { lte: effectiveOn },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveOn } }],
-        ...(ids.length ? { id: { in: ids } } : {}),
-      },
-    });
-    const byId = new Map(rules.map((rule) => [rule.id, rule]));
-    const rateCodes = new Map([
-      [21, "ES_VAT_GENERAL_21"],
-      [10, "ES_VAT_REDUCED_10"],
-      [4, "ES_VAT_SUPER_REDUCED_4"],
-    ]);
-    const missingCodes = [
-      ...new Set(
-        lines.flatMap((line) => {
-          if (line.taxRuleId || line.taxRate === undefined) return [];
-          const code = rateCodes.get(line.taxRate);
-          return code ? [code] : [];
-        }),
-      ),
-    ];
-    const fallbackRules = missingCodes.length
-      ? await this.tenant.db.taxRule.findMany({
-          where: {
-            code: { in: missingCodes },
-            effectiveFrom: { lte: effectiveOn },
-            OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveOn } }],
-          },
-        })
-      : [];
-    const byCode = new Map(fallbackRules.map((rule) => [rule.code, rule]));
-    return lines.map((line) => {
-      const rule = line.taxRuleId
-        ? byId.get(line.taxRuleId)
-        : byCode.get(rateCodes.get(line.taxRate ?? -1) ?? "");
-      if (!rule)
-        throw new BadRequestException(
-          line.taxRate === 0
-            ? "taxRuleId is required for zero-rated, exempt, or non-subject invoice lines"
-            : "An effective taxRuleId or a supported 21, 10, or 4 taxRate is required for every invoice line",
-        );
-      if (
-        line.taxRate !== undefined &&
-        !new Decimal(line.taxRate).equals(rule.rate ?? 0)
-      )
-        throw new BadRequestException(
-          "taxRate does not match the selected tax rule",
-        );
-      if (rule.exempt && !line.exemptionReason?.trim())
-        throw new BadRequestException(
-          "exemptionReason is required for exempt invoice lines",
-        );
-      if (!rule.exempt && line.exemptionReason)
-        throw new BadRequestException(
-          "exemptionReason is only valid for exempt invoice lines",
-        );
-      if (rule.surchargeRate?.greaterThan(0))
-        throw new BadRequestException(
-          "Equivalence surcharge rules are not supported in this fiscal slice",
-        );
-      return rule;
-    });
   }
 
   private async createInvoiceLines(

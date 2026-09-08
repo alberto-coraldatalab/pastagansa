@@ -8,11 +8,13 @@ import {
   DocumentType,
   InvoiceStatus,
   Prisma,
+  PurchaseInvoiceStatus,
   RectificationImpact,
   TaxBookType,
   TaxLedgerAmount,
   TaxLedgerDirection,
   TaxLedgerEntry,
+  TaxRule,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditService } from "../audit/audit.service";
@@ -37,6 +39,60 @@ export class TaxService {
         OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveOn } }],
       },
       orderBy: [{ taxFamily: "asc" }, { rate: "desc" }, { code: "asc" }],
+    });
+  }
+
+  async resolveRules(lines: TaxRuleInput[], effectiveOnValue: string) {
+    const effectiveOn = new Date(effectiveOnValue);
+    const ids = [
+      ...new Set(
+        lines.flatMap(({ taxRuleId }) => (taxRuleId ? [taxRuleId] : [])),
+      ),
+    ];
+    const rules = await this.tenant.db.taxRule.findMany({
+      where: {
+        effectiveFrom: { lte: effectiveOn },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveOn } }],
+        ...(ids.length ? { id: { in: ids } } : {}),
+      },
+    });
+    const byId = new Map(rules.map((rule) => [rule.id, rule]));
+    const rateCodes = new Map([
+      [21, "ES_VAT_GENERAL_21"],
+      [10, "ES_VAT_REDUCED_10"],
+      [4, "ES_VAT_SUPER_REDUCED_4"],
+    ]);
+    const missingCodes = [
+      ...new Set(
+        lines.flatMap((line) => {
+          if (line.taxRuleId || line.taxRate === undefined) return [];
+          const code = rateCodes.get(line.taxRate);
+          return code ? [code] : [];
+        }),
+      ),
+    ];
+    const fallbackRules = missingCodes.length
+      ? await this.tenant.db.taxRule.findMany({
+          where: {
+            code: { in: missingCodes },
+            effectiveFrom: { lte: effectiveOn },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveOn } }],
+          },
+        })
+      : [];
+    const byCode = new Map(fallbackRules.map((rule) => [rule.code, rule]));
+    return lines.map((line) => {
+      const rule = line.taxRuleId
+        ? byId.get(line.taxRuleId)
+        : byCode.get(rateCodes.get(line.taxRate ?? -1) ?? "");
+      if (!rule)
+        throw new BadRequestException(
+          line.taxRate === 0
+            ? "taxRuleId is required for zero-rated, exempt, or non-subject lines"
+            : "An effective taxRuleId or a supported 21, 10, or 4 taxRate is required for every line",
+        );
+      this.validateRuleSelection(rule, line);
+      return rule;
     });
   }
 
@@ -181,6 +237,74 @@ export class TaxService {
     });
   }
 
+  async postPurchaseInvoice(purchaseInvoiceId: string) {
+    const scope = this.scope();
+    const existing = await this.tenant.db.taxLedgerEntry.findFirst({
+      where: { purchaseInvoiceId, ...scope },
+      include: { amounts: true },
+    });
+    if (existing) return existing;
+    const purchase = await this.tenant.db.purchaseInvoice.findFirst({
+      where: { id: purchaseInvoiceId, ...scope },
+      include: { lines: { include: { taxLines: true } } },
+    });
+    if (
+      !purchase ||
+      purchase.status !== PurchaseInvoiceStatus.APPROVED ||
+      !purchase.receptionFullNumber
+    )
+      throw new ConflictException(
+        "Only approved purchase invoices can enter Tax Ledger",
+      );
+    if (
+      purchase.lines.length === 0 ||
+      purchase.lines.some((line) => line.taxLines.length !== 1)
+    )
+      throw new ConflictException(
+        "Every purchase invoice line must have exactly one fiscal breakdown",
+      );
+    const taxLines = purchase.lines.map((line) => line.taxLines[0]);
+    const entry = await this.tenant.db.taxLedgerEntry.create({
+      data: {
+        ...scope,
+        purchaseInvoiceId: purchase.id,
+        direction: TaxLedgerDirection.PURCHASES,
+        bookType: TaxBookType.RECEIVED_INVOICES,
+        issueDate: purchase.issueDate,
+        operationDate: purchase.operationDate,
+        taxPointDate: purchase.deductionDate,
+        receivedDate: purchase.receivedDate,
+        counterpartyId: purchase.supplierId,
+        counterpartyTaxId: purchase.supplierTaxId,
+        counterpartyCountry: "ES",
+        documentNumber: purchase.supplierInvoiceNumber,
+        registrationNumber: purchase.receptionFullNumber,
+      },
+    });
+    await this.tenant.db.taxLedgerAmount.createMany({
+      data: taxLines.map((line) => ({
+        ...scope,
+        taxLedgerEntryId: entry.id,
+        purchaseTaxLineId: line.id,
+        taxRuleId: line.taxRuleId,
+        taxableBase: line.taxableBase,
+        rate: line.taxRate,
+        taxAmount: line.taxAmount,
+        surchargeAmount: new Decimal(0),
+        deductibleAmount: line.deductibleAmount,
+      })),
+    });
+    await this.audit.record("tax_ledger.posted", "tax_ledger", entry.id, {
+      purchaseInvoiceId: purchase.id,
+      supplierInvoiceNumber: purchase.supplierInvoiceNumber,
+      deductibleTaxTotal: purchase.deductibleTaxTotal.toString(),
+    });
+    return this.tenant.db.taxLedgerEntry.findUniqueOrThrow({
+      where: { id: entry.id },
+      include: { amounts: true },
+    });
+  }
+
   private ledgerFilters(query: ListTaxLedgerDto) {
     return {
       ...(query.direction ? { direction: query.direction } : {}),
@@ -201,6 +325,34 @@ export class TaxService {
     if (!companyId) throw new BadRequestException("x-company-id is required");
     return { organizationId, companyId };
   }
+
+  private validateRuleSelection(rule: TaxRule, line: TaxRuleInput) {
+    if (
+      line.taxRate !== undefined &&
+      !new Decimal(line.taxRate).equals(rule.rate ?? 0)
+    )
+      throw new BadRequestException(
+        "taxRate does not match the selected tax rule",
+      );
+    if (rule.exempt && !line.exemptionReason?.trim())
+      throw new BadRequestException(
+        "exemptionReason is required for exempt lines",
+      );
+    if (!rule.exempt && line.exemptionReason)
+      throw new BadRequestException(
+        "exemptionReason is only valid for exempt lines",
+      );
+    if (rule.surchargeRate?.greaterThan(0))
+      throw new BadRequestException(
+        "Equivalence surcharge rules are not supported in this fiscal slice",
+      );
+  }
+}
+
+export interface TaxRuleInput {
+  taxRuleId?: string;
+  taxRate?: number;
+  exemptionReason?: string;
 }
 
 function countryFrom(value: Prisma.JsonValue | null) {

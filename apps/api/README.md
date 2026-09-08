@@ -37,6 +37,8 @@ Invoice lines resolve a versioned fiscal rule for their issue date and persist a
 
 Issuing an invoice posts its frozen breakdown to the append-only Tax Ledger in the same transaction. `GET /v1/tax-ledger` supports date, direction, book, and cursor filters; `GET /v1/tax-ledger/:id` returns one entry. Decreasing rectifications post negative bases and quotas linked to the corrected entry. Both endpoints are company-scoped and protected by RLS.
 
+`/v1/purchase-invoices` provides company-scoped supplier invoice drafts with supplier snapshots, duplicate supplier-number protection, fiscal lines, and partial input-VAT deductibility. Approval through `POST /v1/purchase-invoices/:id/approve` requires an idempotency key and a `PURCHASE_INVOICE` reception sequence, freezes the document, and posts it to the received-invoices Tax Ledger in the same transaction. The ledger retains the supplier document number, internal reception number, issue/operation/receipt dates, deduction date, supported VAT, and deductible VAT.
+
 `POST /v1/invoices/:id/rectifications` creates a rectifying draft linked to an issued standard invoice. Total rectifications copy the frozen original lines; partial and difference rectifications require explicit lines. Rectifications record their reason and increase/decrease impact, use a `CREDIT_NOTE` sequence at issuance, and are included in the same PDF, email, tenant, audit, idempotency, and immutability guarantees. Concurrent issuance is serialized against the original invoice so decreases cannot exceed its corrected balance.
 
 `PUT /v1/invoices/:id/payment-schedule` replaces the installments of a standard invoice draft; installment amounts must add up exactly to the invoice total. Issuance creates one default installment when no custom schedule exists and then freezes its commercial fields. `POST /v1/invoices/:id/payments` records an idempotent manual collection, allocates it to the oldest open installments, rejects overpayment, and atomically updates the invoice balance and `PARTIALLY_PAID`/`PAID` status. `GET /v1/invoices/:id/payment-schedule` and `GET /v1/invoices/:id/payments` expose the resulting detail. Recorded payments and allocations are append-only.
@@ -59,6 +61,6 @@ npm run test:integration
 npm audit --audit-level=high
 ```
 
-The integration suite requires PostgreSQL with all migrations applied. CI provisions PostgreSQL, deploys migrations, and exercises tenant isolation, quotation persistence and races, refresh-token concurrency, revocation, invoice issuance concurrency, fiscal snapshot immutability, Tax Ledger posting, and audit visibility.
+The integration suite requires PostgreSQL with all migrations applied. CI provisions PostgreSQL, deploys migrations, and exercises tenant isolation, quotation persistence and races, refresh-token concurrency, revocation, invoice issuance concurrency, supplier-invoice approval, fiscal snapshot immutability, issued/received Tax Ledger posting, and audit visibility.
 
 OpenAPI is served at `/docs` and Prometheus-format metrics at `/v1/metrics`. Every response receives an `x-request-id`; errors include the same identifier.

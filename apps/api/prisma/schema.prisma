@@ -65,6 +65,7 @@ enum QuoteStatus {
 enum DocumentType {
   INVOICE
   CREDIT_NOTE
+  PURCHASE_INVOICE
 }
 
 enum InvoiceStatus {
@@ -116,55 +117,67 @@ enum TaxBookType {
   RECEIVED_INVOICES
 }
 
+enum PurchaseInvoiceStatus {
+  DRAFT
+  APPROVED
+  CANCELLED
+}
+
 model Organization {
-  id                  String                 @id @default(uuid()) @db.Uuid
-  name                String
-  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  companies           Company[]
-  memberships         Membership[]
-  auditEvents         AuditEvent[]
-  contacts            Contact[]
-  quotes              Quote[]
-  contactAddresses    ContactAddress[]
-  catalogItems        CatalogItem[]
-  documentSequences   DocumentSequence[]
-  invoices            Invoice[]
-  invoiceDeliveries   InvoiceEmailDelivery[]
-  invoiceInstallments InvoiceInstallment[]
-  payments            Payment[]
-  paymentAllocations  PaymentAllocation[]
-  invoiceTaxLines     InvoiceTaxLine[]
-  taxLedgerEntries    TaxLedgerEntry[]
-  taxLedgerAmounts    TaxLedgerAmount[]
+  id                   String                 @id @default(uuid()) @db.Uuid
+  name                 String
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  companies            Company[]
+  memberships          Membership[]
+  auditEvents          AuditEvent[]
+  contacts             Contact[]
+  quotes               Quote[]
+  contactAddresses     ContactAddress[]
+  catalogItems         CatalogItem[]
+  documentSequences    DocumentSequence[]
+  invoices             Invoice[]
+  invoiceDeliveries    InvoiceEmailDelivery[]
+  invoiceInstallments  InvoiceInstallment[]
+  payments             Payment[]
+  paymentAllocations   PaymentAllocation[]
+  invoiceTaxLines      InvoiceTaxLine[]
+  taxLedgerEntries     TaxLedgerEntry[]
+  taxLedgerAmounts     TaxLedgerAmount[]
+  purchaseInvoices     PurchaseInvoice[]
+  purchaseInvoiceLines PurchaseInvoiceLine[]
+  purchaseTaxLines     PurchaseTaxLine[]
 
   @@map("organizations")
 }
 
 model Company {
-  id                  String                 @id @default(uuid()) @db.Uuid
-  organizationId      String                 @map("organization_id") @db.Uuid
-  legalName           String                 @map("legal_name")
-  taxId               String                 @map("tax_id") @db.VarChar(40)
-  country             String                 @default("ES") @db.Char(2)
-  baseCurrency        String                 @default("EUR") @map("base_currency") @db.Char(3)
-  timezone            String                 @default("Europe/Madrid") @db.VarChar(64)
-  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  organization        Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  memberships         Membership[]
-  auditEvents         AuditEvent[]
-  contacts            Contact[]
-  quotes              Quote[]
-  contactAddresses    ContactAddress[]
-  catalogItems        CatalogItem[]
-  documentSequences   DocumentSequence[]
-  invoices            Invoice[]
-  invoiceDeliveries   InvoiceEmailDelivery[]
-  invoiceInstallments InvoiceInstallment[]
-  payments            Payment[]
-  paymentAllocations  PaymentAllocation[]
-  invoiceTaxLines     InvoiceTaxLine[]
-  taxLedgerEntries    TaxLedgerEntry[]
-  taxLedgerAmounts    TaxLedgerAmount[]
+  id                   String                 @id @default(uuid()) @db.Uuid
+  organizationId       String                 @map("organization_id") @db.Uuid
+  legalName            String                 @map("legal_name")
+  taxId                String                 @map("tax_id") @db.VarChar(40)
+  country              String                 @default("ES") @db.Char(2)
+  baseCurrency         String                 @default("EUR") @map("base_currency") @db.Char(3)
+  timezone             String                 @default("Europe/Madrid") @db.VarChar(64)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships          Membership[]
+  auditEvents          AuditEvent[]
+  contacts             Contact[]
+  quotes               Quote[]
+  contactAddresses     ContactAddress[]
+  catalogItems         CatalogItem[]
+  documentSequences    DocumentSequence[]
+  invoices             Invoice[]
+  invoiceDeliveries    InvoiceEmailDelivery[]
+  invoiceInstallments  InvoiceInstallment[]
+  payments             Payment[]
+  paymentAllocations   PaymentAllocation[]
+  invoiceTaxLines      InvoiceTaxLine[]
+  taxLedgerEntries     TaxLedgerEntry[]
+  taxLedgerAmounts     TaxLedgerAmount[]
+  purchaseInvoices     PurchaseInvoice[]
+  purchaseInvoiceLines PurchaseInvoiceLine[]
+  purchaseTaxLines     PurchaseTaxLine[]
 
   @@unique([organizationId, taxId])
   @@index([organizationId])
@@ -172,27 +185,28 @@ model Company {
 }
 
 model CatalogItem {
-  id                 String            @id @default(uuid()) @db.Uuid
-  organizationId     String            @map("organization_id") @db.Uuid
-  companyId          String            @map("company_id") @db.Uuid
-  type               CatalogItemType
-  sku                String?           @db.VarChar(80)
-  name               String            @db.VarChar(240)
-  description        String?
-  unit               String            @default("unit") @db.VarChar(30)
-  salesPrice         Decimal?          @map("sales_price") @db.Decimal(14, 2)
-  currency           String            @default("EUR") @db.Char(3)
-  suggestedTaxCode   String?           @map("suggested_tax_code") @db.VarChar(80)
-  revenueAccountCode String?           @map("revenue_account_code") @db.VarChar(20)
-  expenseAccountCode String?           @map("expense_account_code") @db.VarChar(20)
-  trackInventory     Boolean           @default(false) @map("track_inventory")
-  status             CatalogItemStatus @default(ACTIVE)
-  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company            Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  quoteLines         QuoteLine[]
-  invoiceLines       InvoiceLine[]
+  id                   String                @id @default(uuid()) @db.Uuid
+  organizationId       String                @map("organization_id") @db.Uuid
+  companyId            String                @map("company_id") @db.Uuid
+  type                 CatalogItemType
+  sku                  String?               @db.VarChar(80)
+  name                 String                @db.VarChar(240)
+  description          String?
+  unit                 String                @default("unit") @db.VarChar(30)
+  salesPrice           Decimal?              @map("sales_price") @db.Decimal(14, 2)
+  currency             String                @default("EUR") @db.Char(3)
+  suggestedTaxCode     String?               @map("suggested_tax_code") @db.VarChar(80)
+  revenueAccountCode   String?               @map("revenue_account_code") @db.VarChar(20)
+  expenseAccountCode   String?               @map("expense_account_code") @db.VarChar(20)
+  trackInventory       Boolean               @default(false) @map("track_inventory")
+  status               CatalogItemStatus     @default(ACTIVE)
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  quoteLines           QuoteLine[]
+  invoiceLines         InvoiceLine[]
+  purchaseInvoiceLines PurchaseInvoiceLine[]
 
   @@unique([companyId, sku])
   @@index([companyId, status, name])
@@ -200,27 +214,28 @@ model CatalogItem {
 }
 
 model Contact {
-  id               String           @id @default(uuid()) @db.Uuid
-  organizationId   String           @map("organization_id") @db.Uuid
-  companyId        String           @map("company_id") @db.Uuid
-  legalName        String           @map("legal_name") @db.VarChar(240)
-  tradeName        String?          @map("trade_name") @db.VarChar(240)
-  taxId            String?          @map("tax_id") @db.VarChar(40)
-  email            String?          @db.VarChar(320)
-  phone            String?          @db.VarChar(40)
-  paymentTermsDays Int?             @map("payment_terms_days")
-  paymentMethod    PaymentMethod?   @map("payment_method")
-  isCustomer       Boolean          @default(false) @map("is_customer")
-  isSupplier       Boolean          @default(false) @map("is_supplier")
-  status           ContactStatus    @default(ACTIVE)
-  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company          Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id               String            @id @default(uuid()) @db.Uuid
+  organizationId   String            @map("organization_id") @db.Uuid
+  companyId        String            @map("company_id") @db.Uuid
+  legalName        String            @map("legal_name") @db.VarChar(240)
+  tradeName        String?           @map("trade_name") @db.VarChar(240)
+  taxId            String?           @map("tax_id") @db.VarChar(40)
+  email            String?           @db.VarChar(320)
+  phone            String?           @db.VarChar(40)
+  paymentTermsDays Int?              @map("payment_terms_days")
+  paymentMethod    PaymentMethod?    @map("payment_method")
+  isCustomer       Boolean           @default(false) @map("is_customer")
+  isSupplier       Boolean           @default(false) @map("is_supplier")
+  status           ContactStatus     @default(ACTIVE)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
   addresses        ContactAddress[]
   quotes           Quote[]
   invoices         Invoice[]
   taxLedgerEntries TaxLedgerEntry[]
+  purchaseInvoices PurchaseInvoice[]
 
   @@unique([companyId, taxId])
   @@unique([id, organizationId, companyId])
@@ -229,19 +244,20 @@ model Contact {
 }
 
 model DocumentSequence {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  companyId      String       @map("company_id") @db.Uuid
-  documentType   DocumentType @map("document_type")
-  series         String       @db.VarChar(30)
-  nextNumber     BigInt       @default(1) @map("next_number")
-  padding        Int          @default(4)
-  active         Boolean      @default(true)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company        Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  invoices       Invoice[]
+  id               String            @id @default(uuid()) @db.Uuid
+  organizationId   String            @map("organization_id") @db.Uuid
+  companyId        String            @map("company_id") @db.Uuid
+  documentType     DocumentType      @map("document_type")
+  series           String            @db.VarChar(30)
+  nextNumber       BigInt            @default(1) @map("next_number")
+  padding          Int               @default(4)
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invoices         Invoice[]
+  purchaseInvoices PurchaseInvoice[]
 
   @@unique([companyId, documentType, series])
   @@unique([id, organizationId, companyId])
@@ -328,6 +344,7 @@ model TaxRule {
   effectiveTo       DateTime?         @map("effective_to") @db.Date
   createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   invoiceTaxLines   InvoiceTaxLine[]
+  purchaseTaxLines  PurchaseTaxLine[]
   ledgerAmounts     TaxLedgerAmount[]
 
   @@unique([code, effectiveFrom])
@@ -369,23 +386,27 @@ model TaxLedgerEntry {
   id                  String               @id @default(uuid()) @db.Uuid
   organizationId      String               @map("organization_id") @db.Uuid
   companyId           String               @map("company_id") @db.Uuid
-  invoiceId           String               @unique @map("invoice_id") @db.Uuid
+  invoiceId           String?              @unique @map("invoice_id") @db.Uuid
+  purchaseInvoiceId   String?              @unique @map("purchase_invoice_id") @db.Uuid
   direction           TaxLedgerDirection
   bookType            TaxBookType          @map("book_type")
   issueDate           DateTime             @map("issue_date") @db.Date
   operationDate       DateTime             @map("operation_date") @db.Date
   taxPointDate        DateTime             @map("tax_point_date") @db.Date
+  receivedDate        DateTime?            @map("received_date") @db.Date
   counterpartyId      String               @map("counterparty_id") @db.Uuid
   counterpartyTaxId   String?              @map("counterparty_tax_id") @db.VarChar(40)
   counterpartyCountry String               @default("ES") @map("counterparty_country") @db.Char(2)
   documentNumber      String               @map("document_number") @db.VarChar(100)
+  registrationNumber  String?              @map("registration_number") @db.VarChar(80)
   correctionOfId      String?              @map("correction_of_id") @db.Uuid
   rectificationImpact RectificationImpact? @map("rectification_impact")
   status              TaxLedgerStatus      @default(POSTED)
   createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company             Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  invoice             Invoice              @relation(fields: [invoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  invoice             Invoice?             @relation(fields: [invoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  purchaseInvoice     PurchaseInvoice?     @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   counterparty        Contact              @relation(fields: [counterpartyId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   correctionOf        TaxLedgerEntry?      @relation("TaxLedgerCorrections", fields: [correctionOfId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   corrections         TaxLedgerEntry[]     @relation("TaxLedgerCorrections")
@@ -393,32 +414,138 @@ model TaxLedgerEntry {
 
   @@unique([id, organizationId, companyId])
   @@unique([invoiceId, organizationId, companyId])
+  @@unique([purchaseInvoiceId, organizationId, companyId])
   @@index([companyId, taxPointDate, id])
   @@map("tax_ledger_entries")
 }
 
 model TaxLedgerAmount {
-  id               String         @id @default(uuid()) @db.Uuid
-  organizationId   String         @map("organization_id") @db.Uuid
-  companyId        String         @map("company_id") @db.Uuid
-  taxLedgerEntryId String         @map("tax_ledger_entry_id") @db.Uuid
-  invoiceTaxLineId String         @map("invoice_tax_line_id") @db.Uuid
-  taxRuleId        String         @map("tax_rule_id") @db.Uuid
-  taxableBase      Decimal        @map("taxable_base") @db.Decimal(14, 2)
-  rate             Decimal?       @db.Decimal(9, 6)
-  taxAmount        Decimal        @map("tax_amount") @db.Decimal(14, 2)
-  surchargeRate    Decimal?       @map("surcharge_rate") @db.Decimal(9, 6)
-  surchargeAmount  Decimal        @default(0) @map("surcharge_amount") @db.Decimal(14, 2)
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company          Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  entry            TaxLedgerEntry @relation(fields: [taxLedgerEntryId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
-  invoiceTaxLine   InvoiceTaxLine @relation(fields: [invoiceTaxLineId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
-  taxRule          TaxRule        @relation(fields: [taxRuleId], references: [id], onDelete: Restrict)
+  id                String           @id @default(uuid()) @db.Uuid
+  organizationId    String           @map("organization_id") @db.Uuid
+  companyId         String           @map("company_id") @db.Uuid
+  taxLedgerEntryId  String           @map("tax_ledger_entry_id") @db.Uuid
+  invoiceTaxLineId  String?          @map("invoice_tax_line_id") @db.Uuid
+  purchaseTaxLineId String?          @map("purchase_tax_line_id") @db.Uuid
+  taxRuleId         String           @map("tax_rule_id") @db.Uuid
+  taxableBase       Decimal          @map("taxable_base") @db.Decimal(14, 2)
+  rate              Decimal?         @db.Decimal(9, 6)
+  taxAmount         Decimal          @map("tax_amount") @db.Decimal(14, 2)
+  surchargeRate     Decimal?         @map("surcharge_rate") @db.Decimal(9, 6)
+  surchargeAmount   Decimal          @default(0) @map("surcharge_amount") @db.Decimal(14, 2)
+  deductibleAmount  Decimal?         @map("deductible_amount") @db.Decimal(14, 2)
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  entry             TaxLedgerEntry   @relation(fields: [taxLedgerEntryId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  invoiceTaxLine    InvoiceTaxLine?  @relation(fields: [invoiceTaxLineId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  purchaseTaxLine   PurchaseTaxLine? @relation(fields: [purchaseTaxLineId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  taxRule           TaxRule          @relation(fields: [taxRuleId], references: [id], onDelete: Restrict)
 
   @@unique([taxLedgerEntryId, invoiceTaxLineId])
+  @@unique([taxLedgerEntryId, purchaseTaxLineId])
   @@index([companyId, taxRuleId])
   @@map("tax_ledger_amounts")
+}
+
+model PurchaseInvoice {
+  id                    String                @id @default(uuid()) @db.Uuid
+  organizationId        String                @map("organization_id") @db.Uuid
+  companyId             String                @map("company_id") @db.Uuid
+  supplierId            String                @map("supplier_id") @db.Uuid
+  sequenceId            String?               @map("sequence_id") @db.Uuid
+  draftCode             String                @default(cuid()) @map("draft_code") @db.VarChar(40)
+  supplierInvoiceNumber String                @map("supplier_invoice_number") @db.VarChar(100)
+  receptionSeries       String?               @map("reception_series") @db.VarChar(30)
+  receptionNumber       BigInt?               @map("reception_number")
+  receptionFullNumber   String?               @map("reception_full_number") @db.VarChar(80)
+  approvalKey           String?               @map("approval_key") @db.VarChar(128)
+  status                PurchaseInvoiceStatus @default(DRAFT)
+  supplierLegalName     String                @map("supplier_legal_name") @db.VarChar(240)
+  supplierTaxId         String?               @map("supplier_tax_id") @db.VarChar(40)
+  issueDate             DateTime              @map("issue_date") @db.Date
+  operationDate         DateTime              @map("operation_date") @db.Date
+  receivedDate          DateTime              @map("received_date") @db.Date
+  deductionDate         DateTime              @map("deduction_date") @db.Date
+  currency              String                @default("EUR") @db.Char(3)
+  notes                 String?
+  subtotal              Decimal               @db.Decimal(14, 2)
+  discountTotal         Decimal               @map("discount_total") @db.Decimal(14, 2)
+  taxTotal              Decimal               @map("tax_total") @db.Decimal(14, 2)
+  deductibleTaxTotal    Decimal               @map("deductible_tax_total") @db.Decimal(14, 2)
+  total                 Decimal               @db.Decimal(14, 2)
+  approvedAt            DateTime?             @map("approved_at") @db.Timestamptz(6)
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company               Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  supplier              Contact               @relation(fields: [supplierId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  sequence              DocumentSequence?     @relation(fields: [sequenceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  lines                 PurchaseInvoiceLine[]
+  taxLines              PurchaseTaxLine[]
+  taxLedgerEntry        TaxLedgerEntry?
+
+  @@unique([companyId, draftCode])
+  @@unique([companyId, supplierId, supplierInvoiceNumber])
+  @@unique([companyId, receptionSeries, receptionNumber])
+  @@unique([companyId, approvalKey])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, status, receivedDate])
+  @@map("purchase_invoices")
+}
+
+model PurchaseInvoiceLine {
+  id                String            @id @default(uuid()) @db.Uuid
+  organizationId    String            @map("organization_id") @db.Uuid
+  companyId         String            @map("company_id") @db.Uuid
+  purchaseInvoiceId String            @map("purchase_invoice_id") @db.Uuid
+  catalogItemId     String?           @map("catalog_item_id") @db.Uuid
+  position          Int
+  description       String
+  quantity          Decimal           @db.Decimal(14, 3)
+  unitPrice         Decimal           @map("unit_price") @db.Decimal(14, 2)
+  discountPct       Decimal           @default(0) @map("discount_pct") @db.Decimal(5, 2)
+  netAmount         Decimal           @map("net_amount") @db.Decimal(14, 2)
+  taxAmount         Decimal           @map("tax_amount") @db.Decimal(14, 2)
+  totalAmount       Decimal           @map("total_amount") @db.Decimal(14, 2)
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseInvoice   PurchaseInvoice   @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  catalogItem       CatalogItem?      @relation(fields: [catalogItemId], references: [id], onDelete: Restrict)
+  taxLines          PurchaseTaxLine[]
+
+  @@unique([purchaseInvoiceId, position])
+  @@unique([id, purchaseInvoiceId, organizationId, companyId])
+  @@map("purchase_invoice_lines")
+}
+
+model PurchaseTaxLine {
+  id                    String              @id @default(uuid()) @db.Uuid
+  organizationId        String              @map("organization_id") @db.Uuid
+  companyId             String              @map("company_id") @db.Uuid
+  purchaseInvoiceId     String              @map("purchase_invoice_id") @db.Uuid
+  purchaseInvoiceLineId String              @unique @map("purchase_invoice_line_id") @db.Uuid
+  taxRuleId             String              @map("tax_rule_id") @db.Uuid
+  taxCode               String              @map("tax_code") @db.VarChar(80)
+  taxableBase           Decimal             @map("taxable_base") @db.Decimal(14, 2)
+  taxRate               Decimal?            @map("tax_rate") @db.Decimal(9, 6)
+  taxAmount             Decimal             @map("tax_amount") @db.Decimal(14, 2)
+  deductiblePct         Decimal             @default(100) @map("deductible_pct") @db.Decimal(5, 2)
+  deductibleAmount      Decimal             @map("deductible_amount") @db.Decimal(14, 2)
+  subject               Boolean
+  exempt                Boolean
+  exemptionReason       String?             @map("exemption_reason") @db.VarChar(100)
+  reverseCharge         Boolean             @map("reverse_charge")
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company               Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseInvoice       PurchaseInvoice     @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  purchaseInvoiceLine   PurchaseInvoiceLine @relation(fields: [purchaseInvoiceLineId, purchaseInvoiceId, organizationId, companyId], references: [id, purchaseInvoiceId, organizationId, companyId], onDelete: Cascade)
+  taxRule               TaxRule             @relation(fields: [taxRuleId], references: [id], onDelete: Restrict)
+  ledgerAmounts         TaxLedgerAmount[]
+
+  @@unique([id, organizationId, companyId])
+  @@index([purchaseInvoiceId])
+  @@map("purchase_tax_lines")
 }
 
 model InvoiceInstallment {
