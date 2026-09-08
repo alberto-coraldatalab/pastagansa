@@ -44,5 +44,3 @@ CREATE POLICY "invoice_email_deliveries_organization_isolation" ON "invoice_emai
   USING ("organization_id" = NULLIF(current_setting('app.organization_id', true), '')::uuid)
   WITH CHECK ("organization_id" = NULLIF(current_setting('app.organization_id', true), '')::uuid);
 ALTER TABLE "invoice_email_deliveries" FORCE ROW LEVEL SECURITY;
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON "invoice_email_deliveries" TO pastagansa_app;
