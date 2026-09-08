@@ -25,6 +25,8 @@ Future business controllers must use `@TenantProtected()`; the authentication an
 
 `/v1/catalog-items` manages products and services, including commercial defaults used when document lines are created. Tax codes are suggestions only; they will be resolved by the versioned fiscal engine, not trusted as tax calculations.
 
+`POST /v1/catalog-items/import` accepts a `csv` string with the catalog fields in its documented header. It validates all rows and executes an all-or-nothing import.
+
 Tenant selection headers (`x-organization-id`, `x-company-id`) are never authorization. They are only candidates validated against the database membership.
 
 ## Database safety

@@ -6,6 +6,8 @@ import { TenantContextService } from '../tenancy/tenant-context.service';
 import { CreateCatalogItemDto } from './dto/create-catalog-item.dto';
 import { ListCatalogItemsDto } from './dto/list-catalog-items.dto';
 import { UpdateCatalogItemDto } from './dto/update-catalog-item.dto';
+import { ImportCatalogItemsDto } from './dto/import-catalog-items.dto';
+import { parseCatalogCsv } from './csv';
 
 @Injectable()
 export class CatalogService {
@@ -27,6 +29,22 @@ export class CatalogService {
       const item = await this.prisma.catalogItem.create({ data: { ...this.scope(), ...normaliseCreate(input) } });
       await this.audit.record('catalog_item.created', 'catalog_item', item.id, { type: item.type });
       return item;
+    } catch (error) { throwConflict(error); }
+  }
+
+  async importCsv(input: ImportCatalogItemsDto) {
+    const rows = parseCatalogCsv(input.csv);
+    if (rows.length > 1_000) throw new BadRequestException('A catalog import cannot contain more than 1,000 rows');
+    const scope = this.scope();
+    const skus = rows.flatMap(({ sku }) => sku ? [sku] : []);
+    if (skus.length) {
+      const existing = await this.prisma.catalogItem.findFirst({ where: { ...scope, sku: { in: skus } }, select: { sku: true } });
+      if (existing?.sku) throw new ConflictException(`A catalog item with SKU ${existing.sku} already exists`);
+    }
+    try {
+      const items = await this.prisma.$transaction((tx) => Promise.all(rows.map((row) => tx.catalogItem.create({ data: { ...scope, type: row.type, sku: row.sku, name: row.name, description: row.description, unit: row.unit, salesPrice: row.salesPrice, currency: row.currency, suggestedTaxCode: row.suggestedTaxCode, revenueAccountCode: row.revenueAccountCode, expenseAccountCode: row.expenseAccountCode, trackInventory: row.trackInventory } }))));
+      await this.audit.record('catalog_item.imported', 'catalog_import', undefined, { count: items.length });
+      return { imported: items.length, items };
     } catch (error) { throwConflict(error); }
   }
 
