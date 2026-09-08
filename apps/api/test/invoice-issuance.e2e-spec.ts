@@ -107,6 +107,7 @@ describe("invoice issuance concurrency", () => {
           discountTotal: "0",
           taxTotal: "21",
           total: "121",
+          amountDue: "121",
         })),
       });
       const created = await db.invoice.findMany({

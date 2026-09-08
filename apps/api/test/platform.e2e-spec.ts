@@ -145,6 +145,31 @@ describe("platform integrity", () => {
       .expect(200);
     expect(updatedInvoice.body.notes).toBe("Updated draft");
     await authed(accountA.accessToken, tenantA)
+      .put(`/v1/invoices/${invoiceDraft.body.id}/payment-schedule`)
+      .send({
+        installments: [
+          { dueDate: "2026-09-30", amount: 60 },
+          { dueDate: "2026-10-31", amount: 60 },
+        ],
+      })
+      .expect(400);
+    const paymentSchedule = await authed(accountA.accessToken, tenantA)
+      .put(`/v1/invoices/${invoiceDraft.body.id}/payment-schedule`)
+      .send({
+        installments: [
+          { dueDate: "2026-09-30", amount: 60.5 },
+          { dueDate: "2026-10-31", amount: 60.5 },
+        ],
+      })
+      .expect(200);
+    expect(paymentSchedule.body).toHaveLength(2);
+    expect(paymentSchedule.body[1]).toMatchObject({
+      position: 2,
+      amount: "60.5",
+      paidAmount: "0",
+      status: "PENDING",
+    });
+    await authed(accountA.accessToken, tenantA)
       .get(`/v1/invoices/${invoiceDraft.body.id}/pdf`)
       .expect(409);
     await authed(accountA.accessToken, tenantA)
@@ -164,6 +189,14 @@ describe("platform integrity", () => {
       .send({ sequenceId: sequence.body.id })
       .expect(200);
     expect(retriedIssue.body.fullNumber).toBe(issuedInvoice.body.fullNumber);
+    const issuedSchedule = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${invoiceDraft.body.id}/payment-schedule`)
+      .expect(200);
+    expect(issuedSchedule.body).toHaveLength(2);
+    await authed(accountA.accessToken, tenantA)
+      .put(`/v1/invoices/${invoiceDraft.body.id}/payment-schedule`)
+      .send({ installments: [{ dueDate: "2026-10-31", amount: 121 }] })
+      .expect(409);
     const invoicePdf = await authed(accountA.accessToken, tenantA)
       .get(`/v1/invoices/${invoiceDraft.body.id}/pdf`)
       .expect("content-type", /application\/pdf/)
@@ -204,6 +237,90 @@ describe("platform integrity", () => {
     await authed(accountB.accessToken, tenantB)
       .get(`/v1/invoices/${invoiceDraft.body.id}/email-deliveries`)
       .expect(404);
+    const firstPaymentInput = {
+      amount: 60.5,
+      paidAt: "2026-09-15T10:00:00.000Z",
+      method: "BANK_TRANSFER",
+      reference: "TRANSFER-001",
+    };
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/payments`)
+      .send(firstPaymentInput)
+      .expect(400);
+    const firstPayment = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/payments`)
+      .set("idempotency-key", "payment-invoice-a-1")
+      .send(firstPaymentInput)
+      .expect(201);
+    expect(firstPayment.body.allocations).toHaveLength(1);
+    expect(firstPayment.body.allocations[0].amount).toBe("60.5");
+    await expect(
+      admin.payment.update({
+        where: { id: firstPayment.body.id },
+        data: { reference: "TAMPERED" },
+      }),
+    ).rejects.toThrow(/recorded payments and allocations are immutable/);
+    await expect(
+      admin.paymentAllocation.update({
+        where: { id: firstPayment.body.allocations[0].id },
+        data: { amount: "1" },
+      }),
+    ).rejects.toThrow(/recorded payments and allocations are immutable/);
+    const retriedPayment = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/payments`)
+      .set("idempotency-key", "payment-invoice-a-1")
+      .send(firstPaymentInput)
+      .expect(201);
+    expect(retriedPayment.body.id).toBe(firstPayment.body.id);
+    const partlyPaidInvoice = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${invoiceDraft.body.id}`)
+      .expect(200);
+    expect(partlyPaidInvoice.body).toMatchObject({
+      status: "PARTIALLY_PAID",
+      amountPaid: "60.5",
+      amountDue: "60.5",
+    });
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/payments`)
+      .set("idempotency-key", "payment-invoice-a-overpay")
+      .send({ ...firstPaymentInput, amount: 61 })
+      .expect(400);
+    await authed(accountB.accessToken, tenantB)
+      .get(`/v1/invoices/${invoiceDraft.body.id}/payments`)
+      .expect(404);
+    const finalPaymentAttempts = await Promise.all([
+      authed(accountA.accessToken, tenantA)
+        .post(`/v1/invoices/${invoiceDraft.body.id}/payments`)
+        .set("idempotency-key", "payment-invoice-a-2")
+        .send({
+          ...firstPaymentInput,
+          paidAt: "2026-10-15T10:00:00.000Z",
+          reference: "TRANSFER-002",
+        }),
+      authed(accountA.accessToken, tenantA)
+        .post(`/v1/invoices/${invoiceDraft.body.id}/payments`)
+        .set("idempotency-key", "payment-invoice-a-competing")
+        .send({
+          ...firstPaymentInput,
+          paidAt: "2026-10-15T10:01:00.000Z",
+          reference: "TRANSFER-COMPETING",
+        }),
+    ]);
+    expect(finalPaymentAttempts.map(({ status }) => status).sort()).toEqual([
+      201, 409,
+    ]);
+    const payments = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${invoiceDraft.body.id}/payments`)
+      .expect(200);
+    expect(payments.body).toHaveLength(2);
+    const paidInvoice = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${invoiceDraft.body.id}`)
+      .expect(200);
+    expect(paidInvoice.body).toMatchObject({
+      status: "PAID",
+      amountPaid: "121",
+      amountDue: "0",
+    });
     await authed(accountB.accessToken, tenantB)
       .post(`/v1/invoices/${invoiceDraft.body.id}/rectifications`)
       .send({
@@ -354,6 +471,7 @@ describe("platform integrity", () => {
     return {
       get: (path: string) => apply(request(app.getHttpServer()).get(path)),
       post: (path: string) => apply(request(app.getHttpServer()).post(path)),
+      put: (path: string) => apply(request(app.getHttpServer()).put(path)),
       patch: (path: string) => apply(request(app.getHttpServer()).patch(path)),
       delete: (path: string) =>
         apply(request(app.getHttpServer()).delete(path)),

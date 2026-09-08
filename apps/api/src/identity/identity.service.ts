@@ -60,6 +60,8 @@ export class IdentityService {
           ["invoice.delete", "Delete invoice drafts"],
           ["invoice.issue", "Issue invoices"],
           ["invoice.send", "Send invoices"],
+          ["payment.read", "Read invoice payments"],
+          ["payment.create", "Record invoice payments"],
         ].map(([code, name]) =>
           tx.permission.upsert({
             where: { code },

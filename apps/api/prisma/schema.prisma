@@ -96,43 +96,55 @@ enum InvoiceEmailStatus {
   FAILED
 }
 
+enum InstallmentStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+}
+
 model Organization {
-  id                String                 @id @default(uuid()) @db.Uuid
-  name              String
-  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  companies         Company[]
-  memberships       Membership[]
-  auditEvents       AuditEvent[]
-  contacts          Contact[]
-  quotes            Quote[]
-  contactAddresses  ContactAddress[]
-  catalogItems      CatalogItem[]
-  documentSequences DocumentSequence[]
-  invoices          Invoice[]
-  invoiceDeliveries InvoiceEmailDelivery[]
+  id                  String                 @id @default(uuid()) @db.Uuid
+  name                String
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  companies           Company[]
+  memberships         Membership[]
+  auditEvents         AuditEvent[]
+  contacts            Contact[]
+  quotes              Quote[]
+  contactAddresses    ContactAddress[]
+  catalogItems        CatalogItem[]
+  documentSequences   DocumentSequence[]
+  invoices            Invoice[]
+  invoiceDeliveries   InvoiceEmailDelivery[]
+  invoiceInstallments InvoiceInstallment[]
+  payments            Payment[]
+  paymentAllocations  PaymentAllocation[]
 
   @@map("organizations")
 }
 
 model Company {
-  id                String                 @id @default(uuid()) @db.Uuid
-  organizationId    String                 @map("organization_id") @db.Uuid
-  legalName         String                 @map("legal_name")
-  taxId             String                 @map("tax_id") @db.VarChar(40)
-  country           String                 @default("ES") @db.Char(2)
-  baseCurrency      String                 @default("EUR") @map("base_currency") @db.Char(3)
-  timezone          String                 @default("Europe/Madrid") @db.VarChar(64)
-  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  memberships       Membership[]
-  auditEvents       AuditEvent[]
-  contacts          Contact[]
-  quotes            Quote[]
-  contactAddresses  ContactAddress[]
-  catalogItems      CatalogItem[]
-  documentSequences DocumentSequence[]
-  invoices          Invoice[]
-  invoiceDeliveries InvoiceEmailDelivery[]
+  id                  String                 @id @default(uuid()) @db.Uuid
+  organizationId      String                 @map("organization_id") @db.Uuid
+  legalName           String                 @map("legal_name")
+  taxId               String                 @map("tax_id") @db.VarChar(40)
+  country             String                 @default("ES") @db.Char(2)
+  baseCurrency        String                 @default("EUR") @map("base_currency") @db.Char(3)
+  timezone            String                 @default("Europe/Madrid") @db.VarChar(64)
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization        Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships         Membership[]
+  auditEvents         AuditEvent[]
+  contacts            Contact[]
+  quotes              Quote[]
+  contactAddresses    ContactAddress[]
+  catalogItems        CatalogItem[]
+  documentSequences   DocumentSequence[]
+  invoices            Invoice[]
+  invoiceDeliveries   InvoiceEmailDelivery[]
+  invoiceInstallments InvoiceInstallment[]
+  payments            Payment[]
+  paymentAllocations  PaymentAllocation[]
 
   @@unique([organizationId, taxId])
   @@index([organizationId])
@@ -246,6 +258,8 @@ model Invoice {
   discountTotal       Decimal                @map("discount_total") @db.Decimal(14, 2)
   taxTotal            Decimal                @map("tax_total") @db.Decimal(14, 2)
   total               Decimal                @db.Decimal(14, 2)
+  amountPaid          Decimal                @default(0) @map("amount_paid") @db.Decimal(14, 2)
+  amountDue           Decimal                @default(0) @map("amount_due") @db.Decimal(14, 2)
   issuedAt            DateTime?              @map("issued_at") @db.Timestamptz(6)
   createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -257,6 +271,8 @@ model Invoice {
   rectifications      Invoice[]              @relation("InvoiceRectifications")
   lines               InvoiceLine[]
   emailDeliveries     InvoiceEmailDelivery[]
+  installments        InvoiceInstallment[]
+  paymentAllocations  PaymentAllocation[]
 
   @@unique([companyId, draftCode])
   @@unique([companyId, series, number])
@@ -265,6 +281,72 @@ model Invoice {
   @@index([companyId, status, issueDate])
   @@index([originalInvoiceId, createdAt])
   @@map("invoices")
+}
+
+model InvoiceInstallment {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  companyId      String              @map("company_id") @db.Uuid
+  invoiceId      String              @map("invoice_id") @db.Uuid
+  position       Int
+  dueDate        DateTime            @map("due_date") @db.Date
+  amount         Decimal             @db.Decimal(14, 2)
+  paidAmount     Decimal             @default(0) @map("paid_amount") @db.Decimal(14, 2)
+  status         InstallmentStatus   @default(PENDING)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invoice        Invoice             @relation(fields: [invoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  allocations    PaymentAllocation[]
+
+  @@unique([invoiceId, position])
+  @@unique([id, organizationId, companyId])
+  @@unique([id, invoiceId, organizationId, companyId])
+  @@index([companyId, status, dueDate])
+  @@map("invoice_installments")
+}
+
+model Payment {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  companyId      String              @map("company_id") @db.Uuid
+  idempotencyKey String              @map("idempotency_key") @db.VarChar(128)
+  amount         Decimal             @db.Decimal(14, 2)
+  currency       String              @db.Char(3)
+  paidAt         DateTime            @map("paid_at") @db.Timestamptz(6)
+  method         PaymentMethod
+  reference      String?             @db.VarChar(240)
+  notes          String?             @db.VarChar(1000)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  allocations    PaymentAllocation[]
+
+  @@unique([companyId, idempotencyKey])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, paidAt])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  companyId      String             @map("company_id") @db.Uuid
+  paymentId      String             @map("payment_id") @db.Uuid
+  invoiceId      String             @map("invoice_id") @db.Uuid
+  installmentId  String             @map("installment_id") @db.Uuid
+  amount         Decimal            @db.Decimal(14, 2)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  payment        Payment            @relation(fields: [paymentId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  invoice        Invoice            @relation(fields: [invoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  installment    InvoiceInstallment @relation(fields: [installmentId, invoiceId, organizationId, companyId], references: [id, invoiceId, organizationId, companyId], onDelete: Restrict)
+
+  @@unique([paymentId, installmentId])
+  @@index([invoiceId, createdAt])
+  @@map("payment_allocations")
 }
 
 model InvoiceEmailDelivery {

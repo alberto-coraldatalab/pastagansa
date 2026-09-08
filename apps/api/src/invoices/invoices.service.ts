@@ -84,6 +84,7 @@ export class InvoicesService {
       where: { id, ...this.scope() },
       include: {
         lines: { orderBy: { position: "asc" } },
+        installments: { orderBy: { position: "asc" } },
         originalInvoice: { select: { id: true, fullNumber: true } },
       },
     });
@@ -215,6 +216,7 @@ export class InvoicesService {
           currency: original.currency,
           notes: input.notes?.trim() || null,
           ...totals,
+          amountDue: new Decimal(0),
           lines: {
             create: lines.map(({ persisted }) => ({ ...persisted, ...scope })),
           },
@@ -264,6 +266,9 @@ export class InvoicesService {
       throw new ConflictException(
         "Invoice no longer exists or is no longer a draft",
       );
+    await this.tenant.db.invoiceInstallment.deleteMany({
+      where: { invoiceId: id, ...scope },
+    });
     await this.tenant.db.invoiceLine.deleteMany({
       where: { invoiceId: id, ...scope },
     });
@@ -275,13 +280,23 @@ export class InvoicesService {
   }
 
   async delete(id: string) {
-    const changed = await this.tenant.db.invoice.deleteMany({
-      where: { id, ...this.scope(), status: InvoiceStatus.DRAFT },
+    const scope = this.scope();
+    const invoice = await this.tenant.db.invoice.findFirst({
+      where: { id, ...scope },
+      select: { status: true },
     });
-    if (changed.count !== 1)
+    if (!invoice || invoice.status !== InvoiceStatus.DRAFT)
       throw new ConflictException(
         "Invoice no longer exists or is no longer a draft",
       );
+    await this.tenant.db.invoiceInstallment.deleteMany({
+      where: { invoiceId: id, ...scope },
+    });
+    const changed = await this.tenant.db.invoice.deleteMany({
+      where: { id, ...scope, status: InvoiceStatus.DRAFT },
+    });
+    if (changed.count !== 1)
+      throw new ConflictException("Invoice was changed concurrently");
     await this.audit.record("invoice.draft_deleted", "invoice", id);
   }
 
@@ -332,6 +347,21 @@ export class InvoicesService {
       throw new BadRequestException(
         `An active ${invoice.documentType} sequence from this company is required`,
       );
+    if (invoice.documentType === DocumentType.INVOICE) {
+      const installments = await this.tenant.db.invoiceInstallment.count({
+        where: { invoiceId: id, ...scope },
+      });
+      if (!installments && invoice.total.greaterThan(0))
+        await this.tenant.db.invoiceInstallment.create({
+          data: {
+            ...scope,
+            invoiceId: id,
+            position: 1,
+            dueDate: invoice.dueDate ?? invoice.issueDate,
+            amount: invoice.total,
+          },
+        });
+    }
     const [allocated] = await this.tenant.db.$queryRaw<
       Array<{ number: bigint }>
     >`
@@ -394,7 +424,10 @@ export class InvoicesService {
           ...scope,
           status: { notIn: [InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED] },
         },
-        data: { status: InvoiceStatus.RECTIFIED },
+        data: {
+          status: InvoiceStatus.RECTIFIED,
+          amountDue: new Decimal(0),
+        },
       });
       await this.audit.record(
         "invoice.rectified",
@@ -542,6 +575,8 @@ export class InvoicesService {
         currency: input.currency ?? "EUR",
         notes: input.notes?.trim() || null,
         ...totals,
+        amountPaid: new Decimal(0),
+        amountDue: totals.total,
       },
       lines: lines.map(({ persisted }) => persisted),
     };
