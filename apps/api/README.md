@@ -17,6 +17,8 @@ npm run dev
 
 Future business controllers must use `@TenantProtected()`; the authentication and tenant guards then require a verified bearer token, check the requested organization/company against active memberships, and write the approved context to `request.tenant`.
 
+`GET` and `PATCH /v1/companies/current` are the first company-scoped endpoints. They require tenant headers, a bearer token, and the `company.read` or `company.update` permission respectively. Company updates are recorded in `audit_events`.
+
 Tenant selection headers (`x-organization-id`, `x-company-id`) are never authorization. They are only candidates validated against the database membership.
 
 ## Database safety

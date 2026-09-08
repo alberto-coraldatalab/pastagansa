@@ -18,6 +18,12 @@ export class IdentityService {
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
     const user = await this.prisma.$transaction(async (tx) => {
       const role = await tx.role.upsert({ where: { code: 'organization.owner' }, update: {}, create: { code: 'organization.owner', name: 'Organization owner' } });
+      const permissions = await Promise.all([
+        ['company.read', 'Read company configuration'],
+        ['company.update', 'Update company configuration'],
+        ['company.manage', 'Manage companies'],
+      ].map(([code, name]) => tx.permission.upsert({ where: { code }, update: {}, create: { code, name } })));
+      await Promise.all(permissions.map(({ id: permissionId }) => tx.rolePermission.upsert({ where: { roleId_permissionId: { roleId: role.id, permissionId } }, update: {}, create: { roleId: role.id, permissionId } })));
       const organization = await tx.organization.create({ data: { name: input.organizationName.trim() } });
       const company = await tx.company.create({ data: { organizationId: organization.id, legalName: input.legalName.trim(), taxId: input.taxId.trim().toUpperCase() } });
       const createdUser = await tx.user.create({ data: { email, passwordHash, status: UserStatus.ACTIVE } });
