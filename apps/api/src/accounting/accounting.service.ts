@@ -26,6 +26,7 @@ import {
   CreateJournalEntryDto,
   ReverseJournalEntryDto,
 } from "./dto/accounting.dto";
+import { UpdateAccountingRuleDto } from "./dto/accounting-rule.dto";
 import {
   ListJournalEntriesDto,
   TrialBalanceDto,
@@ -86,6 +87,54 @@ export class AccountingService {
         );
       throw error;
     }
+  }
+
+  async listRules() {
+    await this.ensureAccountingRules();
+    return this.tenant.db.accountingRule.findMany({
+      where: this.scope(),
+      include: { account: true },
+      orderBy: [{ sourceType: "asc" }, { accountingRole: "asc" }],
+    });
+  }
+
+  async updateRule(
+    sourceType: JournalSourceType,
+    accountingRole: AccountingRole,
+    input: UpdateAccountingRuleDto,
+  ) {
+    assertRuleCombination(sourceType, accountingRole);
+    await this.ensureAccountingRules();
+    const expectedClass = ACCOUNT_CLASS_BY_ROLE[accountingRole];
+    const account = await this.tenant.db.account.findFirst({
+      where: {
+        id: input.accountId,
+        ...this.scope(),
+        active: true,
+        accountClass: expectedClass,
+      },
+    });
+    if (!account)
+      throw new BadRequestException(
+        `Rule account must be an active ${expectedClass} account in the selected company`,
+      );
+    const rule = await this.tenant.db.accountingRule.update({
+      where: {
+        companyId_sourceType_accountingRole: {
+          companyId: this.scope().companyId,
+          sourceType,
+          accountingRole,
+        },
+      },
+      data: { accountId: account.id },
+      include: { account: true },
+    });
+    await this.audit.record("accounting_rule.updated", "accounting_rule", rule.id, {
+      sourceType,
+      accountingRole,
+      accountId: account.id,
+    });
+    return rule;
   }
 
   async listFiscalYears() {
@@ -393,7 +442,10 @@ export class AccountingService {
     });
     if (!invoice || !invoice.fullNumber)
       throw new ConflictException("Only issued invoices can be posted");
-    const accounts = await this.accountsByRole();
+    const accounts = await this.accountsForSource(
+      JournalSourceType.SALES_INVOICE,
+      SALES_RULE_ROLES,
+    );
     const net = invoice.total.minus(invoice.taxTotal);
     const decrease =
       invoice.rectificationImpact === RectificationImpact.DECREASE;
@@ -451,7 +503,10 @@ export class AccountingService {
       throw new ConflictException(
         "Only approved purchase invoices can be posted",
       );
-    const accounts = await this.accountsByRole();
+    const accounts = await this.accountsForSource(
+      JournalSourceType.PURCHASE_INVOICE,
+      PURCHASE_RULE_ROLES,
+    );
     const expense = purchase.total.minus(purchase.deductibleTaxTotal);
     return this.createPostedEntry({
       entryDate: purchase.operationDate,
@@ -498,7 +553,10 @@ export class AccountingService {
       throw new ConflictException(
         "Only allocated customer payments can be posted",
       );
-    const accounts = await this.accountsByRole();
+    const accounts = await this.accountsForSource(
+      JournalSourceType.PAYMENT,
+      CUSTOMER_PAYMENT_RULE_ROLES,
+    );
     const receivables = new Map<string, Decimal>();
     for (const allocation of payment.allocations) {
       const current = receivables.get(allocation.invoice.contactId);
@@ -558,7 +616,10 @@ export class AccountingService {
     });
     if (!payment)
       throw new ConflictException("Supplier payment was not found for posting");
-    const accounts = await this.accountsByRole();
+    const accounts = await this.accountsForSource(
+      JournalSourceType.SUPPLIER_PAYMENT,
+      SUPPLIER_PAYMENT_RULE_ROLES,
+    );
     return this.createPostedEntry({
       entryDate: payment.paidAt,
       description: `Supplier payment ${payment.purchaseInvoice.supplierInvoiceNumber}`.slice(
@@ -659,37 +720,61 @@ export class AccountingService {
     return this.getEntry(entry.id);
   }
 
-  private async accountsByRole() {
-    await this.ensureAccounts();
-    const accounts = await this.tenant.db.account.findMany({
-      where: { ...this.scope(), active: true, systemRole: { not: null } },
+  private async accountsForSource<Role extends AccountingRole>(
+    sourceType: JournalSourceType,
+    required: readonly Role[],
+  ): Promise<Record<Role, string>> {
+    await this.ensureAccountingRules();
+    const rules = await this.tenant.db.accountingRule.findMany({
+      where: {
+        ...this.scope(),
+        sourceType,
+        accountingRole: { in: [...required] },
+        account: { active: true },
+      },
     });
     const byRole = new Map(
-      accounts.map((account) => [account.systemRole, account.id]),
+      rules.map((rule) => [rule.accountingRole, rule.accountId]),
     );
-    const required = [
-      AccountingRole.CUSTOMER_RECEIVABLE,
-      AccountingRole.SUPPLIER_PAYABLE,
-      AccountingRole.SALES_REVENUE,
-      AccountingRole.PURCHASE_EXPENSE,
-      AccountingRole.OUTPUT_VAT,
-      AccountingRole.INPUT_VAT,
-      AccountingRole.BANK,
-    ];
     for (const role of required)
       if (!byRole.has(role))
         throw new ConflictException(
-          `Active accounting role ${role} is required`,
+          `Active accounting rule ${sourceType}/${role} is required`,
         );
     return Object.fromEntries(
       required.map((role) => [role, byRole.get(role)!]),
-    ) as Record<(typeof required)[number], string>;
+    ) as Record<Role, string>;
   }
 
   private async ensureAccounts() {
     const scope = this.scope();
     await this.tenant.db.account.createMany({
       data: DEFAULT_ACCOUNTS.map((account) => ({ ...scope, ...account })),
+      skipDuplicates: true,
+    });
+  }
+
+  private async ensureAccountingRules() {
+    await this.ensureAccounts();
+    const scope = this.scope();
+    const accounts = await this.tenant.db.account.findMany({
+      where: { ...scope, active: true, systemRole: { not: null } },
+      select: { id: true, systemRole: true },
+    });
+    const byRole = new Map(
+      accounts.map((account) => [account.systemRole, account.id]),
+    );
+    for (const rule of DEFAULT_ACCOUNTING_RULES)
+      if (!byRole.has(rule.accountingRole))
+        throw new ConflictException(
+          `Active accounting role ${rule.accountingRole} is required`,
+        );
+    await this.tenant.db.accountingRule.createMany({
+      data: DEFAULT_ACCOUNTING_RULES.map((rule) => ({
+        ...scope,
+        ...rule,
+        accountId: byRole.get(rule.accountingRole)!,
+      })),
       skipDuplicates: true,
     });
   }
@@ -746,6 +831,62 @@ export class AccountingService {
     if (!companyId) throw new BadRequestException("x-company-id is required");
     return { organizationId, companyId };
   }
+}
+
+const SALES_RULE_ROLES = [
+  AccountingRole.CUSTOMER_RECEIVABLE,
+  AccountingRole.SALES_REVENUE,
+  AccountingRole.OUTPUT_VAT,
+] as const;
+const PURCHASE_RULE_ROLES = [
+  AccountingRole.PURCHASE_EXPENSE,
+  AccountingRole.INPUT_VAT,
+  AccountingRole.SUPPLIER_PAYABLE,
+] as const;
+const CUSTOMER_PAYMENT_RULE_ROLES = [
+  AccountingRole.BANK,
+  AccountingRole.CUSTOMER_RECEIVABLE,
+] as const;
+const SUPPLIER_PAYMENT_RULE_ROLES = [
+  AccountingRole.SUPPLIER_PAYABLE,
+  AccountingRole.BANK,
+] as const;
+
+const RULE_ROLES: Partial<
+  Record<JournalSourceType, readonly AccountingRole[]>
+> = {
+  [JournalSourceType.SALES_INVOICE]: SALES_RULE_ROLES,
+  [JournalSourceType.PURCHASE_INVOICE]: PURCHASE_RULE_ROLES,
+  [JournalSourceType.PAYMENT]: CUSTOMER_PAYMENT_RULE_ROLES,
+  [JournalSourceType.SUPPLIER_PAYMENT]: SUPPLIER_PAYMENT_RULE_ROLES,
+};
+
+const DEFAULT_ACCOUNTING_RULES = Object.entries(RULE_ROLES).flatMap(
+  ([sourceType, roles]) =>
+    (roles ?? []).map((accountingRole) => ({
+      sourceType: sourceType as JournalSourceType,
+      accountingRole,
+    })),
+);
+
+const ACCOUNT_CLASS_BY_ROLE: Record<AccountingRole, AccountClass> = {
+  [AccountingRole.CUSTOMER_RECEIVABLE]: AccountClass.ASSET,
+  [AccountingRole.SUPPLIER_PAYABLE]: AccountClass.LIABILITY,
+  [AccountingRole.SALES_REVENUE]: AccountClass.INCOME,
+  [AccountingRole.PURCHASE_EXPENSE]: AccountClass.EXPENSE,
+  [AccountingRole.OUTPUT_VAT]: AccountClass.LIABILITY,
+  [AccountingRole.INPUT_VAT]: AccountClass.ASSET,
+  [AccountingRole.BANK]: AccountClass.ASSET,
+};
+
+function assertRuleCombination(
+  sourceType: JournalSourceType,
+  accountingRole: AccountingRole,
+) {
+  if (!RULE_ROLES[sourceType]?.includes(accountingRole))
+    throw new BadRequestException(
+      `Accounting role ${accountingRole} is not valid for ${sourceType}`,
+    );
 }
 
 const DEFAULT_ACCOUNTS = [

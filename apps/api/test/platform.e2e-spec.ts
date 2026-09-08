@@ -475,6 +475,62 @@ describe("platform integrity", () => {
       amountPaid: "121",
       amountDue: "0",
     });
+    const defaultAccountingRules = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .get("/v1/accounting/rules")
+      .expect(200);
+    expect(defaultAccountingRules.body).toHaveLength(10);
+    expect(defaultAccountingRules.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceType: "SALES_INVOICE",
+          accountingRole: "SALES_REVENUE",
+          account: expect.objectContaining({ code: "700000" }),
+        }),
+      ]),
+    );
+    const alternateRevenueAccount = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .post("/v1/accounting/accounts")
+      .send({
+        code: "701000",
+        name: "Ventas alternativas",
+        accountClass: "INCOME",
+      })
+      .expect(201);
+    await authed(accountA.accessToken, tenantA)
+      .put("/v1/accounting/rules/PAYMENT/SALES_REVENUE")
+      .send({ accountId: alternateRevenueAccount.body.id })
+      .expect(400);
+    await authed(accountB.accessToken, tenantB)
+      .put("/v1/accounting/rules/SALES_INVOICE/SALES_REVENUE")
+      .send({ accountId: alternateRevenueAccount.body.id })
+      .expect(400);
+    const updatedRevenueRule = await authed(accountA.accessToken, tenantA)
+      .put("/v1/accounting/rules/SALES_INVOICE/SALES_REVENUE")
+      .send({ accountId: alternateRevenueAccount.body.id })
+      .expect(200);
+    expect(updatedRevenueRule.body).toMatchObject({
+      sourceType: "SALES_INVOICE",
+      accountingRole: "SALES_REVENUE",
+      account: { id: alternateRevenueAccount.body.id, code: "701000" },
+    });
+    const bankRule = defaultAccountingRules.body.find(
+      ({ sourceType, accountingRole }: Record<string, string>) =>
+        sourceType === "PAYMENT" && accountingRole === "BANK",
+    );
+    await expect(
+      admin.accountingRule.update({
+        where: { id: updatedRevenueRule.body.id },
+        data: { accountId: bankRule.account.id },
+      }),
+    ).rejects.toThrow(
+      /accounting rule requires an active account of the expected class/,
+    );
     await authed(accountB.accessToken, tenantB)
       .post(`/v1/invoices/${invoiceDraft.body.id}/rectifications`)
       .send({
@@ -539,7 +595,7 @@ describe("platform integrity", () => {
     expect(accountingAmounts(rectificationEntry)).toEqual({
       "430000": { debit: "0", credit: "121" },
       "477000": { debit: "21", credit: "0" },
-      "700000": { debit: "100", credit: "0" },
+      "701000": { debit: "100", credit: "0" },
     });
     await authed(accountA.accessToken, tenantA)
       .get(`/v1/invoices/${rectification.body.id}/pdf`)
@@ -1020,7 +1076,7 @@ describe("platform integrity", () => {
     const accounts = await authed(accountA.accessToken, tenantA)
       .get("/v1/accounting/accounts")
       .expect(200);
-    expect(accounts.body).toHaveLength(7);
+    expect(accounts.body).toHaveLength(8);
     const bankAccount = accounts.body.find(
       ({ code }: { code: string }) => code === "572000",
     );

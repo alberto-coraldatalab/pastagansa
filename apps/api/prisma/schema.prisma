@@ -197,6 +197,7 @@ model Organization {
   accountingPeriods    AccountingPeriod[]
   journalEntries       JournalEntry[]
   journalLines         JournalLine[]
+  accountingRules      AccountingRule[]
   supplierPayments     SupplierPayment[]
   bankAccounts         BankAccount[]
   bankTransactions     BankTransaction[]
@@ -238,6 +239,7 @@ model Company {
   accountingPeriods    AccountingPeriod[]
   journalEntries       JournalEntry[]
   journalLines         JournalLine[]
+  accountingRules      AccountingRule[]
   supplierPayments     SupplierPayment[]
   bankAccounts         BankAccount[]
   bankTransactions     BankTransaction[]
@@ -727,12 +729,32 @@ model Account {
   children       Account[]       @relation("AccountHierarchy")
   journalLines   JournalLine[]
   bankAccounts   BankAccount[]
+  postingRules   AccountingRule[]
 
   @@unique([companyId, code])
   @@unique([companyId, systemRole])
   @@unique([id, organizationId, companyId])
   @@index([companyId, accountClass, active])
   @@map("accounts")
+}
+
+model AccountingRule {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  companyId      String            @map("company_id") @db.Uuid
+  sourceType     JournalSourceType @map("source_type")
+  accountingRole AccountingRole    @map("accounting_role")
+  accountId      String            @map("account_id") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  account        Account           @relation(fields: [accountId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+
+  @@unique([companyId, sourceType, accountingRole])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, sourceType])
+  @@map("accounting_rules")
 }
 
 model FiscalYear {

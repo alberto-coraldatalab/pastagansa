@@ -73,6 +73,8 @@ export class IdentityService {
           ["supplier_payment.create", "Record supplier payments"],
           ["account.read", "Read chart of accounts"],
           ["account.manage", "Manage chart of accounts"],
+          ["accounting_rule.read", "Read accounting rules"],
+          ["accounting_rule.manage", "Manage accounting rules"],
           ["fiscal_year.read", "Read fiscal years and periods"],
           ["fiscal_year.manage", "Manage fiscal years"],
           ["accounting_period.lock", "Lock accounting periods"],

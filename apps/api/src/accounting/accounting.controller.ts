@@ -6,10 +6,13 @@ import {
   Headers,
   HttpCode,
   Param,
+  ParseEnumPipe,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
 } from "@nestjs/common";
+import { AccountingRole, JournalSourceType } from "@prisma/client";
 import { RequirePermissions } from "../authorization/permissions.decorator";
 import { TenantProtected } from "../tenancy/tenant.decorator";
 import { AccountingService } from "./accounting.service";
@@ -19,6 +22,7 @@ import {
   CreateJournalEntryDto,
   ReverseJournalEntryDto,
 } from "./dto/accounting.dto";
+import { UpdateAccountingRuleDto } from "./dto/accounting-rule.dto";
 import {
   ListJournalEntriesDto,
   TrialBalanceDto,
@@ -39,6 +43,24 @@ export class AccountingController {
   @RequirePermissions("account.manage")
   createAccount(@Body() input: CreateAccountDto) {
     return this.accounting.createAccount(input);
+  }
+
+  @Get("rules")
+  @RequirePermissions("accounting_rule.read")
+  rules() {
+    return this.accounting.listRules();
+  }
+
+  @Put("rules/:sourceType/:accountingRole")
+  @RequirePermissions("accounting_rule.manage")
+  updateRule(
+    @Param("sourceType", new ParseEnumPipe(JournalSourceType))
+    sourceType: JournalSourceType,
+    @Param("accountingRole", new ParseEnumPipe(AccountingRole))
+    accountingRole: AccountingRole,
+    @Body() input: UpdateAccountingRuleDto,
+  ) {
+    return this.accounting.updateRule(sourceType, accountingRole, input);
   }
 
   @Get("fiscal-years")
