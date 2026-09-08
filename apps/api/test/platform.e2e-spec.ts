@@ -141,6 +141,9 @@ describe("platform integrity", () => {
       .expect(200);
     expect(updatedInvoice.body.notes).toBe("Updated draft");
     await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${invoiceDraft.body.id}/pdf`)
+      .expect(409);
+    await authed(accountA.accessToken, tenantA)
       .post(`/v1/invoices/${invoiceDraft.body.id}/issue`)
       .send({ sequenceId: sequence.body.id })
       .expect(400);
@@ -157,6 +160,46 @@ describe("platform integrity", () => {
       .send({ sequenceId: sequence.body.id })
       .expect(200);
     expect(retriedIssue.body.fullNumber).toBe(issuedInvoice.body.fullNumber);
+    const invoicePdf = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${invoiceDraft.body.id}/pdf`)
+      .expect("content-type", /application\/pdf/)
+      .expect(
+        "content-disposition",
+        'attachment; filename="factura-F2026-00001.pdf"',
+      )
+      .expect(200);
+    expect(invoicePdf.body.subarray(0, 5).toString()).toBe("%PDF-");
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/email`)
+      .send({})
+      .expect(400);
+    const queuedEmails = await Promise.all([
+      authed(accountA.accessToken, tenantA)
+        .post(`/v1/invoices/${invoiceDraft.body.id}/email`)
+        .set("idempotency-key", "email-invoice-a")
+        .send({})
+        .expect(202),
+      authed(accountA.accessToken, tenantA)
+        .post(`/v1/invoices/${invoiceDraft.body.id}/email`)
+        .set("idempotency-key", "email-invoice-a")
+        .send({})
+        .expect(202),
+    ]);
+    const [queuedEmail, retriedEmail] = queuedEmails;
+    expect(queuedEmail.body).toMatchObject({
+      invoiceId: invoiceDraft.body.id,
+      recipient: "billing-a@example.com",
+      status: "PENDING",
+      attempts: 0,
+    });
+    expect(retriedEmail.body.id).toBe(queuedEmail.body.id);
+    const deliveries = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${invoiceDraft.body.id}/email-deliveries`)
+      .expect(200);
+    expect(deliveries.body).toHaveLength(1);
+    await authed(accountB.accessToken, tenantB)
+      .get(`/v1/invoices/${invoiceDraft.body.id}/email-deliveries`)
+      .expect(404);
     await authed(accountA.accessToken, tenantA)
       .patch(`/v1/invoices/${invoiceDraft.body.id}`)
       .send(invoice(contactA.body.id))

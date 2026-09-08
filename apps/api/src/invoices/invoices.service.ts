@@ -21,12 +21,14 @@ import {
 } from "./dto/invoice.dto";
 import { ListInvoicesDto } from "./dto/list-invoices.dto";
 import { IssueInvoiceDto } from "./dto/issue-invoice.dto";
+import { InvoicePdfService } from "./invoice-pdf.service";
 
 @Injectable()
 export class InvoicesService {
   constructor(
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
+    private readonly pdf: InvoicePdfService,
   ) {}
 
   async list(query: ListInvoicesDto) {
@@ -77,6 +79,19 @@ export class InvoicesService {
     });
     if (!invoice) throw new NotFoundException("Invoice not found");
     return presentInvoice(invoice);
+  }
+
+  async downloadPdf(id: string) {
+    const invoice = await this.get(id);
+    if (invoice.status === InvoiceStatus.DRAFT || !invoice.fullNumber)
+      throw new ConflictException("Only issued invoices have an official PDF");
+    return {
+      filename: `factura-${safeFilename(invoice.fullNumber)}.pdf`,
+      content: await this.pdf.render({
+        ...invoice,
+        fullNumber: invoice.fullNumber,
+      }),
+    };
   }
 
   async create(input: CreateInvoiceDto) {
@@ -377,4 +392,8 @@ export function formatInvoiceNumber(
   padding: number,
 ) {
   return `${series}-${number.toString().padStart(padding, "0")}`;
+}
+
+function safeFilename(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, "-");
 }

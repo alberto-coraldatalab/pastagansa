@@ -78,10 +78,17 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum InvoiceEmailStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
 model Organization {
-  id                String             @id @default(uuid()) @db.Uuid
+  id                String                 @id @default(uuid()) @db.Uuid
   name              String
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   companies         Company[]
   memberships       Membership[]
   auditEvents       AuditEvent[]
@@ -91,20 +98,21 @@ model Organization {
   catalogItems      CatalogItem[]
   documentSequences DocumentSequence[]
   invoices          Invoice[]
+  invoiceDeliveries InvoiceEmailDelivery[]
 
   @@map("organizations")
 }
 
 model Company {
-  id                String             @id @default(uuid()) @db.Uuid
-  organizationId    String             @map("organization_id") @db.Uuid
-  legalName         String             @map("legal_name")
-  taxId             String             @map("tax_id") @db.VarChar(40)
-  country           String             @default("ES") @db.Char(2)
-  baseCurrency      String             @default("EUR") @map("base_currency") @db.Char(3)
-  timezone          String             @default("Europe/Madrid") @db.VarChar(64)
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                String                 @id @default(uuid()) @db.Uuid
+  organizationId    String                 @map("organization_id") @db.Uuid
+  legalName         String                 @map("legal_name")
+  taxId             String                 @map("tax_id") @db.VarChar(40)
+  country           String                 @default("ES") @db.Char(2)
+  baseCurrency      String                 @default("EUR") @map("base_currency") @db.Char(3)
+  timezone          String                 @default("Europe/Madrid") @db.VarChar(64)
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   memberships       Membership[]
   auditEvents       AuditEvent[]
   contacts          Contact[]
@@ -113,6 +121,7 @@ model Company {
   catalogItems      CatalogItem[]
   documentSequences DocumentSequence[]
   invoices          Invoice[]
+  invoiceDeliveries InvoiceEmailDelivery[]
 
   @@unique([organizationId, taxId])
   @@index([organizationId])
@@ -196,39 +205,40 @@ model DocumentSequence {
 }
 
 model Invoice {
-  id                String            @id @default(uuid()) @db.Uuid
-  organizationId    String            @map("organization_id") @db.Uuid
-  companyId         String            @map("company_id") @db.Uuid
-  contactId         String            @map("contact_id") @db.Uuid
-  sequenceId        String?           @map("sequence_id") @db.Uuid
-  draftCode         String            @default(cuid()) @map("draft_code") @db.VarChar(40)
-  series            String?           @db.VarChar(30)
+  id                String                 @id @default(uuid()) @db.Uuid
+  organizationId    String                 @map("organization_id") @db.Uuid
+  companyId         String                 @map("company_id") @db.Uuid
+  contactId         String                 @map("contact_id") @db.Uuid
+  sequenceId        String?                @map("sequence_id") @db.Uuid
+  draftCode         String                 @default(cuid()) @map("draft_code") @db.VarChar(40)
+  series            String?                @db.VarChar(30)
   number            BigInt?
-  fullNumber        String?           @map("full_number") @db.VarChar(80)
-  issuanceKey       String?           @map("issuance_key") @db.VarChar(128)
-  status            InvoiceStatus     @default(DRAFT)
-  issuerLegalName   String            @map("issuer_legal_name") @db.VarChar(240)
-  issuerTaxId       String            @map("issuer_tax_id") @db.VarChar(40)
-  customerLegalName String            @map("customer_legal_name") @db.VarChar(240)
-  customerTaxId     String?           @map("customer_tax_id") @db.VarChar(40)
-  customerEmail     String?           @map("customer_email") @db.VarChar(320)
-  billingAddress    Json?             @map("billing_address")
-  issueDate         DateTime          @map("issue_date") @db.Date
-  dueDate           DateTime?         @map("due_date") @db.Date
-  currency          String            @default("EUR") @db.Char(3)
+  fullNumber        String?                @map("full_number") @db.VarChar(80)
+  issuanceKey       String?                @map("issuance_key") @db.VarChar(128)
+  status            InvoiceStatus          @default(DRAFT)
+  issuerLegalName   String                 @map("issuer_legal_name") @db.VarChar(240)
+  issuerTaxId       String                 @map("issuer_tax_id") @db.VarChar(40)
+  customerLegalName String                 @map("customer_legal_name") @db.VarChar(240)
+  customerTaxId     String?                @map("customer_tax_id") @db.VarChar(40)
+  customerEmail     String?                @map("customer_email") @db.VarChar(320)
+  billingAddress    Json?                  @map("billing_address")
+  issueDate         DateTime               @map("issue_date") @db.Date
+  dueDate           DateTime?              @map("due_date") @db.Date
+  currency          String                 @default("EUR") @db.Char(3)
   notes             String?
-  subtotal          Decimal           @db.Decimal(14, 2)
-  discountTotal     Decimal           @map("discount_total") @db.Decimal(14, 2)
-  taxTotal          Decimal           @map("tax_total") @db.Decimal(14, 2)
-  total             Decimal           @db.Decimal(14, 2)
-  issuedAt          DateTime?         @map("issued_at") @db.Timestamptz(6)
-  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company           Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  contact           Contact           @relation(fields: [contactId], references: [id], onDelete: Restrict)
-  sequence          DocumentSequence? @relation(fields: [sequenceId], references: [id], onDelete: Restrict)
+  subtotal          Decimal                @db.Decimal(14, 2)
+  discountTotal     Decimal                @map("discount_total") @db.Decimal(14, 2)
+  taxTotal          Decimal                @map("tax_total") @db.Decimal(14, 2)
+  total             Decimal                @db.Decimal(14, 2)
+  issuedAt          DateTime?              @map("issued_at") @db.Timestamptz(6)
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company                @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  contact           Contact                @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  sequence          DocumentSequence?      @relation(fields: [sequenceId], references: [id], onDelete: Restrict)
   lines             InvoiceLine[]
+  emailDeliveries   InvoiceEmailDelivery[]
 
   @@unique([companyId, draftCode])
   @@unique([companyId, series, number])
@@ -236,6 +246,32 @@ model Invoice {
   @@unique([id, organizationId, companyId])
   @@index([companyId, status, issueDate])
   @@map("invoices")
+}
+
+model InvoiceEmailDelivery {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  companyId      String             @map("company_id") @db.Uuid
+  invoiceId      String             @map("invoice_id") @db.Uuid
+  idempotencyKey String             @map("idempotency_key") @db.VarChar(128)
+  recipient      String             @db.VarChar(320)
+  subject        String             @db.VarChar(300)
+  status         InvoiceEmailStatus @default(PENDING)
+  attempts       Int                @default(0)
+  availableAt    DateTime           @default(now()) @map("available_at") @db.Timestamptz(6)
+  lockedAt       DateTime?          @map("locked_at") @db.Timestamptz(6)
+  sentAt         DateTime?          @map("sent_at") @db.Timestamptz(6)
+  lastError      String?            @map("last_error") @db.VarChar(1000)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invoice        Invoice            @relation(fields: [invoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+
+  @@unique([companyId, idempotencyKey])
+  @@index([status, availableAt])
+  @@index([invoiceId, createdAt])
+  @@map("invoice_email_deliveries")
 }
 
 model InvoiceLine {

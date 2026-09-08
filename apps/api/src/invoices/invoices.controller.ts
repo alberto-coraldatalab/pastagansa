@@ -11,18 +11,24 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
 } from "@nestjs/common";
 import { RequirePermissions } from "../authorization/permissions.decorator";
 import { TenantProtected } from "../tenancy/tenant.decorator";
 import { CreateInvoiceDto, UpdateInvoiceDto } from "./dto/invoice.dto";
 import { ListInvoicesDto } from "./dto/list-invoices.dto";
 import { IssueInvoiceDto } from "./dto/issue-invoice.dto";
+import { SendInvoiceEmailDto } from "./dto/send-invoice-email.dto";
+import { InvoiceEmailService } from "./invoice-email.service";
 import { InvoicesService } from "./invoices.service";
 
 @Controller("invoices")
 @TenantProtected()
 export class InvoicesController {
-  constructor(private readonly invoices: InvoicesService) {}
+  constructor(
+    private readonly invoices: InvoicesService,
+    private readonly emails: InvoiceEmailService,
+  ) {}
 
   @Get()
   @RequirePermissions("invoice.read")
@@ -34,6 +40,23 @@ export class InvoicesController {
   @RequirePermissions("invoice.read")
   get(@Param("id", ParseUUIDPipe) id: string) {
     return this.invoices.get(id);
+  }
+
+  @Get(":id/pdf")
+  @RequirePermissions("invoice.read")
+  async pdf(@Param("id", ParseUUIDPipe) id: string) {
+    const file = await this.invoices.downloadPdf(id);
+    return new StreamableFile(file.content, {
+      type: "application/pdf",
+      disposition: `attachment; filename="${file.filename}"`,
+      length: file.content.length,
+    });
+  }
+
+  @Get(":id/email-deliveries")
+  @RequirePermissions("invoice.read")
+  deliveries(@Param("id", ParseUUIDPipe) id: string) {
+    return this.emails.list(id);
   }
 
   @Post()
@@ -60,6 +83,21 @@ export class InvoicesController {
     @Body() input: IssueInvoiceDto,
   ) {
     return this.invoices.issue(
+      id,
+      input,
+      requireIdempotencyKey(idempotencyKey),
+    );
+  }
+
+  @Post(":id/email")
+  @HttpCode(202)
+  @RequirePermissions("invoice.send")
+  email(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() input: SendInvoiceEmailDto,
+  ) {
+    return this.emails.enqueue(
       id,
       input,
       requireIdempotencyKey(idempotencyKey),

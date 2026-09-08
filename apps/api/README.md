@@ -29,6 +29,10 @@ Future business controllers must use `@TenantProtected()`; the authentication an
 
 Contact and catalog list endpoints return `{ data, nextCursor }`. Provide `cursor` from the previous response together with an optional `limit` (1–100) to fetch the next page; cursors are validated against the selected company.
 
+`/v1/invoices` supports draft creation, atomic issuance through a company document sequence, official PDF download, and transactional email enqueueing. Issuance and email requests require an `Idempotency-Key` header. Once issued, invoice headers and lines are immutable at the database layer.
+
+Invoice email delivery remains safely pending until SMTP is configured. Set `SMTP_HOST`, `SMTP_FROM`, and optionally `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, and `SMTP_PASSWORD`; authenticated SMTP requires both user and password. The outbox worker also requires `DIRECT_DATABASE_URL` so it can discover tenant queues before processing each delivery through an organization-scoped RLS transaction. Delivery is at-least-once and retries transient failures up to five attempts with exponential backoff.
+
 Tenant selection headers (`x-organization-id`, `x-company-id`) are never authorization. They are only candidates validated against the database membership.
 
 ## Database safety
