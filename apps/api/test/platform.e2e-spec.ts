@@ -1,7 +1,8 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PrismaClient } from "@prisma/client";
-import request, { Test as SupertestTest } from "supertest";
+import request = require("supertest");
+import type { Test as SupertestTest } from "supertest";
 import { AppModule } from "../src/app.module";
 
 describe("platform integrity", () => {
