@@ -231,6 +231,7 @@ export class PurchasesService {
         receptionFullNumber,
         approvalKey: idempotencyKey,
         status: PurchaseInvoiceStatus.APPROVED,
+        amountDue: purchase.total,
         approvedAt: new Date(),
       },
     });

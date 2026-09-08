@@ -625,6 +625,8 @@ describe("platform integrity", () => {
       status: "APPROVED",
       receptionNumber: "1",
       receptionFullNumber: "REC2026-00001",
+      amountPaid: "0",
+      amountDue: "242",
     });
     const retriedPurchaseApproval = await authed(accountA.accessToken, tenantA)
       .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/approve`)
@@ -667,6 +669,114 @@ describe("platform integrity", () => {
       "400000": { debit: "0", credit: "242" },
       "472000": { debit: "21", credit: "0" },
       "600000": { debit: "221", credit: "0" },
+    });
+    const supplierPaymentInput = {
+      amount: 100,
+      paidAt: "2026-10-10T10:00:00.000Z",
+      method: "BANK_TRANSFER",
+      reference: "SUPPLIER-TRANSFER-001",
+    };
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
+      .send(supplierPaymentInput)
+      .expect(400);
+    await authed(accountB.accessToken, tenantB)
+      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
+      .expect(404);
+    const firstSupplierPayment = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
+      .set("idempotency-key", "supplier-payment-a-1")
+      .send(supplierPaymentInput)
+      .expect(201);
+    expect(firstSupplierPayment.body).toMatchObject({
+      purchaseInvoiceId: purchaseDraft.body.id,
+      amount: "100",
+      currency: "EUR",
+    });
+    let supplierPaymentEntries = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/journal-entries?sourceType=SUPPLIER_PAYMENT")
+      .expect(200);
+    expect(supplierPaymentEntries.body.data).toHaveLength(1);
+    expect(supplierPaymentEntries.body.data[0]).toMatchObject({
+      sourceId: firstSupplierPayment.body.id,
+      status: "POSTED",
+      entryNumber: "6",
+    });
+    expect(accountingAmounts(supplierPaymentEntries.body.data[0])).toEqual({
+      "400000": { debit: "100", credit: "0" },
+      "572000": { debit: "0", credit: "100" },
+    });
+    await expect(
+      admin.supplierPayment.update({
+        where: { id: firstSupplierPayment.body.id },
+        data: { reference: "TAMPERED" },
+      }),
+    ).rejects.toThrow(/recorded supplier payments are immutable/);
+    const retriedSupplierPayment = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
+      .set("idempotency-key", "supplier-payment-a-1")
+      .send(supplierPaymentInput)
+      .expect(201);
+    expect(retriedSupplierPayment.body.id).toBe(firstSupplierPayment.body.id);
+    supplierPaymentEntries = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/journal-entries?sourceType=SUPPLIER_PAYMENT")
+      .expect(200);
+    expect(supplierPaymentEntries.body.data).toHaveLength(1);
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
+      .set("idempotency-key", "supplier-payment-a-overpay")
+      .send({ ...supplierPaymentInput, amount: 143 })
+      .expect(400);
+    const finalSupplierAttempts = await Promise.all([
+      authed(accountA.accessToken, tenantA)
+        .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
+        .set("idempotency-key", "supplier-payment-a-2")
+        .send({
+          ...supplierPaymentInput,
+          amount: 142,
+          reference: "SUPPLIER-TRANSFER-002",
+        }),
+      authed(accountA.accessToken, tenantA)
+        .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
+        .set("idempotency-key", "supplier-payment-a-competing")
+        .send({
+          ...supplierPaymentInput,
+          amount: 142,
+          reference: "SUPPLIER-TRANSFER-COMPETING",
+        }),
+    ]);
+    expect(
+      finalSupplierAttempts.map(({ status }) => status).sort(),
+    ).toEqual([201, 409]);
+    const supplierPayments = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
+      .expect(200);
+    expect(supplierPayments.body).toHaveLength(2);
+    const paidPurchase = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}`)
+      .expect(200);
+    expect(paidPurchase.body).toMatchObject({
+      status: "APPROVED",
+      amountPaid: "242",
+      amountDue: "0",
+    });
+    supplierPaymentEntries = await authed(accountA.accessToken, tenantA)
+      .get("/v1/accounting/journal-entries?sourceType=SUPPLIER_PAYMENT")
+      .expect(200);
+    expect(supplierPaymentEntries.body.data).toHaveLength(2);
+    const finalSupplierPayment = supplierPayments.body.find(
+      ({ id }: { id: string }) => id !== firstSupplierPayment.body.id,
+    );
+    const finalSupplierEntry = supplierPaymentEntries.body.data.find(
+      ({ sourceId }: { sourceId: string }) =>
+        sourceId === finalSupplierPayment.id,
+    );
+    expect(accountingAmounts(finalSupplierEntry)).toEqual({
+      "400000": { debit: "142", credit: "0" },
+      "572000": { debit: "0", credit: "142" },
     });
     await expect(
       admin.purchaseInvoice.update({

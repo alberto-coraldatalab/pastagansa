@@ -16,16 +16,21 @@ import { RequirePermissions } from "../authorization/permissions.decorator";
 import { TenantProtected } from "../tenancy/tenant.decorator";
 import { ApprovePurchaseInvoiceDto } from "./dto/approve-purchase-invoice.dto";
 import { ListPurchaseInvoicesDto } from "./dto/list-purchase-invoices.dto";
+import { RecordSupplierPaymentDto } from "./dto/record-supplier-payment.dto";
 import {
   CreatePurchaseInvoiceDto,
   UpdatePurchaseInvoiceDto,
 } from "./dto/purchase-invoice.dto";
 import { PurchasesService } from "./purchases.service";
+import { SupplierPaymentsService } from "./supplier-payments.service";
 
 @Controller("purchase-invoices")
 @TenantProtected()
 export class PurchasesController {
-  constructor(private readonly purchases: PurchasesService) {}
+  constructor(
+    private readonly purchases: PurchasesService,
+    private readonly supplierPayments: SupplierPaymentsService,
+  ) {}
 
   @Get()
   @RequirePermissions("purchase_invoice.read")
@@ -63,6 +68,26 @@ export class PurchasesController {
     @Body() input: ApprovePurchaseInvoiceDto,
   ) {
     return this.purchases.approve(
+      id,
+      input,
+      requireIdempotencyKey(idempotencyKey),
+    );
+  }
+
+  @Get(":id/payments")
+  @RequirePermissions("supplier_payment.read")
+  payments(@Param("id", ParseUUIDPipe) id: string) {
+    return this.supplierPayments.list(id);
+  }
+
+  @Post(":id/payments")
+  @RequirePermissions("supplier_payment.create")
+  recordPayment(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() input: RecordSupplierPaymentDto,
+  ) {
+    return this.supplierPayments.record(
       id,
       input,
       requireIdempotencyKey(idempotencyKey),

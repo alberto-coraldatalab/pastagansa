@@ -161,6 +161,7 @@ enum JournalSourceType {
   SALES_INVOICE
   PURCHASE_INVOICE
   PAYMENT
+  SUPPLIER_PAYMENT
 }
 
 model Organization {
@@ -191,6 +192,7 @@ model Organization {
   accountingPeriods    AccountingPeriod[]
   journalEntries       JournalEntry[]
   journalLines         JournalLine[]
+  supplierPayments     SupplierPayment[]
 
   @@map("organizations")
 }
@@ -228,6 +230,7 @@ model Company {
   accountingPeriods    AccountingPeriod[]
   journalEntries       JournalEntry[]
   journalLines         JournalLine[]
+  supplierPayments     SupplierPayment[]
 
   @@unique([organizationId, taxId])
   @@index([organizationId])
@@ -524,6 +527,8 @@ model PurchaseInvoice {
   taxTotal              Decimal               @map("tax_total") @db.Decimal(14, 2)
   deductibleTaxTotal    Decimal               @map("deductible_tax_total") @db.Decimal(14, 2)
   total                 Decimal               @db.Decimal(14, 2)
+  amountPaid            Decimal               @default(0) @map("amount_paid") @db.Decimal(14, 2)
+  amountDue             Decimal               @default(0) @map("amount_due") @db.Decimal(14, 2)
   approvedAt            DateTime?             @map("approved_at") @db.Timestamptz(6)
   createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -534,6 +539,7 @@ model PurchaseInvoice {
   lines                 PurchaseInvoiceLine[]
   taxLines              PurchaseTaxLine[]
   taxLedgerEntry        TaxLedgerEntry?
+  supplierPayments      SupplierPayment[]
 
   @@unique([companyId, draftCode])
   @@unique([companyId, supplierId, supplierInvoiceNumber])
@@ -542,6 +548,30 @@ model PurchaseInvoice {
   @@unique([id, organizationId, companyId])
   @@index([companyId, status, receivedDate])
   @@map("purchase_invoices")
+}
+
+model SupplierPayment {
+  id                String          @id @default(uuid()) @db.Uuid
+  organizationId    String          @map("organization_id") @db.Uuid
+  companyId         String          @map("company_id") @db.Uuid
+  purchaseInvoiceId String          @map("purchase_invoice_id") @db.Uuid
+  idempotencyKey    String          @map("idempotency_key") @db.VarChar(128)
+  amount            Decimal         @db.Decimal(14, 2)
+  currency          String          @db.Char(3)
+  paidAt            DateTime        @map("paid_at") @db.Timestamptz(6)
+  method            PaymentMethod
+  reference         String?         @db.VarChar(240)
+  notes             String?         @db.VarChar(1000)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+
+  @@unique([companyId, idempotencyKey])
+  @@unique([id, organizationId, companyId])
+  @@index([purchaseInvoiceId, paidAt])
+  @@index([companyId, paidAt])
+  @@map("supplier_payments")
 }
 
 model PurchaseInvoiceLine {

@@ -69,6 +69,8 @@ export class IdentityService {
           ["purchase_invoice.update", "Update purchase invoices"],
           ["purchase_invoice.approve", "Approve purchase invoices"],
           ["purchase_invoice.delete", "Delete purchase invoice drafts"],
+          ["supplier_payment.read", "Read supplier payments"],
+          ["supplier_payment.create", "Record supplier payments"],
           ["account.read", "Read chart of accounts"],
           ["account.manage", "Manage chart of accounts"],
           ["fiscal_year.read", "Read fiscal years and periods"],

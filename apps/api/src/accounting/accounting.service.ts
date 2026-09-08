@@ -539,6 +539,46 @@ export class AccountingService {
     });
   }
 
+  async postSupplierPayment(paymentId: string) {
+    const existing = await this.tenant.db.journalEntry.findFirst({
+      where: {
+        ...this.scope(),
+        sourceType: JournalSourceType.SUPPLIER_PAYMENT,
+        sourceId: paymentId,
+      },
+    });
+    if (existing) return this.getEntry(existing.id);
+    const payment = await this.tenant.db.supplierPayment.findFirst({
+      where: { id: paymentId, ...this.scope() },
+      include: {
+        purchaseInvoice: {
+          select: { supplierId: true, supplierInvoiceNumber: true },
+        },
+      },
+    });
+    if (!payment)
+      throw new ConflictException("Supplier payment was not found for posting");
+    const accounts = await this.accountsByRole();
+    return this.createPostedEntry({
+      entryDate: payment.paidAt,
+      description: `Supplier payment ${payment.purchaseInvoice.supplierInvoiceNumber}`.slice(
+        0,
+        1000,
+      ),
+      sourceType: JournalSourceType.SUPPLIER_PAYMENT,
+      sourceId: payment.id,
+      lines: [
+        posting(
+          accounts.SUPPLIER_PAYABLE,
+          payment.amount,
+          false,
+          payment.purchaseInvoice.supplierId,
+        ),
+        posting(accounts.BANK, payment.amount, true),
+      ],
+    });
+  }
+
   private async createPostedEntry(input: {
     entryDate: Date;
     description: string;
