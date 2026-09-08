@@ -13,7 +13,9 @@ npm run db:migrate
 npm run dev
 ```
 
-`GET /v1/health` is public. Future business controllers must use `@TenantProtected()`; the global `TenantGuard` then requires a verified `request.user`, checks the requested organization/company against active memberships, and writes the approved context to `request.tenant`.
+`GET /v1/health` and the identity endpoints are public. `POST /v1/identity/register` creates an owner, organization, and first company atomically; `login` and `refresh` use Argon2id password/refresh-token hashes and rotate refresh tokens.
+
+Future business controllers must use `@TenantProtected()`; the authentication and tenant guards then require a verified bearer token, check the requested organization/company against active memberships, and write the approved context to `request.tenant`.
 
 Tenant selection headers (`x-organization-id`, `x-company-id`) are never authorization. They are only candidates validated against the database membership.
 

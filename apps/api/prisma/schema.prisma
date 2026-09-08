@@ -19,6 +19,11 @@ enum MembershipStatus {
   SUSPENDED
 }
 
+enum SessionStatus {
+  ACTIVE
+  REVOKED
+}
+
 model Organization {
   id          String       @id @default(uuid()) @db.Uuid
   name        String
@@ -54,7 +59,22 @@ model User {
   createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   memberships  Membership[]
   auditEvents  AuditEvent[] @relation("actor_audit_events")
+  sessions     Session[]
   @@map("users")
+}
+
+model Session {
+  id           String        @id @default(uuid()) @db.Uuid
+  userId       String        @map("user_id") @db.Uuid
+  refreshHash  String        @map("refresh_hash")
+  status       SessionStatus @default(ACTIVE)
+  expiresAt    DateTime      @map("expires_at") @db.Timestamptz(6)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt   DateTime?     @map("last_used_at") @db.Timestamptz(6)
+  revokedAt    DateTime?     @map("revoked_at") @db.Timestamptz(6)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, status])
+  @@map("sessions")
 }
 
 model Role {
