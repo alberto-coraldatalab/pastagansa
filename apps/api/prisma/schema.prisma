@@ -29,6 +29,16 @@ enum ContactStatus {
   ARCHIVED
 }
 
+enum CatalogItemType {
+  PRODUCT
+  SERVICE
+}
+
+enum CatalogItemStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 model Organization {
   id          String       @id @default(uuid()) @db.Uuid
   name        String
@@ -37,6 +47,7 @@ model Organization {
   memberships Membership[]
   auditEvents AuditEvent[]
   contacts    Contact[]
+  catalogItems CatalogItem[]
   @@map("organizations")
 }
 
@@ -53,9 +64,35 @@ model Company {
   memberships    Membership[]
   auditEvents    AuditEvent[]
   contacts       Contact[]
+  catalogItems   CatalogItem[]
   @@unique([organizationId, taxId])
   @@index([organizationId])
   @@map("companies")
+}
+
+model CatalogItem {
+  id                    String            @id @default(uuid()) @db.Uuid
+  organizationId        String            @map("organization_id") @db.Uuid
+  companyId             String            @map("company_id") @db.Uuid
+  type                  CatalogItemType
+  sku                   String?           @db.VarChar(80)
+  name                  String            @db.VarChar(240)
+  description           String?
+  unit                  String            @default("unit") @db.VarChar(30)
+  salesPrice            Decimal?          @map("sales_price") @db.Decimal(14, 2)
+  currency              String            @default("EUR") @db.Char(3)
+  suggestedTaxCode      String?           @map("suggested_tax_code") @db.VarChar(80)
+  revenueAccountCode    String?           @map("revenue_account_code") @db.VarChar(20)
+  expenseAccountCode    String?           @map("expense_account_code") @db.VarChar(20)
+  trackInventory        Boolean           @default(false) @map("track_inventory")
+  status                CatalogItemStatus @default(ACTIVE)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company               Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  @@unique([companyId, sku])
+  @@index([companyId, status, name])
+  @@map("catalog_items")
 }
 
 model Contact {
