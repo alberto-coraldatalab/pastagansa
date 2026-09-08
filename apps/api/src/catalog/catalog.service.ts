@@ -14,11 +14,17 @@ export class CatalogService {
   constructor(private readonly prisma: PrismaService, private readonly tenant: TenantContextService, private readonly audit: AuditService) {}
 
   async list(query: ListCatalogItemsDto) {
+    if (query.cursor) await this.assertCursorInScope(query.cursor);
     const search = query.search?.trim();
-    return this.prisma.catalogItem.findMany({
+    const items = await this.prisma.catalogItem.findMany({
       where: { ...this.scope(), status: CatalogItemStatus.ACTIVE, ...(search ? { OR: [{ name: { contains: search, mode: 'insensitive' } }, { sku: { contains: search, mode: 'insensitive' } }] } : {}) },
-      orderBy: { name: 'asc' }, take: query.limit,
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      take: query.limit + 1,
     });
+    const hasMore = items.length > query.limit;
+    const data = hasMore ? items.slice(0, -1) : items;
+    return { data, nextCursor: hasMore ? data.at(-1)?.id ?? null : null };
   }
 
   async get(id: string) { return this.findActive(id); }
@@ -79,6 +85,11 @@ export class CatalogService {
     const item = await this.prisma.catalogItem.findFirst({ where: { id, ...this.scope(), status: CatalogItemStatus.ACTIVE } });
     if (!item) throw new NotFoundException('Catalog item not found');
     return item;
+  }
+
+  private async assertCursorInScope(id: string) {
+    const cursor = await this.prisma.catalogItem.findFirst({ where: { id, ...this.scope(), status: CatalogItemStatus.ACTIVE }, select: { id: true } });
+    if (!cursor) throw new BadRequestException('Cursor does not belong to the selected company');
   }
 }
 

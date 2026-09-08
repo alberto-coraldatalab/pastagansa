@@ -27,6 +27,8 @@ Future business controllers must use `@TenantProtected()`; the authentication an
 
 `POST /v1/catalog-items/import` accepts a `csv` string with the catalog fields in its documented header. It validates all rows and executes an all-or-nothing import.
 
+Contact and catalog list endpoints return `{ data, nextCursor }`. Provide `cursor` from the previous response together with an optional `limit` (1–100) to fetch the next page; cursors are validated against the selected company.
+
 Tenant selection headers (`x-organization-id`, `x-company-id`) are never authorization. They are only candidates validated against the database membership.
 
 ## Database safety

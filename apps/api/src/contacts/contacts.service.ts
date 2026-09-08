@@ -15,12 +15,17 @@ export class ContactsService {
 
   async list(query: ListContactsDto) {
     const scope = this.scope();
+    if (query.cursor) await this.assertCursorInScope(query.cursor);
     const search = query.search?.trim();
-    return this.prisma.contact.findMany({
+    const contacts = await this.prisma.contact.findMany({
       where: { ...scope, status: ContactStatus.ACTIVE, ...(search ? { OR: [{ legalName: { contains: search, mode: 'insensitive' } }, { tradeName: { contains: search, mode: 'insensitive' } }, { taxId: { contains: search, mode: 'insensitive' } }] } : {}) },
-      orderBy: { legalName: 'asc' },
-      take: query.limit,
+      orderBy: [{ legalName: 'asc' }, { id: 'asc' }],
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      take: query.limit + 1,
     });
+    const hasMore = contacts.length > query.limit;
+    const data = hasMore ? contacts.slice(0, -1) : contacts;
+    return { data, nextCursor: hasMore ? data.at(-1)?.id ?? null : null };
   }
 
   async get(id: string) { return this.findActive(id); }
@@ -88,6 +93,11 @@ export class ContactsService {
     const contact = await this.prisma.contact.findFirst({ where: { id, ...this.scope(), status: ContactStatus.ACTIVE } });
     if (!contact) throw new NotFoundException('Contact not found');
     return contact;
+  }
+
+  private async assertCursorInScope(id: string) {
+    const cursor = await this.prisma.contact.findFirst({ where: { id, ...this.scope(), status: ContactStatus.ACTIVE }, select: { id: true } });
+    if (!cursor) throw new BadRequestException('Cursor does not belong to the selected company');
   }
 }
 
