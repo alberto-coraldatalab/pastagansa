@@ -140,6 +140,30 @@ describe("platform integrity", () => {
       .send({ ...invoice(contactA.body.id), notes: "Updated draft" })
       .expect(200);
     expect(updatedInvoice.body.notes).toBe("Updated draft");
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/issue`)
+      .send({ sequenceId: sequence.body.id })
+      .expect(400);
+    const issuedInvoice = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/issue`)
+      .set("idempotency-key", "issue-invoice-a")
+      .send({ sequenceId: sequence.body.id })
+      .expect(200);
+    expect(issuedInvoice.body.status).toBe("ISSUED");
+    expect(issuedInvoice.body.fullNumber).toBe("F2026-00001");
+    const retriedIssue = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/issue`)
+      .set("idempotency-key", "issue-invoice-a")
+      .send({ sequenceId: sequence.body.id })
+      .expect(200);
+    expect(retriedIssue.body.fullNumber).toBe(issuedInvoice.body.fullNumber);
+    await authed(accountA.accessToken, tenantA)
+      .patch(`/v1/invoices/${invoiceDraft.body.id}`)
+      .send(invoice(contactA.body.id))
+      .expect(409);
+    await authed(accountA.accessToken, tenantA)
+      .delete(`/v1/invoices/${invoiceDraft.body.id}`)
+      .expect(409);
     const disposableInvoice = await authed(accountA.accessToken, tenantA)
       .post("/v1/invoices")
       .send(invoice(contactA.body.id))

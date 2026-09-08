@@ -1,4 +1,5 @@
 # Plan de implementación
+
 ## ERP SaaS de gestión, contabilidad y fiscalidad para España
 
 **Versión:** 1.0  
@@ -13,13 +14,13 @@
 **Rama de referencia:** `main`
 **Criterio:** un elemento solo se marca como completado cuando existe implementación, migración cuando aplica y validación automatizada básica. El estado no sustituye la revisión fiscal, de seguridad ni de producto exigida en este plan.
 
-| Fase | Estado | Alcance implementado / pendiente relevante |
-|---|---|---|
-| Fase 0 — Descubrimiento y arquitectura | En curso | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local y CI con PostgreSQL 17, migraciones, lint, build, 15 pruebas unitarias, prueba integral de aislamiento/concurrencia y auditoría de dependencias. La ampliación de CI para borradores/series está pendiente de validación. Pendientes ADRs, despliegue staging y matriz normativa validada. |
-| Fase 1 — Plataforma base | En curso | Registro y login; tokens con sesiones revocables y refresh rotativo protegido contra concurrencia; organización/empresa inicial; RBAC; transacciones por request con contexto RLS forzado; audit log transaccional y append-only; headers de seguridad, rate limit, request IDs, errores/logs estructurados, métricas y OpenAPI. Pendientes recuperación de contraseña, MFA, gestión completa de organizaciones/membresías/roles, archivos/antivirus, trazas distribuidas y backups. |
-| Fase 2 — Maestros | En curso | CRUD con archivado, permisos, auditoría y scope de empresa para contactos cliente/proveedor y catálogo de productos/servicios; direcciones y condiciones comerciales de contacto; importación CSV validada para contactos y catálogo; búsqueda y paginación por cursor en ambos listados. Pendientes filtros avanzados, UX web y configuración fiscal/contable validada. |
-| Fase 3 — Ventas | En curso | Presupuestos completos hasta PDF y transiciones con precondición explícita de estado; borradores de factura y series documentales por empresa implementados con snapshots, cálculo decimal, CRUD, RBAC, auditoría, RLS y constraints de tenant. Migración PostgreSQL validada; repetición de la prueba integral pendiente tras corregir una carrera real detectada por CI. Pendientes emisión/numeración atómica, pedidos, albaranes, rectificativas, recurrencia, email y UX web. |
-| Fases 4–14 | No iniciadas | No existe todavía implementación de compras, contabilidad, fiscalidad, tesorería, SIF/VERI*FACTU, reporting, webhooks, hardening, piloto o GA. |
+| Fase                                   | Estado       | Alcance implementado / pendiente relevante                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fase 0 — Descubrimiento y arquitectura | En curso     | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local y CI con PostgreSQL 17, migraciones, lint, build, 16 pruebas unitarias, pruebas integrales de aislamiento/concurrencia y auditoría de dependencias. Borradores y series ya están validados en PostgreSQL; la nueva prueba de 100 emisiones concurrentes está implementada y pendiente de CI. Pendientes ADRs, despliegue staging y matriz normativa validada.                                                                     |
+| Fase 1 — Plataforma base               | En curso     | Registro y login; tokens con sesiones revocables y refresh rotativo protegido contra concurrencia; organización/empresa inicial; RBAC; transacciones por request con contexto RLS forzado; audit log transaccional y append-only; headers de seguridad, rate limit, request IDs, errores/logs estructurados, métricas y OpenAPI. Pendientes recuperación de contraseña, MFA, gestión completa de organizaciones/membresías/roles, archivos/antivirus, trazas distribuidas y backups.                                                         |
+| Fase 2 — Maestros                      | En curso     | CRUD con archivado, permisos, auditoría y scope de empresa para contactos cliente/proveedor y catálogo de productos/servicios; direcciones y condiciones comerciales de contacto; importación CSV validada para contactos y catálogo; búsqueda y paginación por cursor en ambos listados. Pendientes filtros avanzados, UX web y configuración fiscal/contable validada.                                                                                                                                                                     |
+| Fase 3 — Ventas                        | En curso     | Presupuestos completos hasta PDF y transiciones con precondición explícita de estado; borradores de factura y series documentales por empresa implementados con snapshots, cálculo decimal, CRUD, RBAC, auditoría, RLS y constraints de tenant. Emisión idempotente y numeración atómica implementadas con bloqueo transaccional, protección de inmutabilidad y una prueba de 100 emisiones simultáneas pendiente de validación PostgreSQL en CI. Pendientes PDF/email de factura, pedidos, albaranes, rectificativas, recurrencia y UX web. |
+| Fases 4–14                             | No iniciadas | No existe todavía implementación de compras, contabilidad, fiscalidad, tesorería, SIF/VERI*FACTU, reporting, webhooks, hardening, piloto o GA.                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ### Regla operativa de commits
 
@@ -392,7 +393,7 @@ Datos listos para crear documentos comerciales.
 
 **Duración:** 3 sprints.
 
-**Estado real:** En curso. Implementados presupuestos hasta PDF, con cambios de estado atómicos condicionados al estado esperado por el cliente. Implementados borradores de factura con líneas, totales decimales, snapshots de emisor/cliente/dirección/email, paginación opaca y CRUD restringido al estado borrador. Implementadas también series documentales configurables por empresa, con migración RLS y constraints de tenant validada en PostgreSQL; repetición integral de CI pendiente. Pendientes emisión/numeración atómica, email, rectificativas, recurrentes, vencimientos y pagos.
+**Estado real:** En curso. Implementados presupuestos hasta PDF, con cambios de estado atómicos condicionados al estado esperado por el cliente. Implementados borradores de factura con líneas, totales decimales, snapshots de emisor/cliente/dirección/email, paginación opaca y CRUD restringido al estado borrador. Implementadas también series documentales configurables por empresa, con migración RLS y constraints de tenant validada en PostgreSQL. La emisión idempotente y la numeración atómica ya están implementadas con asignación transaccional, clave de idempotencia, bloqueo por factura y serie, auditoría e inmutabilidad de cabecera y líneas; su prueba de 100 emisiones concurrentes está pendiente de CI con PostgreSQL. Pendientes PDF/email, rectificativas, recurrentes, vencimientos y pagos.
 
 ## Sprint A
 
@@ -1438,18 +1439,18 @@ Tras estabilizar P0:
 
 # 51. Riesgos del programa
 
-| Riesgo | Probabilidad | Impacto | Acción |
-|---|---|---|---|
-| Alcance excesivo | Alta | Alto | P0 estricto |
-| Error fiscal | Media | Crítico | golden tests + revisión |
-| Cambio normativo | Alta | Alto | versionado |
-| SIF tardío | Media | Crítico | iniciar en paralelo |
-| Falta experto contable | Media | Alto | contratación temprana |
-| Migraciones | Alta | Alto | dry-runs |
-| Multi-tenancy defectuoso | Baja/media | Crítico | tests + RLS |
-| UX contable lenta | Media | Alto | usuarios piloto |
-| Vendor banking | Media | Medio | adapter |
-| OCR sobreconfiado | Media | Medio | human review |
+| Riesgo                   | Probabilidad | Impacto | Acción                  |
+| ------------------------ | ------------ | ------- | ----------------------- |
+| Alcance excesivo         | Alta         | Alto    | P0 estricto             |
+| Error fiscal             | Media        | Crítico | golden tests + revisión |
+| Cambio normativo         | Alta         | Alto    | versionado              |
+| SIF tardío               | Media        | Crítico | iniciar en paralelo     |
+| Falta experto contable   | Media        | Alto    | contratación temprana   |
+| Migraciones              | Alta         | Alto    | dry-runs                |
+| Multi-tenancy defectuoso | Baja/media   | Crítico | tests + RLS             |
+| UX contable lenta        | Media        | Alto    | usuarios piloto         |
+| Vendor banking           | Media        | Medio   | adapter                 |
+| OCR sobreconfiado        | Media        | Medio   | human review            |
 
 ---
 
@@ -1758,15 +1759,15 @@ La ingeniería implementa reglas; no debe inventarlas.
 
 # 68. Matriz RACI resumida
 
-| Entregable | Product | Tech | Fiscal | QA | DevOps |
-|---|---|---|---|---|---|
-| Journey | A/R | C | C | C | I |
-| Tax rule | C | R | A | C | I |
-| Accounting rule | C | R | A | C | I |
-| SIF adapter | C | R/A | C | R | C |
-| Security | I | A/R | I | C | R |
-| Release | A | R | C | R | R |
-| Tax sign-off | I | C | A/R | C | I |
+| Entregable      | Product | Tech | Fiscal | QA  | DevOps |
+| --------------- | ------- | ---- | ------ | --- | ------ |
+| Journey         | A/R     | C    | C      | C   | I      |
+| Tax rule        | C       | R    | A      | C   | I      |
+| Accounting rule | C       | R    | A      | C   | I      |
+| SIF adapter     | C       | R/A  | C      | R   | C      |
+| Security        | I       | A/R  | I      | C   | R      |
+| Release         | A       | R    | C      | R   | R      |
+| Tax sign-off    | I       | C    | A/R    | C   | I      |
 
 ---
 

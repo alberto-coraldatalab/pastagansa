@@ -1,4 +1,4 @@
-import { calculateInvoiceLine } from "./invoices.service";
+import { calculateInvoiceLine, formatInvoiceNumber } from "./invoices.service";
 
 describe("calculateInvoiceLine", () => {
   it("calculates and rounds persisted invoice amounts deterministically", () => {
@@ -15,5 +15,12 @@ describe("calculateInvoiceLine", () => {
     expect(result.persisted.netAmount.toFixed(2)).toBe("135.00");
     expect(result.persisted.taxAmount.toFixed(2)).toBe("28.35");
     expect(result.persisted.totalAmount.toFixed(2)).toBe("163.35");
+  });
+});
+
+describe("formatInvoiceNumber", () => {
+  it("pads short numbers without truncating larger values", () => {
+    expect(formatInvoiceNumber("F2026", 42n, 5)).toBe("F2026-00042");
+    expect(formatInvoiceNumber("F2026", 123456n, 5)).toBe("F2026-123456");
   });
 });

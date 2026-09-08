@@ -20,6 +20,7 @@ import {
   UpdateInvoiceDto,
 } from "./dto/invoice.dto";
 import { ListInvoicesDto } from "./dto/list-invoices.dto";
+import { IssueInvoiceDto } from "./dto/issue-invoice.dto";
 
 @Injectable()
 export class InvoicesService {
@@ -125,6 +126,105 @@ export class InvoicesService {
         "Invoice no longer exists or is no longer a draft",
       );
     await this.audit.record("invoice.draft_deleted", "invoice", id);
+  }
+
+  async issue(id: string, input: IssueInvoiceDto, idempotencyKey: string) {
+    const scope = this.scope();
+    const locked = await this.tenant.db.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "invoices"
+      WHERE "id" = CAST(${id} AS uuid)
+        AND "organization_id" = CAST(${scope.organizationId} AS uuid)
+        AND "company_id" = CAST(${scope.companyId} AS uuid)
+      FOR UPDATE
+    `;
+    if (!locked.length) throw new NotFoundException("Invoice not found");
+    const invoice = await this.tenant.db.invoice.findFirstOrThrow({
+      where: { id, ...scope },
+      include: { lines: { orderBy: { position: "asc" } } },
+    });
+    if (invoice.status !== InvoiceStatus.DRAFT) {
+      if (invoice.issuanceKey === idempotencyKey)
+        return presentInvoice(invoice);
+      throw new ConflictException("Invoice has already been issued");
+    }
+    if (!invoice.lines.length)
+      throw new BadRequestException("Invoice must contain at least one line");
+    const reusedKey = await this.tenant.db.invoice.findFirst({
+      where: {
+        ...scope,
+        issuanceKey: idempotencyKey,
+        id: { not: invoice.id },
+      },
+      select: { id: true },
+    });
+    if (reusedKey)
+      throw new ConflictException(
+        "Idempotency-Key has already been used for another invoice",
+      );
+    const sequence = await this.tenant.db.documentSequence.findFirst({
+      where: {
+        id: input.sequenceId,
+        ...scope,
+        documentType: "INVOICE",
+        active: true,
+      },
+    });
+    if (!sequence)
+      throw new BadRequestException(
+        "An active invoice sequence from this company is required",
+      );
+    const [allocated] = await this.tenant.db.$queryRaw<
+      Array<{ number: bigint }>
+    >`
+      UPDATE "document_sequences"
+      SET "next_number" = "next_number" + 1,
+          "updated_at" = CURRENT_TIMESTAMP
+      WHERE "id" = CAST(${sequence.id} AS uuid)
+        AND "organization_id" = CAST(${scope.organizationId} AS uuid)
+        AND "company_id" = CAST(${scope.companyId} AS uuid)
+        AND "active" = true
+      RETURNING "next_number" - 1 AS "number"
+    `;
+    if (!allocated)
+      throw new ConflictException("Document sequence is no longer active");
+    const fullNumber = formatInvoiceNumber(
+      sequence.series,
+      allocated.number,
+      sequence.padding,
+    );
+    try {
+      const changed = await this.tenant.db.invoice.updateMany({
+        where: { id, ...scope, status: InvoiceStatus.DRAFT },
+        data: {
+          sequenceId: sequence.id,
+          series: sequence.series,
+          number: allocated.number,
+          fullNumber,
+          issuanceKey: idempotencyKey,
+          issuedAt: new Date(),
+          status: InvoiceStatus.ISSUED,
+        },
+      });
+      if (changed.count !== 1)
+        throw new ConflictException("Invoice was issued concurrently");
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      )
+        throw new ConflictException(
+          "Invoice number or Idempotency-Key was allocated concurrently",
+        );
+      throw error;
+    }
+    await this.audit.record("invoice.issued", "invoice", id, {
+      sequenceId: sequence.id,
+      series: sequence.series,
+      number: allocated.number.toString(),
+      fullNumber,
+      idempotencyKey,
+    });
+    return this.get(id);
   }
 
   private async build(input: CreateInvoiceDto) {
@@ -269,4 +369,12 @@ function zeroTotals() {
 
 function presentInvoice<T extends { number: bigint | null }>(invoice: T) {
   return { ...invoice, number: invoice.number?.toString() ?? null };
+}
+
+export function formatInvoiceNumber(
+  series: string,
+  number: bigint,
+  padding: number,
+) {
+  return `${series}-${number.toString().padStart(padding, "0")}`;
 }
