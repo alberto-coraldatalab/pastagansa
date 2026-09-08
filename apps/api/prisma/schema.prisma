@@ -24,6 +24,11 @@ enum SessionStatus {
   REVOKED
 }
 
+enum ContactStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 model Organization {
   id          String       @id @default(uuid()) @db.Uuid
   name        String
@@ -31,6 +36,7 @@ model Organization {
   companies   Company[]
   memberships Membership[]
   auditEvents AuditEvent[]
+  contacts    Contact[]
   @@map("organizations")
 }
 
@@ -46,9 +52,31 @@ model Company {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   memberships    Membership[]
   auditEvents    AuditEvent[]
+  contacts       Contact[]
   @@unique([organizationId, taxId])
   @@index([organizationId])
   @@map("companies")
+}
+
+model Contact {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  companyId      String        @map("company_id") @db.Uuid
+  legalName      String        @map("legal_name") @db.VarChar(240)
+  tradeName      String?       @map("trade_name") @db.VarChar(240)
+  taxId          String?       @map("tax_id") @db.VarChar(40)
+  email          String?       @db.VarChar(320)
+  phone          String?       @db.VarChar(40)
+  isCustomer     Boolean       @default(false) @map("is_customer")
+  isSupplier     Boolean       @default(false) @map("is_supplier")
+  status         ContactStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  @@unique([companyId, taxId])
+  @@index([companyId, status, legalName])
+  @@map("contacts")
 }
 
 model User {

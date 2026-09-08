@@ -19,6 +19,8 @@ Future business controllers must use `@TenantProtected()`; the authentication an
 
 `GET` and `PATCH /v1/companies/current` are the first company-scoped endpoints. They require tenant headers, a bearer token, and the `company.read` or `company.update` permission respectively. Company updates are recorded in `audit_events`.
 
+`/v1/contacts` provides company-scoped customer/supplier master data. Contact deletion is an archive operation; all writes carry tenant, permission, and audit enforcement.
+
 Tenant selection headers (`x-organization-id`, `x-company-id`) are never authorization. They are only candidates validated against the database membership.
 
 ## Database safety
