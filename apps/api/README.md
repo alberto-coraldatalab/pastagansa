@@ -15,6 +15,8 @@ npm run dev
 
 `GET /v1/health` and the identity endpoints are public. `POST /v1/identity/register` creates an owner, organization, and first company atomically; `login` and `refresh` use Argon2id password/refresh-token hashes and rotate refresh tokens.
 
+Authenticated clients use `GET /v1/identity/context` to discover the active user's organizations, companies, roles, and permission codes before selecting tenant headers. Password hashes and session secrets are never included.
+
 Future business controllers must use `@TenantProtected()`; the authentication and tenant guards then require a verified bearer token, check the requested organization/company against active memberships, and write the approved context to `request.tenant`.
 
 `GET` and `PATCH /v1/companies/current` are the first company-scoped endpoints. They require tenant headers, a bearer token, and the `company.read` or `company.update` permission respectively. Company updates are recorded in `audit_events`.

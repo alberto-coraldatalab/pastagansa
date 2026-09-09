@@ -65,6 +65,29 @@ describe("platform integrity", () => {
     const tenantA = await tenantFor("owner-a@example.com");
     const tenantB = await tenantFor("owner-b@example.com");
 
+    const identityContext = await request(app.getHttpServer())
+      .get("/v1/identity/context")
+      .set("authorization", `Bearer ${accountA.accessToken}`)
+      .expect(200);
+    expect(identityContext.body).toMatchObject({
+      email: "owner-a@example.com",
+      memberships: [
+        {
+          organization: { id: tenantA.organizationId, name: "Org A" },
+          company: {
+            id: tenantA.companyId,
+            legalName: "A Company",
+            taxId: "B12345674",
+          },
+          role: { code: "organization.owner" },
+        },
+      ],
+    });
+    expect(identityContext.body.memberships[0].role.permissions).toContain(
+      "invoice.issue",
+    );
+    expect(JSON.stringify(identityContext.body)).not.toContain("passwordHash");
+
     const taxRules = await authed(accountA.accessToken, tenantA)
       .get("/v1/tax-rules?effectiveOn=2026-09-08")
       .expect(200);

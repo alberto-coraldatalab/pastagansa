@@ -94,6 +94,13 @@ Gate:
 
 Resultado: el usuario entra en una aplicación reconocible y aterriza en su empresa.
 
+Estado real: en curso. Ya existen el workspace Next.js integrado en lint, build y
+tests del monorepo; registro/login/logout; renovación de sesión mediante cookies
+HTTP-only; descubrimiento autenticado de membresías bajo RLS; selección de la primera
+empresa activa; shell responsive y estados de carga/error. Pendientes selector
+multiempresa, pruebas E2E de navegador y comprobaciones automáticas de accesibilidad
+para superar el gate completo.
+
 Entregables:
 
 - shell responsive, navegación principal y dirección visual lima;

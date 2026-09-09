@@ -37,6 +37,12 @@ export class IdentityController {
     return this.identity.sessions(request.user!.id);
   }
 
+  @Get("context")
+  @Authenticated()
+  context(@Req() request: AuthenticatedRequest) {
+    return this.identity.context(request.user!.id);
+  }
+
   @HttpCode(204)
   @Post("logout")
   @Authenticated()

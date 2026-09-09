@@ -221,6 +221,74 @@ export class IdentityService {
     });
   }
 
+  async context(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        memberships: {
+          where: { status: MembershipStatus.ACTIVE },
+          select: {
+            companyId: true,
+            organization: { select: { id: true, name: true } },
+            role: {
+              select: {
+                code: true,
+                name: true,
+                permissions: {
+                  select: { permission: { select: { code: true } } },
+                },
+              },
+            },
+          },
+          orderBy: [{ organizationId: "asc" }, { companyId: "asc" }],
+        },
+      },
+    });
+    const companies = new Map(
+      (
+        await Promise.all(
+          user.memberships.map(async ({ organization, companyId }) => {
+            if (!companyId) return undefined;
+            return this.prisma.$transaction(async (tx) => {
+              await tx.$queryRaw`SELECT set_config('app.organization_id', ${organization.id}, true)`;
+              return tx.company.findFirst({
+                where: { id: companyId, organizationId: organization.id },
+                select: {
+                  id: true,
+                  legalName: true,
+                  taxId: true,
+                  country: true,
+                  baseCurrency: true,
+                  timezone: true,
+                },
+              });
+            });
+          }),
+        )
+      )
+        .filter((company) => company !== null && company !== undefined)
+        .map((company) => [company.id, company]),
+    );
+    return {
+      ...user,
+      memberships: user.memberships.map(
+        ({ role, companyId, ...membership }) => ({
+          ...membership,
+          company: companyId ? (companies.get(companyId) ?? null) : null,
+          role: {
+            code: role.code,
+            name: role.name,
+            permissions: role.permissions.map(
+              ({ permission }) => permission.code,
+            ),
+          },
+        }),
+      ),
+    };
+  }
+
   async revoke(userId: string, sessionId: string) {
     await this.prisma.session.updateMany({
       where: { id: sessionId, userId, status: SessionStatus.ACTIVE },

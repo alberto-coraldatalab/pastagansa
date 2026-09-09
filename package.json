@@ -7,10 +7,12 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=@pastagansa/api",
-    "build": "npm run build --workspace=@pastagansa/api",
-    "lint": "npm run lint --workspace=@pastagansa/api",
-    "test": "npm run test --workspace=@pastagansa/api",
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev --workspace=@pastagansa/api",
+    "dev:web": "npm run dev --workspace=@pastagansa/web",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
     "test:integration": "npm run test:integration --workspace=@pastagansa/api",
     "db:generate": "npm run db:generate --workspace=@pastagansa/api",
     "db:migrate": "npm run db:migrate --workspace=@pastagansa/api",
@@ -19,6 +21,9 @@
   "dependencies": {
     "@nestjs/platform-express": "11.2.3",
     "multer": "2.3.0"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.5"
   },
   "engines": {
     "node": ">=22.0.0"
