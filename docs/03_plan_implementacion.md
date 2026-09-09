@@ -16,7 +16,7 @@
 
 | Fase                                   | Estado       | Alcance implementado / pendiente relevante                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fase 0 — Descubrimiento y arquitectura | En curso     | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local y CI con PostgreSQL 17, migraciones, lint, build, 18 pruebas unitarias, pruebas integrales de aislamiento/concurrencia y auditoría de dependencias. La emisión de 100 facturas simultáneas, su idempotencia, inmutabilidad posterior, PDF y outbox transaccional ya están validados en CI con PostgreSQL; el último pipeline completo está verde. Pendientes ADRs, despliegue staging y matriz normativa validada.                                                                                                                                                                                                                                                                                                                                          |
+| Fase 0 — Descubrimiento y arquitectura | En curso     | Especificaciones funcional, técnica, UI/UX y este plan están versionadas; existe repositorio, Docker local y CI con PostgreSQL 17, migraciones, lint, build, 20 pruebas unitarias, pruebas integrales de aislamiento/concurrencia y auditoría de dependencias. La emisión de 100 facturas simultáneas, su idempotencia, inmutabilidad posterior, PDF y outbox transaccional ya están validados en CI con PostgreSQL; el último pipeline completo está verde. Pendientes ADRs, despliegue staging y matriz normativa validada.                                                                                                                                                                                                                                                                                                                                          |
 | Fase 1 — Plataforma base               | En curso     | Registro y login; tokens con sesiones revocables y refresh rotativo protegido contra concurrencia; organización/empresa inicial; RBAC; transacciones por request con contexto RLS forzado; audit log transaccional y append-only; headers de seguridad, rate limit, request IDs, errores/logs estructurados, métricas y OpenAPI. Pendientes recuperación de contraseña, MFA, gestión completa de organizaciones/membresías/roles, archivos/antivirus, trazas distribuidas y backups.                                                                                                                                                                                                                                                                                                                                                                                   |
 | Fase 2 — Maestros                      | Completada   | Gate superado: contactos cliente/proveedor y catálogo de productos/servicios disponen de CRUD con archivado, permisos, auditoría, aislamiento por empresa, direcciones, condiciones comerciales, cuentas sugeridas, importación CSV atómica, búsqueda y paginación por cursor; estos maestros alimentan documentos comerciales reales. La UX web y filtros de producto adicionales continúan como stream transversal y no bloquean este gate de datos.                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Fase 3 — Ventas                        | En curso     | Presupuestos completos hasta PDF y transiciones con precondición explícita de estado; borradores, series, emisión idempotente y numeración atómica de facturas validados en PostgreSQL, incluida una prueba de 100 emisiones simultáneas. PDF oficial y outbox transaccional SMTP implementados. Rectificativas con relación, motivo, impacto, serie propia y límites concurrentes. Implementados también vencimientos configurables y cobros manuales idempotentes con reparto, saldo, estados y protección frente a carreras/sobrecobro. La emisión congela el desglose fiscal y publica tanto el Tax Ledger como el asiento contable de venta en la misma transacción. Pendientes SMTP de staging, pedidos, albaranes, recurrencia, devoluciones/cobros multidocumento y UX web.                                                                                    |
@@ -25,6 +25,7 @@
 | Fase 6 — Motor fiscal                  | En curso     | Reglas fiscales españolas versionadas e inmutables para IVA general, reducido, superreducido, cero, exento y no sujeto; snapshots por línea; Tax Ledger append-only para facturas emitidas y recibidas, aislado por empresa y publicado transaccionalmente. Las compras registran fechas de emisión, operación, recepción y deducción, IVA soportado y cuota deducible; las rectificativas de venta generan importes negativos vinculados al apunte original. Pendientes recargo de equivalencia, inversión del sujeto pasivo, operaciones intracomunitarias/importaciones/exportaciones, prorrata avanzada, IRPF y validación fiscal exhaustiva.                                                                                                                                                                                                                      |
 | Fase 9 — Tesorería                     | En curso     | Cuentas bancarias ligadas a cuentas contables conciliables, importación atómica de movimientos normalizados, protección frente a duplicados, bandeja paginada, sugerencias explícitas por importe/fecha/referencia y conciliación uno-a-uno append-only con controles de dirección, importe, cuenta, asiento posted, concurrencia y RLS. Pendientes CSV/Norma 43, saldos, conciliación parcial/combinada, reglas avanzadas y proveedor Open Banking.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Fases 7–8 y 10–14                      | No iniciadas | No existe todavía implementación de libros/modelos fiscales, SIF/VERI\*FACTU, reporting, webhooks, hardening, piloto o GA.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Hito U — Producto usable               | En curso     | Prioridad activa de ejecución. Entregará una aplicación web desplegable que permita registro/login, selección de empresa, gestión mínima de clientes y productos, emisión/descarga de factura, alta y aprobación de compra con adjunto/OCR, estados de cobro/pago y visibilidad básica contable. Incluye datos demo reproducibles, pruebas E2E de navegador, accesibilidad esencial, manejo consistente de errores y staging observable. El detalle y los gates están en `docs/05_plan_producto_usable.md`. |
 
 ### Regla operativa de commits
 
@@ -219,7 +220,22 @@ Una story está terminada si:
 
 # 9. Estrategia general por fases
 
-Plan de referencia:
+Las fases siguientes conservan el mapa de capacidades y sus dependencias, pero no
+dictan por sí solas el orden inmediato de entrega. Desde septiembre de 2026 se aplica
+un overlay de producto: **Hito U — Producto usable**. Hasta superar su gate se pausa la
+expansión fiscal avanzada que no sea necesaria para los recorridos ya soportados.
+
+Orden activo de ejecución:
+
+```text
+U0  Arranque reproducible y datos demo
+U1  Web foundation, autenticación y contexto de empresa
+U2  Venta usable de extremo a extremo
+U3  Compra usable de extremo a extremo
+U4  Visibilidad financiera y operación en staging
+```
+
+Después se retoma el plan de capacidades:
 
 ```text
 Fase 0  Descubrimiento y arquitectura
@@ -236,6 +252,9 @@ Fase 10 P1/P2
 ```
 
 Varias líneas pueden solaparse, pero las dependencias del dominio deben respetarse.
+
+El alcance, criterios de aceptación y decisiones de aplazamiento del Hito U se
+mantienen en `docs/05_plan_producto_usable.md`.
 
 ---
 
@@ -912,8 +931,16 @@ No lanzar GA si falta alguno de los críticos:
 
 # 28. Backlog P0 por prioridad
 
+Mientras el Hito U esté abierto, este backlog se interpreta con una prioridad previa:
+ninguna ampliación de dominio desplaza un slice necesario para que los recorridos de
+venta y compra existentes puedan completarse desde la web y verificarse en staging.
+
 ## P0.0 — Crítico
 
+- shell web, autenticación y contexto de empresa;
+- cliente → factura emitida → PDF desde navegador;
+- compra → adjunto/OCR → revisión → aprobación desde navegador;
+- seed demo, E2E de navegador y staging reproducible;
 - tenant isolation;
 - auth;
 - invoice issuance;
@@ -1815,6 +1842,17 @@ Contacto → factura → pago.
 ## Hito C — Accounting Loop
 
 Factura → asiento → balance.
+
+**Estado: Completado para el alcance obligatorio de backend.**
+
+## Hito U — Producto usable
+
+Usuario → web → venta/compra completas → resultado financiero visible.
+
+**Estado: En curso y prioridad activa.**
+
+Su gate exige que una persona no desarrolladora complete los recorridos críticos sin
+Swagger, SQL ni intervención manual del equipo. Véase `docs/05_plan_producto_usable.md`.
 
 ## Hito D — Fiscal Loop
 
