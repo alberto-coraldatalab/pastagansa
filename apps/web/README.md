@@ -14,3 +14,8 @@ reusable price, unit, VAT suggestion, and revenue account defaults.
 `/facturas` lists sales documents by status and creates invoice drafts with multiple
 lines. Customer and catalog selection stay in the browser workflow, while tax and
 document totals remain calculated and validated by the API.
+
+Each document has a detail view. Drafts can be edited and issued after an explicit
+confirmation, using an existing invoice series or creating the first one in context.
+Issuance retries reuse their idempotency key. Issued documents expose their official
+PDF through the authenticated server route.

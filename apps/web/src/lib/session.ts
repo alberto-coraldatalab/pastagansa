@@ -63,6 +63,13 @@ function translateApiError(message: string) {
       "Ya existe un contacto con este NIF.",
     "A catalog item with this SKU already exists":
       "Ya existe un elemento del catálogo con este SKU.",
+    "Document series already exists":
+      "Ya existe esta serie de facturación. Recarga y selecciónala.",
+    "Invoice has already been issued": "La factura ya ha sido emitida.",
+    "Invoice no longer exists or is no longer a draft":
+      "La factura ya no existe o ha dejado de ser un borrador.",
+    "dueDate cannot precede issueDate":
+      "El vencimiento no puede ser anterior a la fecha de emisión.",
   };
   return translations[message] ?? message;
 }

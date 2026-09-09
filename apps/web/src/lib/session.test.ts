@@ -62,5 +62,10 @@ describe("session helpers", () => {
         error: { message: "A catalog item with this SKU already exists" },
       }),
     ).toBe("Ya existe un elemento del catálogo con este SKU.");
+    expect(
+      normalizeApiError({
+        error: { message: "Invoice has already been issued" },
+      }),
+    ).toBe("La factura ya ha sido emitida.");
   });
 });

@@ -209,7 +209,9 @@ function InvoiceTable({ items }: { items: Invoice[] }) {
           {items.map((invoice) => (
             <tr key={invoice.id}>
               <td>
-                <strong>{invoice.fullNumber ?? "Borrador"}</strong>
+                <Link className="table-link" href={`/facturas/${invoice.id}`}>
+                  {invoice.fullNumber ?? "Borrador"}
+                </Link>
                 <small>
                   {invoice.fullNumber ? "Factura" : invoice.draftCode}
                 </small>
@@ -258,18 +260,32 @@ const blankLine = (): EditableLine => ({
   taxRate: "21",
 });
 
-function InvoiceDialog({
+export function InvoiceDialog({
   pending,
   error,
+  initial,
   onClose,
   onSubmit,
 }: {
   pending: boolean;
   error?: string;
+  initial?: Invoice;
   onClose(): void;
   onSubmit(payload: InvoiceInput): void;
 }) {
-  const [lines, setLines] = useState<EditableLine[]>([blankLine()]);
+  const [lines, setLines] = useState<EditableLine[]>(() =>
+    initial?.lines?.length
+      ? initial.lines.map((line) => ({
+          key: nextLineKey++,
+          catalogItemId: line.catalogItemId ?? "",
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          discountPct: line.discountPct,
+          taxRate: supportedRate(line.taxRate),
+        }))
+      : [blankLine()],
+  );
   const customers = useQuery({
     queryKey: ["invoice-customers"],
     queryFn: () =>
@@ -355,8 +371,12 @@ function InvoiceDialog({
       >
         <header>
           <div>
-            <p className="eyebrow">Nuevo documento</p>
-            <h2 id="invoice-dialog-title">Factura en borrador</h2>
+            <p className="eyebrow">
+              {initial ? "Editar documento" : "Nuevo documento"}
+            </p>
+            <h2 id="invoice-dialog-title">
+              {initial ? "Editar borrador" : "Factura en borrador"}
+            </h2>
           </div>
           <button
             className="icon-button"
@@ -371,33 +391,28 @@ function InvoiceDialog({
           <p className="dialog-helper">Cargando clientes y catálogo…</p>
         )}
         {loadError && <p className="form-error">{loadError}</p>}
-        {!loading &&
-          !loadError &&
-          (!customers.data?.data.length || !catalog.data?.data.length) && (
-            <div className="invoice-prerequisites">
-              <strong>Faltan datos para facturar</strong>
-              <p>
-                Necesitas al menos un cliente y un elemento de catálogo activos.
-              </p>
-              <div>
-                {!customers.data?.data.length && (
-                  <Link href="/clientes">Crear cliente</Link>
-                )}
-                {!catalog.data?.data.length && (
-                  <Link href="/catalogo">Crear elemento</Link>
-                )}
-              </div>
+        {!loading && !loadError && !customers.data?.data.length && (
+          <div className="invoice-prerequisites">
+            <strong>Faltan datos para facturar</strong>
+            <p>Necesitas al menos un cliente activo.</p>
+            <div>
+              <Link href="/clientes">Crear cliente</Link>
             </div>
-          )}
+          </div>
+        )}
         {!loading &&
           !loadError &&
           !!customers.data?.data.length &&
-          !!catalog.data?.data.length && (
+          catalog.data && (
             <form className="invoice-form" onSubmit={submit}>
               <div className="invoice-basics">
                 <label className="field invoice-customer">
                   <span>Cliente</span>
-                  <select name="contactId" required defaultValue="">
+                  <select
+                    name="contactId"
+                    required
+                    defaultValue={initial?.contactId ?? ""}
+                  >
                     <option value="" disabled>
                       Selecciona un cliente
                     </option>
@@ -414,12 +429,16 @@ function InvoiceDialog({
                     name="issueDate"
                     type="date"
                     required
-                    defaultValue={todayIso()}
+                    defaultValue={initial?.issueDate.slice(0, 10) ?? todayIso()}
                   />
                 </label>
                 <label className="field">
                   <span>Vencimiento</span>
-                  <input name="dueDate" type="date" />
+                  <input
+                    name="dueDate"
+                    type="date"
+                    defaultValue={initial?.dueDate?.slice(0, 10) ?? ""}
+                  />
                 </label>
               </div>
               <div className="invoice-lines-heading">
@@ -550,7 +569,12 @@ function InvoiceDialog({
               </div>
               <label className="field">
                 <span>Notas (opcional)</span>
-                <textarea name="notes" rows={3} maxLength={5000} />
+                <textarea
+                  name="notes"
+                  rows={3}
+                  maxLength={5000}
+                  defaultValue={initial?.notes ?? ""}
+                />
               </label>
               {error && (
                 <p className="form-error" role="alert">
@@ -571,7 +595,11 @@ function InvoiceDialog({
                   className="primary-button compact"
                   disabled={pending}
                 >
-                  {pending ? "Guardando…" : "Guardar borrador"}
+                  {pending
+                    ? "Guardando…"
+                    : initial
+                      ? "Guardar cambios"
+                      : "Guardar borrador"}
                 </button>
               </div>
             </form>
@@ -592,6 +620,13 @@ async function loadOptions<T>(path: string) {
 function suggestedRate(code: string | null): EditableLine["taxRate"] {
   if (code === "ES_VAT_REDUCED_10") return "10";
   if (code === "ES_VAT_SUPER_REDUCED_4") return "4";
+  return "21";
+}
+
+function supportedRate(value: string): EditableLine["taxRate"] {
+  const rate = Number(value);
+  if (rate === 10) return "10";
+  if (rate === 4) return "4";
   return "21";
 }
 

@@ -22,6 +22,7 @@ export type InvoiceInput = z.infer<typeof invoiceInputSchema>;
 
 export interface Invoice {
   id: string;
+  contactId: string;
   draftCode: string;
   fullNumber: string | null;
   status:
@@ -43,13 +44,31 @@ export interface Invoice {
   discountTotal: string;
   taxTotal: string;
   total: string;
+  amountPaid: string;
+  amountDue: string;
+  notes: string | null;
+  issuedAt: string | null;
   lines?: Array<{
     id: string;
+    catalogItemId: string | null;
     description: string;
     quantity: string;
     unitPrice: string;
+    discountPct: string;
+    taxRate: string;
+    netAmount: string;
+    taxAmount: string;
     totalAmount: string;
   }>;
+}
+
+export interface DocumentSequence {
+  id: string;
+  documentType: "INVOICE" | "CREDIT_NOTE" | "PURCHASE_INVOICE";
+  series: string;
+  nextNumber: string;
+  padding: number;
+  active: boolean;
 }
 
 export interface InvoicePage {
@@ -82,4 +101,9 @@ export function invoiceStatusLabel(status: Invoice["status"]) {
     CANCELLED: "Anulada",
     RECTIFIED: "Rectificada",
   }[status];
+}
+
+export function invoiceIssueKey(invoiceId: string, existing?: string | null) {
+  if (existing) return existing;
+  return `issue-${invoiceId}-${crypto.randomUUID()}`;
 }

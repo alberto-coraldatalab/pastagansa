@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatInvoiceDate,
   invoiceInputSchema,
+  invoiceIssueKey,
   invoiceStatusLabel,
   todayIso,
 } from "./invoices";
@@ -43,5 +44,9 @@ describe("invoice presentation", () => {
   it("translates statuses and formats API dates", () => {
     expect(invoiceStatusLabel("DRAFT")).toBe("Borrador");
     expect(formatInvoiceDate("2026-09-09T00:00:00.000Z")).toBe("9/9/2026");
+  });
+
+  it("preserves an issuance key across a retry", () => {
+    expect(invoiceIssueKey("invoice-1", "saved-key")).toBe("saved-key");
   });
 });

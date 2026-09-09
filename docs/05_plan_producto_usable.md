@@ -128,7 +128,9 @@ unidad, IVA sugerido y cuenta de ingresos reutilizables. La web mantiene tokens 
 tenant en servidor y presenta NIF o SKU duplicados como conflictos recuperables.
 También existe listado de facturas por estado y creación de borradores con cliente,
 fechas y múltiples líneas, reutilizando catálogo y mostrando el total confirmado por
-el API. Faltan edición, emisión, PDF y cobro para superar el gate.
+el API. El detalle permite editar borradores, crear o seleccionar una serie, confirmar
+la emisión idempotente y descargar el PDF oficial. Falta registrar el cobro y proteger
+el recorrido completo con E2E de navegador para superar el gate.
 
 Entregables:
 
