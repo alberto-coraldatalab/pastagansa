@@ -1427,6 +1427,136 @@ describe("platform integrity", () => {
     ]);
     expect(transitions.map(({ status }) => status).sort()).toEqual([200, 409]);
 
+    const defaultPurchaseApprovalPolicy = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .get("/v1/purchase-approval-policy")
+      .expect(200);
+    expect(defaultPurchaseApprovalPolicy.body).toEqual([
+      { minimumAmount: "0", requiredApprovals: 1 },
+    ]);
+    await authed(accountA.accessToken, tenantA)
+      .put("/v1/purchase-approval-policy")
+      .send({
+        tiers: [
+          { minimumAmount: 0, requiredApprovals: 2 },
+          { minimumAmount: 1000, requiredApprovals: 1 },
+        ],
+      })
+      .expect(400);
+    const twoLevelPolicy = await authed(accountA.accessToken, tenantA)
+      .put("/v1/purchase-approval-policy")
+      .send({ tiers: [{ minimumAmount: 0, requiredApprovals: 2 }] })
+      .expect(200);
+    expect(twoLevelPolicy.body[0]).toMatchObject({ requiredApprovals: 2 });
+    const multiLevelDraft = await authed(accountA.accessToken, tenantA)
+      .post("/v1/purchase-invoices")
+      .send({
+        ...purchaseInput,
+        supplierInvoiceNumber: "PROV-2026-0050",
+      })
+      .expect(201);
+    const firstApproval = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${multiLevelDraft.body.id}/approve`)
+      .set("idempotency-key", "multi-approval-a-1")
+      .send({ sequenceId: purchaseSequence.body.id })
+      .expect(200);
+    expect(firstApproval.body).toMatchObject({
+      status: "PENDING_APPROVAL",
+      requiredApprovals: 2,
+      approvalCount: 1,
+      receptionFullNumber: null,
+    });
+    expect(firstApproval.body.approvals).toHaveLength(1);
+    await authed(accountA.accessToken, tenantA)
+      .patch(`/v1/purchase-invoices/${multiLevelDraft.body.id}`)
+      .send(purchaseInput)
+      .expect(409);
+    const ownerRole = await admin.role.findUniqueOrThrow({
+      where: { code: "organization.owner" },
+    });
+    await admin.membership.create({
+      data: {
+        organizationId: tenantA.organizationId,
+        companyId: tenantA.companyId,
+        userId: tenantB.userId,
+        roleId: ownerRole.id,
+      },
+    });
+    const rejectedPurchase = await authed(accountB.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${multiLevelDraft.body.id}/reject`)
+      .send({ reason: "Supplier evidence needs correction" })
+      .expect(200);
+    expect(rejectedPurchase.body).toMatchObject({
+      status: "DRAFT",
+      requiredApprovals: 1,
+      approvalCount: 0,
+    });
+    expect(rejectedPurchase.body.approvals).toHaveLength(0);
+    await authed(accountA.accessToken, tenantA)
+      .patch(`/v1/purchase-invoices/${multiLevelDraft.body.id}`)
+      .send({
+        ...purchaseInput,
+        supplierInvoiceNumber: "PROV-2026-0050",
+        notes: "Evidence corrected",
+      })
+      .expect(200);
+    const resubmittedPurchase = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${multiLevelDraft.body.id}/approve`)
+      .set("idempotency-key", "multi-approval-a-2")
+      .send({ sequenceId: purchaseSequence.body.id })
+      .expect(200);
+    expect(resubmittedPurchase.body.status).toBe("PENDING_APPROVAL");
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${multiLevelDraft.body.id}/approve`)
+      .set("idempotency-key", "multi-approval-a-2")
+      .send({ sequenceId: purchaseSequence.body.id })
+      .expect(200);
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${multiLevelDraft.body.id}/approve`)
+      .set("idempotency-key", "multi-approval-a-3")
+      .send({ sequenceId: purchaseSequence.body.id })
+      .expect(409);
+    const completedMultiLevelPurchase = await authed(
+      accountB.accessToken,
+      tenantA,
+    )
+      .post(`/v1/purchase-invoices/${multiLevelDraft.body.id}/approve`)
+      .set("idempotency-key", "multi-approval-b-1")
+      .send({ sequenceId: purchaseSequence.body.id })
+      .expect(200);
+    expect(completedMultiLevelPurchase.body).toMatchObject({
+      status: "APPROVED",
+      requiredApprovals: 2,
+      approvalCount: 2,
+      receptionFullNumber: "REC2026-00002",
+    });
+    expect(completedMultiLevelPurchase.body.approvals).toHaveLength(2);
+    expect(
+      new Set(
+        completedMultiLevelPurchase.body.approvals.map(
+          ({ approvedBy }: { approvedBy: { id: string } }) => approvedBy.id,
+        ),
+      ).size,
+    ).toBe(2);
+    await expect(
+      admin.purchaseInvoiceApproval.update({
+        where: { id: completedMultiLevelPurchase.body.approvals[0].id },
+        data: { position: 2 },
+      }),
+    ).rejects.toThrow(/purchase approvals are immutable/);
+    await expect(
+      admin.$transaction(async (db) => {
+        await db.purchaseInvoice.update({
+          where: { id: multiLevelDraft.body.id },
+          data: { requiredApprovals: 1, approvalCount: 1 },
+        });
+      }),
+    ).rejects.toThrow(
+      /purchase invoice approval count does not match its decisions/,
+    );
+
     const refreshes = await Promise.all([
       request(app.getHttpServer())
         .post("/v1/identity/refresh")

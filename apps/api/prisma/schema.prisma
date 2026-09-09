@@ -119,6 +119,7 @@ enum TaxBookType {
 
 enum PurchaseInvoiceStatus {
   DRAFT
+  PENDING_APPROVAL
   APPROVED
   CANCELLED
 }
@@ -194,6 +195,8 @@ model Organization {
   purchaseTaxLines     PurchaseTaxLine[]
   purchaseInstallments PurchaseInvoiceInstallment[]
   purchaseAttachments  PurchaseInvoiceAttachment[]
+  purchaseApprovalTiers PurchaseApprovalTier[]
+  purchaseApprovals     PurchaseInvoiceApproval[]
   supplierAllocations  SupplierPaymentAllocation[]
   accounts             Account[]
   fiscalYears          FiscalYear[]
@@ -239,6 +242,8 @@ model Company {
   purchaseTaxLines     PurchaseTaxLine[]
   purchaseInstallments PurchaseInvoiceInstallment[]
   purchaseAttachments  PurchaseInvoiceAttachment[]
+  purchaseApprovalTiers PurchaseApprovalTier[]
+  purchaseApprovals     PurchaseInvoiceApproval[]
   supplierAllocations  SupplierPaymentAllocation[]
   accounts             Account[]
   fiscalYears          FiscalYear[]
@@ -330,7 +335,8 @@ model DocumentSequence {
   organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company          Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
   invoices         Invoice[]
-  purchaseInvoices PurchaseInvoice[]
+  purchaseInvoices        PurchaseInvoice[] @relation("PurchaseReceptionSequence")
+  pendingPurchaseInvoices PurchaseInvoice[] @relation("PurchaseRequestedSequence")
 
   @@unique([companyId, documentType, series])
   @@unique([id, organizationId, companyId])
@@ -526,12 +532,15 @@ model PurchaseInvoice {
   companyId             String                       @map("company_id") @db.Uuid
   supplierId            String                       @map("supplier_id") @db.Uuid
   sequenceId            String?                      @map("sequence_id") @db.Uuid
+  requestedSequenceId   String?                      @map("requested_sequence_id") @db.Uuid
   draftCode             String                       @default(cuid()) @map("draft_code") @db.VarChar(40)
   supplierInvoiceNumber String                       @map("supplier_invoice_number") @db.VarChar(100)
   receptionSeries       String?                      @map("reception_series") @db.VarChar(30)
   receptionNumber       BigInt?                      @map("reception_number")
   receptionFullNumber   String?                      @map("reception_full_number") @db.VarChar(80)
   approvalKey           String?                      @map("approval_key") @db.VarChar(128)
+  requiredApprovals     Int                          @default(1) @map("required_approvals")
+  approvalCount         Int                          @default(0) @map("approval_count")
   status                PurchaseInvoiceStatus        @default(DRAFT)
   supplierLegalName     String                       @map("supplier_legal_name") @db.VarChar(240)
   supplierTaxId         String?                      @map("supplier_tax_id") @db.VarChar(40)
@@ -555,13 +564,15 @@ model PurchaseInvoice {
   organization          Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company               Company                      @relation(fields: [companyId], references: [id], onDelete: Restrict)
   supplier              Contact                      @relation(fields: [supplierId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
-  sequence              DocumentSequence?            @relation(fields: [sequenceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  sequence              DocumentSequence?            @relation("PurchaseReceptionSequence", fields: [sequenceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  requestedSequence     DocumentSequence?            @relation("PurchaseRequestedSequence", fields: [requestedSequenceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   lines                 PurchaseInvoiceLine[]
   taxLines              PurchaseTaxLine[]
   taxLedgerEntry        TaxLedgerEntry?
   supplierPayments      SupplierPayment[]
   installments          PurchaseInvoiceInstallment[]
   attachments           PurchaseInvoiceAttachment[]
+  approvals             PurchaseInvoiceApproval[]
 
   @@unique([companyId, draftCode])
   @@unique([companyId, supplierId, supplierInvoiceNumber])
@@ -570,6 +581,45 @@ model PurchaseInvoice {
   @@unique([id, organizationId, companyId])
   @@index([companyId, status, receivedDate])
   @@map("purchase_invoices")
+}
+
+model PurchaseApprovalTier {
+  id                String       @id @default(uuid()) @db.Uuid
+  organizationId    String       @map("organization_id") @db.Uuid
+  companyId         String       @map("company_id") @db.Uuid
+  minimumAmount     Decimal      @map("minimum_amount") @db.Decimal(14, 2)
+  requiredApprovals Int          @map("required_approvals")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([companyId, minimumAmount])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, minimumAmount])
+  @@map("purchase_approval_tiers")
+}
+
+model PurchaseInvoiceApproval {
+  id                String          @id @default(uuid()) @db.Uuid
+  organizationId    String          @map("organization_id") @db.Uuid
+  companyId         String          @map("company_id") @db.Uuid
+  purchaseInvoiceId String          @map("purchase_invoice_id") @db.Uuid
+  position          Int
+  approvedById      String          @map("approved_by_id") @db.Uuid
+  idempotencyKey    String          @map("idempotency_key") @db.VarChar(128)
+  approvedAt        DateTime        @default(now()) @map("approved_at") @db.Timestamptz(6)
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  approvedBy        User            @relation(fields: [approvedById], references: [id], onDelete: Restrict)
+
+  @@unique([purchaseInvoiceId, position])
+  @@unique([purchaseInvoiceId, approvedById])
+  @@unique([companyId, idempotencyKey])
+  @@unique([id, organizationId, companyId])
+  @@index([purchaseInvoiceId, approvedAt])
+  @@map("purchase_invoice_approvals")
 }
 
 model PurchaseInvoiceAttachment {
@@ -1139,6 +1189,7 @@ model User {
   auditEvents         AuditEvent[]                @relation("actor_audit_events")
   sessions            Session[]
   purchaseAttachments PurchaseInvoiceAttachment[]
+  purchaseApprovals   PurchaseInvoiceApproval[]
 
   @@map("users")
 }

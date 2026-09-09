@@ -20,6 +20,7 @@ import { calculateInvoiceLine } from "../invoices/invoices.service";
 import { TaxService } from "../tax/tax.service";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 import { ApprovePurchaseInvoiceDto } from "./dto/approve-purchase-invoice.dto";
+import { RejectPurchaseInvoiceDto } from "./dto/purchase-approval.dto";
 import { ListPurchaseInvoicesDto } from "./dto/list-purchase-invoices.dto";
 import {
   CreatePurchaseInvoiceDto,
@@ -101,6 +102,15 @@ export class PurchasesService {
           include: { taxLines: true },
         },
         installments: { orderBy: { position: "asc" } },
+        approvals: {
+          orderBy: { position: "asc" },
+          select: {
+            id: true,
+            position: true,
+            approvedAt: true,
+            approvedBy: { select: { id: true, email: true } },
+          },
+        },
       },
     });
     if (!purchase) throw new NotFoundException("Purchase invoice not found");
@@ -175,10 +185,38 @@ export class PurchasesService {
       where: { id, ...scope },
       include: { lines: { include: { taxLines: true } } },
     });
-    if (purchase.status !== PurchaseInvoiceStatus.DRAFT) {
-      if (purchase.approvalKey === idempotencyKey) return this.get(id);
-      throw new ConflictException("Purchase invoice is already approved");
+    const existingApproval =
+      await this.tenant.db.purchaseInvoiceApproval.findFirst({
+        where: { companyId: scope.companyId, idempotencyKey },
+      });
+    if (existingApproval) {
+      if (
+        existingApproval.purchaseInvoiceId === id &&
+        existingApproval.approvedById === this.tenant.required.userId
+      )
+        return this.get(id);
+      throw new ConflictException(
+        "Idempotency-Key was already used for another purchase approval",
+      );
     }
+    if (
+      purchase.status !== PurchaseInvoiceStatus.DRAFT &&
+      purchase.status !== PurchaseInvoiceStatus.PENDING_APPROVAL
+    )
+      throw new ConflictException("Purchase invoice is already approved");
+    const actorApproval =
+      await this.tenant.db.purchaseInvoiceApproval.findFirst({
+        where: {
+          purchaseInvoiceId: id,
+          approvedById: this.tenant.required.userId,
+          ...scope,
+        },
+        select: { id: true },
+      });
+    if (actorApproval)
+      throw new ConflictException(
+        "Each approval level requires a different approver",
+      );
     if (
       !purchase.lines.length ||
       purchase.lines.some((line) => line.taxLines.length !== 1)
@@ -186,53 +224,173 @@ export class PurchasesService {
       throw new ConflictException(
         "Every purchase invoice line must have one fiscal breakdown",
       );
-    const reused = await this.tenant.db.purchaseInvoice.findFirst({
-      where: { ...scope, approvalKey: idempotencyKey, id: { not: id } },
-      select: { id: true },
-    });
-    if (reused)
+    const requestedSequenceId =
+      purchase.status === PurchaseInvoiceStatus.PENDING_APPROVAL
+        ? purchase.requestedSequenceId
+        : input.sequenceId;
+    if (
+      purchase.status === PurchaseInvoiceStatus.PENDING_APPROVAL &&
+      input.sequenceId !== requestedSequenceId
+    )
       throw new ConflictException(
-        "Idempotency-Key was already used for another purchase invoice",
+        "The reception sequence is frozen while approval is pending",
       );
-    const sequenceLock = await this.tenant.db.$queryRaw<Array<{ id: string }>>`
-      SELECT "id" FROM "document_sequences"
-      WHERE "id" = CAST(${input.sequenceId} AS uuid)
+    await this.requirePurchaseSequence(requestedSequenceId!, {
+      active: purchase.status === PurchaseInvoiceStatus.DRAFT,
+      lock: false,
+    });
+    if (purchase.status === PurchaseInvoiceStatus.DRAFT)
+      await this.ensurePaymentSchedule(purchase);
+    const requiredApprovals =
+      purchase.status === PurchaseInvoiceStatus.DRAFT
+        ? await this.resolveRequiredApprovals(purchase.total)
+        : purchase.requiredApprovals;
+    const approvalCount = purchase.approvalCount + 1;
+    try {
+      await this.tenant.db.purchaseInvoiceApproval.create({
+        data: {
+          ...scope,
+          purchaseInvoiceId: id,
+          position: approvalCount,
+          approvedById: this.tenant.required.userId,
+          idempotencyKey,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      )
+        throw new ConflictException(
+          "Approval was already recorded concurrently",
+        );
+      throw error;
+    }
+    await this.audit.record(
+      "purchase_invoice.approval_recorded",
+      "purchase_invoice",
+      id,
+      { position: approvalCount, requiredApprovals },
+    );
+    if (approvalCount < requiredApprovals) {
+      await this.tenant.db.purchaseInvoice.update({
+        where: { id },
+        data: {
+          status: PurchaseInvoiceStatus.PENDING_APPROVAL,
+          requestedSequenceId,
+          requiredApprovals,
+          approvalCount,
+        },
+      });
+      return this.get(id);
+    }
+    const receptionFullNumber = await this.finalizeApproval(
+      purchase,
+      requestedSequenceId!,
+      idempotencyKey,
+      requiredApprovals,
+      approvalCount,
+    );
+    await this.audit.record(
+      "purchase_invoice.approved",
+      "purchase_invoice",
+      id,
+      { receptionFullNumber },
+    );
+    return this.get(id);
+  }
+
+  async reject(id: string, input: RejectPurchaseInvoiceDto) {
+    const scope = this.scope();
+    await this.lockPurchase(id);
+    const purchase = await this.tenant.db.purchaseInvoice.findFirst({
+      where: { id, ...scope },
+      select: { status: true },
+    });
+    if (!purchase) throw new NotFoundException("Purchase invoice not found");
+    if (purchase.status !== PurchaseInvoiceStatus.PENDING_APPROVAL)
+      throw new ConflictException(
+        "Only a pending purchase invoice can be rejected",
+      );
+    await this.tenant.db.purchaseInvoiceApproval.deleteMany({
+      where: { purchaseInvoiceId: id, ...scope },
+    });
+    await this.tenant.db.purchaseInvoice.update({
+      where: { id },
+      data: {
+        status: PurchaseInvoiceStatus.DRAFT,
+        requestedSequenceId: null,
+        requiredApprovals: 1,
+        approvalCount: 0,
+      },
+    });
+    await this.audit.record(
+      "purchase_invoice.approval_rejected",
+      "purchase_invoice",
+      id,
+      { reason: input.reason.trim() },
+    );
+    return this.get(id);
+  }
+
+  private async lockPurchase(id: string) {
+    const scope = this.scope();
+    const locked = await this.tenant.db.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "purchase_invoices"
+      WHERE "id" = CAST(${id} AS uuid)
         AND "organization_id" = CAST(${scope.organizationId} AS uuid)
         AND "company_id" = CAST(${scope.companyId} AS uuid)
       FOR UPDATE
     `;
-    if (!sequenceLock.length)
-      throw new BadRequestException("Document sequence not found");
+    if (!locked.length)
+      throw new NotFoundException("Purchase invoice not found");
+  }
+
+  private async requirePurchaseSequence(
+    id: string,
+    options: { active: boolean; lock: boolean },
+  ) {
+    const scope = this.scope();
+    if (options.lock) {
+      const locked = await this.tenant.db.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "document_sequences"
+        WHERE "id" = CAST(${id} AS uuid)
+          AND "organization_id" = CAST(${scope.organizationId} AS uuid)
+          AND "company_id" = CAST(${scope.companyId} AS uuid)
+        FOR UPDATE
+      `;
+      if (!locked.length)
+        throw new BadRequestException("Document sequence not found");
+    }
     const sequence = await this.tenant.db.documentSequence.findFirst({
       where: {
-        id: input.sequenceId,
+        id,
         ...scope,
         documentType: DocumentType.PURCHASE_INVOICE,
-        active: true,
+        ...(options.active ? { active: true } : {}),
       },
     });
     if (!sequence)
       throw new BadRequestException(
-        "An active PURCHASE_INVOICE sequence is required",
+        options.active
+          ? "An active PURCHASE_INVOICE sequence is required"
+          : "Submitted PURCHASE_INVOICE sequence was not found",
       );
-    const receptionNumber = sequence.nextNumber;
-    const receptionFullNumber = `${sequence.series}-${receptionNumber
-      .toString()
-      .padStart(sequence.padding, "0")}`;
-    await this.tenant.db.documentSequence.update({
-      where: { id: sequence.id },
-      data: { nextNumber: { increment: 1 } },
-    });
+    return sequence;
+  }
+
+  private async ensurePaymentSchedule(purchase: PurchaseForApproval) {
+    const scope = this.scope();
     const installments =
       await this.tenant.db.purchaseInvoiceInstallment.findMany({
-        where: { purchaseInvoiceId: id, ...scope },
+        where: { purchaseInvoiceId: purchase.id, ...scope },
         select: { amount: true },
       });
     if (!installments.length && purchase.total.greaterThan(0))
       await this.tenant.db.purchaseInvoiceInstallment.create({
         data: {
           ...scope,
-          purchaseInvoiceId: id,
+          purchaseInvoiceId: purchase.id,
           position: 1,
           dueDate: purchase.dueDate ?? purchase.issueDate,
           amount: purchase.total,
@@ -249,28 +407,55 @@ export class PurchasesService {
       throw new ConflictException(
         "Payment schedule total must equal the purchase invoice total",
       );
+  }
+
+  private async resolveRequiredApprovals(total: Decimal) {
+    const tier = await this.tenant.db.purchaseApprovalTier.findFirst({
+      where: { ...this.scope(), minimumAmount: { lte: total } },
+      orderBy: { minimumAmount: "desc" },
+      select: { requiredApprovals: true },
+    });
+    return tier?.requiredApprovals ?? 1;
+  }
+
+  private async finalizeApproval(
+    purchase: PurchaseForApproval,
+    sequenceId: string,
+    idempotencyKey: string,
+    requiredApprovals: number,
+    approvalCount: number,
+  ) {
+    const sequence = await this.requirePurchaseSequence(sequenceId, {
+      active: false,
+      lock: true,
+    });
+    const receptionNumber = sequence.nextNumber;
+    const receptionFullNumber = `${sequence.series}-${receptionNumber
+      .toString()
+      .padStart(sequence.padding, "0")}`;
+    await this.tenant.db.documentSequence.update({
+      where: { id: sequence.id },
+      data: { nextNumber: { increment: 1 } },
+    });
     await this.tenant.db.purchaseInvoice.update({
-      where: { id },
+      where: { id: purchase.id },
       data: {
+        requestedSequenceId: null,
         sequenceId: sequence.id,
         receptionSeries: sequence.series,
         receptionNumber,
         receptionFullNumber,
         approvalKey: idempotencyKey,
+        requiredApprovals,
+        approvalCount,
         status: PurchaseInvoiceStatus.APPROVED,
         amountDue: purchase.total,
         approvedAt: new Date(),
       },
     });
-    await this.tax.postPurchaseInvoice(id);
-    await this.accounting.postPurchaseInvoice(id);
-    await this.audit.record(
-      "purchase_invoice.approved",
-      "purchase_invoice",
-      id,
-      { receptionFullNumber },
-    );
-    return this.get(id);
+    await this.tax.postPurchaseInvoice(purchase.id);
+    await this.accounting.postPurchaseInvoice(purchase.id);
+    return receptionFullNumber;
   }
 
   async delete(id: string) {
@@ -485,6 +670,10 @@ interface BuiltLine {
     reverseCharge: boolean;
   };
 }
+
+type PurchaseForApproval = Prisma.PurchaseInvoiceGetPayload<{
+  include: { lines: { include: { taxLines: true } } };
+}>;
 
 function presentPurchaseInvoice<T extends { receptionNumber: bigint | null }>(
   purchase: T,

@@ -20,6 +20,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { RequirePermissions } from "../authorization/permissions.decorator";
 import { TenantProtected } from "../tenancy/tenant.decorator";
 import { ApprovePurchaseInvoiceDto } from "./dto/approve-purchase-invoice.dto";
+import { RejectPurchaseInvoiceDto } from "./dto/purchase-approval.dto";
 import { ListPurchaseInvoicesDto } from "./dto/list-purchase-invoices.dto";
 import { RecordSupplierPaymentDto } from "./dto/record-supplier-payment.dto";
 import {
@@ -87,6 +88,16 @@ export class PurchasesController {
       input,
       requireIdempotencyKey(idempotencyKey),
     );
+  }
+
+  @Post(":id/reject")
+  @HttpCode(200)
+  @RequirePermissions("purchase_invoice.approve")
+  reject(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: RejectPurchaseInvoiceDto,
+  ) {
+    return this.purchases.reject(id, input);
   }
 
   @Get(":id/payment-schedule")
