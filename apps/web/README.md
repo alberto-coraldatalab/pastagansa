@@ -32,4 +32,9 @@ both workspaces and preparing PostgreSQL, install Chromium with
 `/compras` provides the first purchase workflow: it lists invoices received from
 suppliers, creates and edits drafts with deductible VAT, approves them into a
 reception series, records outgoing payments, and exposes the resulting journal and
-received-VAT entries. Playwright verifies the state again after a page reload.
+received-VAT entries. Drafts accept downloadable PDF, PNG, and JPEG evidence. PNG and
+JPEG files can be processed by the asynchronous local OCR worker; the UI compares its
+suggestions with editable human corrections and blocks approval until every requested
+extraction has been reviewed. PDF remains downloadable evidence and is explicitly not
+offered to the local OCR engine. Playwright verifies the full control flow and state
+again after a page reload.

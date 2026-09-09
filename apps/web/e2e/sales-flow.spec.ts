@@ -100,6 +100,7 @@ test("completes the sales flow from registration to payment", async ({
 test("completes a purchase from supplier to approval and payment", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   const suffix = Date.now();
   await page.goto("/acceso");
   await page.getByRole("button", { name: "Crear cuenta" }).click();
@@ -151,6 +152,67 @@ test("completes a purchase from supplier to approval and payment", async ({
   await expect(
     page.getByRole("heading", { name: "Compra en borrador" }),
   ).toBeVisible();
+
+  const fileInput = page.locator('input[type="file"]');
+  await fileInput.setInputFiles({
+    name: "factura-proveedor.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n%%EOF\n"),
+  });
+  await expect(
+    page.getByRole("link", { name: "factura-proveedor.pdf" }),
+  ).toBeVisible();
+  await expect(page.getByText("OCR no disponible para PDF")).toBeVisible();
+  const attachmentDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("link", { name: "factura-proveedor.pdf" }).click();
+  const attachmentDownload = await attachmentDownloadPromise;
+  expect(attachmentDownload.suggestedFilename()).toBe("factura-proveedor.pdf");
+  const attachmentPath = await attachmentDownload.path();
+  expect(attachmentPath).not.toBeNull();
+  expect((await readFile(attachmentPath!)).subarray(0, 5).toString()).toBe(
+    "%PDF-",
+  );
+
+  const imageBase64 = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 900;
+    canvas.height = 400;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "white";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "black";
+    context.font = "32px sans-serif";
+    [
+      "PROVEEDOR: Proveedor E2E SL",
+      "FACTURA: PROV-E2E-001",
+      "BASE IMPONIBLE: 100,00 EUR",
+      "IVA 21%: 21,00 EUR",
+      "TOTAL FACTURA: 121,00 EUR",
+    ].forEach((line, index) => context.fillText(line, 30, 55 + index * 65));
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await fileInput.setInputFiles({
+    name: "factura-proveedor.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(imageBase64, "base64"),
+  });
+  const imageRow = page.locator(".attachment-list article").filter({
+    hasText: "factura-proveedor.png",
+  });
+  await expect(imageRow).toBeVisible();
+  await imageRow.getByRole("button", { name: "Solicitar OCR" }).click();
+  await expect(
+    page.getByRole("button", { name: "Aprobar compra" }),
+  ).toBeDisabled();
+  await imageRow
+    .getByRole("button", { name: "Revisar extracción" })
+    .click({ timeout: 30_000 });
+  await page.getByLabel("Número de factura").fill("PROV-E2E-001 REVISADA");
+  await page.getByRole("button", { name: "Confirmar revisión humana" }).click();
+  await expect(imageRow.getByText("Revisión humana completada")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Aprobar compra" }),
+  ).toBeEnabled();
 
   await page.getByRole("button", { name: "Aprobar compra" }).click();
   await page.getByLabel("Nueva serie de recepción").fill("RCE2E");

@@ -78,6 +78,42 @@ export type SupplierPayment = Payment;
 export type SupplierPaymentInput = PaymentInput;
 export type PurchaseTrace = InvoiceTrace;
 
+export interface PurchaseAttachment {
+  id: string;
+  purchaseInvoiceId: string;
+  originalName: string;
+  mediaType: "application/pdf" | "image/png" | "image/jpeg";
+  sizeBytes: number;
+  sha256: string;
+  createdAt: string;
+}
+
+export type PurchaseOcrStatus =
+  "PENDING" | "PROCESSING" | "REVIEW_REQUIRED" | "REVIEWED" | "FAILED";
+
+export interface PurchaseOcrJob {
+  id: string;
+  purchaseInvoiceId: string;
+  attachmentId: string;
+  status: PurchaseOcrStatus;
+  engine: string;
+  engineVersion: string;
+  overallConfidence: string | null;
+  attempts: number;
+  lastError: string | null;
+  rawText?: string | null;
+  extractedFields?: Record<
+    string,
+    { value: string; confidence: number; evidence: string }
+  > | null;
+  reviewFields?: {
+    fields: Record<string, string | null>;
+    notes: string;
+  } | null;
+  reviewedAt: string | null;
+  attachment?: Pick<PurchaseAttachment, "id" | "originalName" | "mediaType">;
+}
+
 export function purchaseStatusLabel(status: Purchase["status"]) {
   return {
     DRAFT: "Borrador",

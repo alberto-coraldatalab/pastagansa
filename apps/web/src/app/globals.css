@@ -1031,6 +1031,87 @@ a {
   margin-top: 1rem;
   overflow: hidden;
 }
+.attachments-panel {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin: 1rem 0;
+  overflow: hidden;
+}
+.attachments-panel > header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 1.3rem 1.5rem;
+}
+.attachments-panel h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+.attachments-panel header p:last-child,
+.attachment-list small {
+  color: var(--muted);
+  display: block;
+  font-size: 0.7rem;
+  margin: 0.25rem 0 0;
+}
+.upload-button {
+  cursor: pointer;
+}
+.attachment-list article {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+}
+.attachment-list a {
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+.attachment-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+}
+.attachment-actions > span,
+.attachment-actions > strong {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+.attachment-actions button {
+  background: none;
+  border: 0;
+  color: var(--lime-dark);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.inline-warning {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #9a3412;
+  font-size: 0.78rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+}
+.ocr-dialog {
+  max-width: 760px;
+}
+.ocr-fields {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: 1fr 1fr;
+}
+.ocr-confidence {
+  background: #f2f9e8;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  padding: 0.8rem 1rem;
+}
 .payments-panel > header {
   align-items: center;
   display: flex;
@@ -1264,10 +1345,19 @@ a {
     flex-direction: column;
     gap: 1rem;
   }
+  .attachments-panel > header,
+  .attachment-list article {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
   .invoice-summary-grid {
     grid-template-columns: 1fr;
   }
   .payment-fields {
+    grid-template-columns: 1fr;
+  }
+  .ocr-fields {
     grid-template-columns: 1fr;
   }
   .trace-grid {

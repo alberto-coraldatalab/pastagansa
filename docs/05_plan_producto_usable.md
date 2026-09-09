@@ -174,12 +174,13 @@ Gate:
 - permisos y estado explican por qué una acción no está disponible;
 - PDF se acepta como adjunto y no se ofrece falsamente como OCR compatible.
 
-Estado real: en curso. Ya existe el recorrido web proveedor → borrador editable →
-aprobación → pago, con serie de recepción, IVA soportado/deducible, saldo, historial y
-trazabilidad exacta hacia el asiento y el libro de IVA. Un E2E de Chromium verifica el
-recorrido y su persistencia tras recarga. Faltan la subida/descarga de adjuntos y la
-solicitud, progreso, reintento y revisión humana del OCR para superar formalmente el
-gate.
+Estado real: completada. El recorrido web cubre proveedor → borrador editable →
+adjuntos → OCR/revisión → aprobación → pago, con serie de recepción, IVA
+soportado/deducible, saldo, historial y trazabilidad exacta hacia el asiento y el libro
+de IVA. PDF, PNG y JPEG se suben y descargan; la interfaz solo ofrece OCR para PNG/JPEG,
+muestra progreso y reintento y compara extracción con correcciones humanas. La
+aprobación queda bloqueada hasta revisar cada OCR solicitado. Un E2E de Chromium
+verifica el recorrido completo, el archivo descargado y la persistencia tras recarga.
 
 ### U4 — Visibilidad y staging
 

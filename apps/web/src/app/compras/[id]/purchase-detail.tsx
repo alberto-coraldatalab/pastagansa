@@ -17,7 +17,9 @@ import {
   purchaseStatusLabel,
   supplierPaymentKey,
   type Purchase,
+  type PurchaseAttachment,
   type PurchaseInput,
+  type PurchaseOcrJob,
   type PurchaseTrace,
   type SupplierPayment,
 } from "@/lib/purchases";
@@ -32,6 +34,11 @@ export function PurchaseDetail({ id }: { id: string }) {
     queryKey: ["purchase", id],
     queryFn: () => requestJson<Purchase>(`/api/purchases/${id}`),
     retry: false,
+  });
+  const ocrJobs = useQuery({
+    queryKey: ["purchase-ocr", id],
+    queryFn: () => requestJson<PurchaseOcrJob[]>(`/api/purchases/${id}/ocr`),
+    refetchInterval: ocrPollInterval,
   });
   const update = useMutation({
     mutationFn: (payload: PurchaseInput) =>
@@ -72,6 +79,7 @@ export function PurchaseDetail({ id }: { id: string }) {
     );
 
   const document = purchase.data;
+  const pendingReview = ocrJobs.data?.some((job) => job.status !== "REVIEWED");
   return (
     <AppShell active="compras">
       <section className="detail-heading">
@@ -97,6 +105,12 @@ export function PurchaseDetail({ id }: { id: string }) {
               <button
                 className="primary-button compact"
                 onClick={() => setApproving(true)}
+                disabled={ocrJobs.isPending || pendingReview}
+                title={
+                  pendingReview
+                    ? "Revisa todas las extracciones OCR antes de aprobar"
+                    : undefined
+                }
               >
                 Aprobar compra
               </button>
@@ -116,6 +130,11 @@ export function PurchaseDetail({ id }: { id: string }) {
           <button onClick={() => setNotice("")} aria-label="Cerrar aviso">
             ×
           </button>
+        </div>
+      )}
+      {document.status === "DRAFT" && pendingReview && (
+        <div className="inline-warning" role="status">
+          Revisa todas las extracciones OCR antes de aprobar la compra.
         </div>
       )}
       <section className="invoice-summary-grid">
@@ -215,6 +234,7 @@ export function PurchaseDetail({ id }: { id: string }) {
           </p>
         )}
       </section>
+      <AttachmentsPanel purchase={document} />
       {document.status === "APPROVED" && <TracePanel purchase={document} />}
       {editing && (
         <PurchaseDialog
@@ -244,6 +264,325 @@ export function PurchaseDetail({ id }: { id: string }) {
       )}
     </AppShell>
   );
+}
+
+function AttachmentsPanel({ purchase }: { purchase: Purchase }) {
+  const queryClient = useQueryClient();
+  const [reviewing, setReviewing] = useState<string>();
+  const attachments = useQuery({
+    queryKey: ["purchase-attachments", purchase.id],
+    queryFn: () =>
+      requestJson<PurchaseAttachment[]>(
+        `/api/purchases/${purchase.id}/attachments`,
+      ),
+  });
+  const jobs = useQuery({
+    queryKey: ["purchase-ocr", purchase.id],
+    queryFn: () =>
+      requestJson<PurchaseOcrJob[]>(`/api/purchases/${purchase.id}/ocr`),
+    refetchInterval: ocrPollInterval,
+  });
+  const upload = useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.set("file", file);
+      return requestJson<PurchaseAttachment>(
+        `/api/purchases/${purchase.id}/attachments`,
+        { method: "POST", body },
+      );
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["purchase-attachments", purchase.id],
+      });
+    },
+  });
+  const queue = useMutation({
+    mutationFn: (attachmentId: string) =>
+      requestJson<PurchaseOcrJob>(
+        `/api/purchases/${purchase.id}/ocr/attachments/${attachmentId}`,
+        { method: "POST" },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["purchase-ocr", purchase.id],
+      });
+    },
+  });
+  const jobsByAttachment = new Map(
+    jobs.data?.map((job) => [job.attachmentId, job]),
+  );
+  return (
+    <section className="attachments-panel" aria-labelledby="attachments-title">
+      <header>
+        <div>
+          <p className="eyebrow">Evidencia</p>
+          <h2 id="attachments-title">Adjuntos y OCR</h2>
+          <p>
+            PDF se conserva como evidencia; OCR local solo procesa PNG/JPEG.
+          </p>
+        </div>
+        {purchase.status === "DRAFT" && (
+          <label className="secondary-button upload-button">
+            {upload.isPending ? "Subiendo…" : "Añadir archivo"}
+            <input
+              className="sr-only"
+              type="file"
+              accept="application/pdf,image/png,image/jpeg"
+              disabled={upload.isPending}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) upload.mutate(file);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
+        )}
+      </header>
+      {(attachments.error || jobs.error || upload.error || queue.error) && (
+        <p className="form-error">
+          {attachments.error?.message ??
+            jobs.error?.message ??
+            upload.error?.message ??
+            queue.error?.message}
+        </p>
+      )}
+      {attachments.isPending && (
+        <p className="dialog-helper">Cargando adjuntos…</p>
+      )}
+      {attachments.data?.length === 0 && (
+        <div className="payments-empty">
+          <strong>Sin documentos adjuntos</strong>
+          <p>Añade la factura recibida en PDF, PNG o JPEG.</p>
+        </div>
+      )}
+      {!!attachments.data?.length && (
+        <div className="attachment-list">
+          {attachments.data.map((attachment) => {
+            const job = jobsByAttachment.get(attachment.id);
+            const compatible = attachment.mediaType !== "application/pdf";
+            return (
+              <article key={attachment.id}>
+                <div>
+                  <a
+                    href={`/api/purchases/${purchase.id}/attachments/${attachment.id}/download`}
+                    download
+                  >
+                    {attachment.originalName}
+                  </a>
+                  <small>
+                    {attachment.mediaType} ·{" "}
+                    {formatFileSize(attachment.sizeBytes)}
+                  </small>
+                </div>
+                <div className="attachment-actions">
+                  {!compatible && <span>OCR no disponible para PDF</span>}
+                  {compatible && !job && purchase.status === "DRAFT" && (
+                    <button onClick={() => queue.mutate(attachment.id)}>
+                      Solicitar OCR
+                    </button>
+                  )}
+                  {job && (
+                    <span className="tag tag-neutral">
+                      {ocrStatusLabel(job.status)}
+                    </span>
+                  )}
+                  {job?.status === "FAILED" && purchase.status === "DRAFT" && (
+                    <button onClick={() => queue.mutate(attachment.id)}>
+                      Reintentar OCR
+                    </button>
+                  )}
+                  {job?.status === "REVIEW_REQUIRED" && (
+                    <button onClick={() => setReviewing(job.id)}>
+                      Revisar extracción
+                    </button>
+                  )}
+                  {job?.status === "REVIEWED" && (
+                    <strong>Revisión humana completada</strong>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+      {reviewing && (
+        <OcrReviewDialog
+          purchaseId={purchase.id}
+          jobId={reviewing}
+          onClose={() => setReviewing(undefined)}
+          onReviewed={async () => {
+            await queryClient.invalidateQueries({
+              queryKey: ["purchase-ocr", purchase.id],
+            });
+            setReviewing(undefined);
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+const reviewFields = [
+  ["supplierName", "Proveedor"],
+  ["taxId", "NIF"],
+  ["invoiceNumber", "Número de factura"],
+  ["issueDate", "Fecha de emisión"],
+  ["taxableBase", "Base imponible"],
+  ["taxAmount", "IVA"],
+  ["total", "Total"],
+  ["dueDate", "Vencimiento"],
+  ["iban", "IBAN"],
+] as const;
+
+function OcrReviewDialog({
+  purchaseId,
+  jobId,
+  onClose,
+  onReviewed,
+}: {
+  purchaseId: string;
+  jobId: string;
+  onClose(): void;
+  onReviewed(): Promise<void>;
+}) {
+  const job = useQuery({
+    queryKey: ["purchase-ocr-job", jobId],
+    queryFn: () =>
+      requestJson<PurchaseOcrJob>(`/api/purchases/${purchaseId}/ocr/${jobId}`),
+  });
+  const review = useMutation({
+    mutationFn: (input: {
+      fields: Record<string, string | null>;
+      notes: string;
+    }) =>
+      requestJson<PurchaseOcrJob>(
+        `/api/purchases/${purchaseId}/ocr/${jobId}/review`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(input),
+        },
+      ),
+    onSuccess: onReviewed,
+  });
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const fields = Object.fromEntries(
+      reviewFields.map(([key]) => [
+        key,
+        String(values.get(key) ?? "").trim() || null,
+      ]),
+    );
+    review.mutate({ fields, notes: String(values.get("notes") ?? "").trim() });
+  }
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section
+        className="dialog ocr-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ocr-review-title"
+      >
+        <header>
+          <div>
+            <p className="eyebrow">Control humano obligatorio</p>
+            <h2 id="ocr-review-title">Revisar extracción OCR</h2>
+          </div>
+          <button
+            className="icon-button"
+            onClick={onClose}
+            disabled={review.isPending}
+            aria-label="Cerrar"
+          >
+            ×
+          </button>
+        </header>
+        {job.isPending && <p className="dialog-helper">Cargando extracción…</p>}
+        {job.error && <p className="form-error">{job.error.message}</p>}
+        {job.data && (
+          <form className="invoice-form" onSubmit={submit}>
+            <p className="ocr-confidence">
+              Confianza global:{" "}
+              <strong>{job.data.overallConfidence ?? "0"} %</strong>. Compara
+              cada sugerencia con el documento.
+            </p>
+            <div className="ocr-fields">
+              {reviewFields.map(([key, label]) => {
+                const extracted = job.data?.extractedFields?.[key];
+                return (
+                  <label className="field" key={key}>
+                    <span>{label}</span>
+                    <small>
+                      OCR: {extracted?.value ?? "No detectado"}
+                      {extracted ? ` · ${extracted.confidence} %` : ""}
+                    </small>
+                    <input
+                      name={key}
+                      defaultValue={extracted?.value ?? ""}
+                      maxLength={500}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+            <label className="field">
+              <span>Nota de revisión</span>
+              <textarea
+                name="notes"
+                required
+                maxLength={1000}
+                defaultValue="Documento contrastado con el original."
+              />
+            </label>
+            {review.error && (
+              <p className="form-error" role="alert">
+                {review.error.message}
+              </p>
+            )}
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onClose}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="primary-button compact"
+                disabled={review.isPending}
+              >
+                {review.isPending ? "Guardando…" : "Confirmar revisión humana"}
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ocrStatusLabel(status: PurchaseOcrJob["status"]) {
+  return {
+    PENDING: "En cola",
+    PROCESSING: "Procesando",
+    REVIEW_REQUIRED: "Revisión requerida",
+    REVIEWED: "Revisado",
+    FAILED: "Fallido",
+  }[status];
+}
+
+function formatFileSize(bytes: number) {
+  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function ocrPollInterval(query: { state: { data?: unknown } }) {
+  const jobs = query.state.data as PurchaseOcrJob[] | undefined;
+  return jobs?.some((job) => ["PENDING", "PROCESSING"].includes(job.status))
+    ? 1_000
+    : false;
 }
 
 function ApprovalDialog({
