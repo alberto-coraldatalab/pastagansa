@@ -23,7 +23,7 @@ export function AppShell({
   active,
   children,
 }: {
-  active: "inicio" | "clientes";
+  active: "inicio" | "clientes" | "catalogo";
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -77,14 +77,17 @@ export function AppShell({
           <NavLink active={active === "clientes"} href="/clientes" number="02">
             Clientes
           </NavLink>
+          <NavLink active={active === "catalogo"} href="/catalogo" number="03">
+            Catálogo
+          </NavLink>
           <span className="nav-item disabled">
-            <span>03</span>Facturas <small>Próximo</small>
+            <span>04</span>Facturas <small>Próximo</small>
           </span>
           <span className="nav-item disabled">
-            <span>04</span>Compras
+            <span>05</span>Compras
           </span>
           <span className="nav-item disabled">
-            <span>05</span>Contabilidad
+            <span>06</span>Contabilidad
           </span>
         </nav>
         <div className="sidebar-company">
@@ -121,7 +124,7 @@ function NavLink({
   children,
 }: {
   active: boolean;
-  href: "/inicio" | "/clientes";
+  href: "/inicio" | "/clientes" | "/catalogo";
   number: string;
   children: React.ReactNode;
 }) {

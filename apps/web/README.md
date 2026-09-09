@@ -7,3 +7,6 @@ Authentication tokens are stored in secure, HTTP-only cookies and are never expo
 The first sales workflow is available at `/clientes`: it lists, searches, paginates,
 and creates customers through server-side API routes that attach the authorized
 tenant context.
+
+`/catalogo` provides the equivalent workflow for products and services, including
+reusable price, unit, VAT suggestion, and revenue account defaults.

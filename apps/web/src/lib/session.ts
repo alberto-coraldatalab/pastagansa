@@ -61,6 +61,8 @@ function translateApiError(message: string) {
   const translations: Record<string, string> = {
     "A contact with this tax ID already exists":
       "Ya existe un contacto con este NIF.",
+    "A catalog item with this SKU already exists":
+      "Ya existe un elemento del catálogo con este SKU.",
   };
   return translations[message] ?? message;
 }

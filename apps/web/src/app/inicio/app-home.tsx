@@ -32,8 +32,8 @@ export function AppHome() {
         </article>
         <Link className="next-card current card-link" href="/clientes">
           <span className="step-mark">2</span>
-          <p>Crear cliente</p>
-          <small>Ya disponible</small>
+          <p>Crear cliente y servicio</p>
+          <small>Maestros ya disponibles</small>
         </Link>
         <article className="next-card">
           <span className="step-mark">3</span>

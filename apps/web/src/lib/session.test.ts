@@ -57,5 +57,10 @@ describe("session helpers", () => {
         error: { message: "A contact with this tax ID already exists" },
       }),
     ).toBe("Ya existe un contacto con este NIF.");
+    expect(
+      normalizeApiError({
+        error: { message: "A catalog item with this SKU already exists" },
+      }),
+    ).toBe("Ya existe un elemento del catálogo con este SKU.");
   });
 });
