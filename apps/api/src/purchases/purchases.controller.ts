@@ -12,7 +12,11 @@ import {
   Post,
   Put,
   Query,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { RequirePermissions } from "../authorization/permissions.decorator";
 import { TenantProtected } from "../tenancy/tenant.decorator";
 import { ApprovePurchaseInvoiceDto } from "./dto/approve-purchase-invoice.dto";
@@ -28,6 +32,11 @@ import {
 } from "./dto/purchase-invoice.dto";
 import { PurchasesService } from "./purchases.service";
 import { SupplierPaymentsService } from "./supplier-payments.service";
+import {
+  MAX_PURCHASE_ATTACHMENT_BYTES,
+  PurchaseAttachmentsService,
+  UploadedPurchaseAttachment,
+} from "./purchase-attachments.service";
 
 @Controller("purchase-invoices")
 @TenantProtected()
@@ -35,6 +44,7 @@ export class PurchasesController {
   constructor(
     private readonly purchases: PurchasesService,
     private readonly supplierPayments: SupplierPaymentsService,
+    private readonly attachments: PurchaseAttachmentsService,
   ) {}
 
   @Get()
@@ -117,12 +127,65 @@ export class PurchasesController {
     );
   }
 
+  @Get(":id/attachments")
+  @RequirePermissions("purchase_invoice.read")
+  listAttachments(@Param("id", ParseUUIDPipe) id: string) {
+    return this.attachments.list(id);
+  }
+
+  @Post(":id/attachments")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { fileSize: MAX_PURCHASE_ATTACHMENT_BYTES, files: 1 },
+    }),
+  )
+  @RequirePermissions("purchase_invoice.update")
+  uploadAttachment(
+    @Param("id", ParseUUIDPipe) id: string,
+    @UploadedFile() file: UploadedPurchaseAttachment | undefined,
+  ) {
+    return this.attachments.upload(id, file);
+  }
+
+  @Get(":id/attachments/:attachmentId/download")
+  @RequirePermissions("purchase_invoice.read")
+  async downloadAttachment(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("attachmentId", ParseUUIDPipe) attachmentId: string,
+  ) {
+    const attachment = await this.attachments.download(id, attachmentId);
+    return new StreamableFile(Buffer.from(attachment.content), {
+      type: attachment.mediaType,
+      disposition: contentDisposition(attachment.originalName),
+      length: attachment.content.length,
+    });
+  }
+
+  @Delete(":id/attachments/:attachmentId")
+  @HttpCode(204)
+  @RequirePermissions("purchase_invoice.update")
+  deleteAttachment(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("attachmentId", ParseUUIDPipe) attachmentId: string,
+  ) {
+    return this.attachments.delete(id, attachmentId);
+  }
+
   @Delete(":id")
   @HttpCode(204)
   @RequirePermissions("purchase_invoice.delete")
   delete(@Param("id", ParseUUIDPipe) id: string) {
     return this.purchases.delete(id);
   }
+}
+
+function contentDisposition(filename: string) {
+  const ascii = filename
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7e]/g, "")
+    .replace(/["\\]/g, "_")
+    .trim();
+  return `attachment; filename="${ascii || "attachment"}"`;
 }
 
 function requireIdempotencyKey(value: string | undefined) {

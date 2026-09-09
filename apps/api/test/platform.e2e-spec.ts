@@ -475,10 +475,7 @@ describe("platform integrity", () => {
       amountPaid: "121",
       amountDue: "0",
     });
-    const defaultAccountingRules = await authed(
-      accountA.accessToken,
-      tenantA,
-    )
+    const defaultAccountingRules = await authed(accountA.accessToken, tenantA)
       .get("/v1/accounting/rules")
       .expect(200);
     expect(defaultAccountingRules.body).toHaveLength(10);
@@ -491,10 +488,7 @@ describe("platform integrity", () => {
         }),
       ]),
     );
-    const alternateRevenueAccount = await authed(
-      accountA.accessToken,
-      tenantA,
-    )
+    const alternateRevenueAccount = await authed(accountA.accessToken, tenantA)
       .post("/v1/accounting/accounts")
       .send({
         code: "701000",
@@ -665,6 +659,83 @@ describe("platform integrity", () => {
     await authed(accountB.accessToken, tenantB)
       .get(`/v1/purchase-invoices/${purchaseDraft.body.id}`)
       .expect(404);
+    const purchasePdf = Buffer.from(
+      "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF",
+    );
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/attachments`)
+      .attach("file", Buffer.from("not a pdf"), {
+        filename: "fake.pdf",
+        contentType: "application/pdf",
+      })
+      .expect(400);
+    const purchaseAttachment = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/attachments`)
+      .attach("file", purchasePdf, {
+        filename: "../supplier-invoice.pdf",
+        contentType: "application/pdf",
+      })
+      .expect(201);
+    expect(purchaseAttachment.body).toMatchObject({
+      purchaseInvoiceId: purchaseDraft.body.id,
+      originalName: "supplier-invoice.pdf",
+      mediaType: "application/pdf",
+      sizeBytes: purchasePdf.length,
+    });
+    expect(purchaseAttachment.body.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(purchaseAttachment.body).not.toHaveProperty("content");
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/attachments`)
+      .attach("file", purchasePdf, {
+        filename: "duplicate.pdf",
+        contentType: "application/pdf",
+      })
+      .expect(409);
+    await authed(accountB.accessToken, tenantB)
+      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}/attachments`)
+      .expect(404);
+    await authed(accountB.accessToken, tenantB)
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/attachments/${purchaseAttachment.body.id}/download`,
+      )
+      .expect(404);
+    const purchaseAttachments = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}/attachments`)
+      .expect(200);
+    expect(purchaseAttachments.body).toHaveLength(1);
+    expect(purchaseAttachments.body[0]).not.toHaveProperty("content");
+    const downloadedPurchaseAttachment = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/attachments/${purchaseAttachment.body.id}/download`,
+      )
+      .expect("content-type", /application\/pdf/)
+      .expect(
+        "content-disposition",
+        'attachment; filename="supplier-invoice.pdf"',
+      )
+      .expect(200);
+    expect(downloadedPurchaseAttachment.body).toEqual(purchasePdf);
+    const temporaryAttachment = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/attachments`)
+      .attach(
+        "file",
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        { filename: "temporary.png", contentType: "image/png" },
+      )
+      .expect(201);
+    await authed(accountA.accessToken, tenantA)
+      .delete(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/attachments/${temporaryAttachment.body.id}`,
+      )
+      .expect(204);
+    await authed(accountA.accessToken, tenantA)
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/attachments/${temporaryAttachment.body.id}/download`,
+      )
+      .expect(404);
     await authed(accountA.accessToken, tenantA)
       .post("/v1/purchase-invoices")
       .send(purchaseInput)
@@ -713,6 +784,29 @@ describe("platform integrity", () => {
     });
     expect(approvedPurchase.body.installments).toHaveLength(2);
     await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/attachments`)
+      .attach("file", Buffer.from("%PDF-1.4\nsecond\n%%EOF"), {
+        filename: "second.pdf",
+        contentType: "application/pdf",
+      })
+      .expect(409);
+    await authed(accountA.accessToken, tenantA)
+      .delete(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/attachments/${purchaseAttachment.body.id}`,
+      )
+      .expect(409);
+    await authed(accountA.accessToken, tenantA)
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/attachments/${purchaseAttachment.body.id}/download`,
+      )
+      .expect(200);
+    await expect(
+      admin.purchaseInvoiceAttachment.update({
+        where: { id: purchaseAttachment.body.id },
+        data: { originalName: "tampered.pdf" },
+      }),
+    ).rejects.toThrow(/purchase invoice attachments are immutable/);
+    await authed(accountA.accessToken, tenantA)
       .put(`/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule`)
       .send({ installments: [{ dueDate: "2026-10-31", amount: 242 }] })
       .expect(409);
@@ -721,10 +815,7 @@ describe("platform integrity", () => {
         `/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule?asOf=2026-10-15`,
       )
       .expect(404);
-    const overduePurchaseSchedule = await authed(
-      accountA.accessToken,
-      tenantA,
-    )
+    const overduePurchaseSchedule = await authed(accountA.accessToken, tenantA)
       .get(
         `/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule?asOf=2026-10-15`,
       )
@@ -855,10 +946,7 @@ describe("platform integrity", () => {
         data: { amount: "1" },
       }),
     ).rejects.toThrow(/recorded supplier payment allocations are immutable/);
-    const retriedSupplierPayment = await authed(
-      accountA.accessToken,
-      tenantA,
-    )
+    const retriedSupplierPayment = await authed(accountA.accessToken, tenantA)
       .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
       .set("idempotency-key", "supplier-payment-a-1")
       .send(supplierPaymentInput)
@@ -891,9 +979,9 @@ describe("platform integrity", () => {
           reference: "SUPPLIER-TRANSFER-COMPETING",
         }),
     ]);
-    expect(
-      finalSupplierAttempts.map(({ status }) => status).sort(),
-    ).toEqual([201, 409]);
+    expect(finalSupplierAttempts.map(({ status }) => status).sort()).toEqual([
+      201, 409,
+    ]);
     const supplierPayments = await authed(accountA.accessToken, tenantA)
       .get(`/v1/purchase-invoices/${purchaseDraft.body.id}/payments`)
       .expect(200);
@@ -1014,10 +1102,7 @@ describe("platform integrity", () => {
         },
       ],
     };
-    const importedBankTransactions = await authed(
-      accountA.accessToken,
-      tenantA,
-    )
+    const importedBankTransactions = await authed(accountA.accessToken, tenantA)
       .post("/v1/banking/transactions/import")
       .send(bankImport)
       .expect(201);
@@ -1040,22 +1125,16 @@ describe("platform integrity", () => {
         externalId === "BANK-SUPPLIER-001",
     );
     await authed(accountB.accessToken, tenantB)
-      .get(
-        `/v1/banking/transactions/${customerBankTransaction.id}/suggestions`,
-      )
+      .get(`/v1/banking/transactions/${customerBankTransaction.id}/suggestions`)
       .expect(404);
     const customerSuggestions = await authed(accountA.accessToken, tenantA)
-      .get(
-        `/v1/banking/transactions/${customerBankTransaction.id}/suggestions`,
-      )
+      .get(`/v1/banking/transactions/${customerBankTransaction.id}/suggestions`)
       .expect(200);
     const firstCustomerEntry = paymentEntries.body.data.find(
-      ({ sourceId }: { sourceId: string }) =>
-        sourceId === firstPayment.body.id,
+      ({ sourceId }: { sourceId: string }) => sourceId === firstPayment.body.id,
     );
     const customerBankLine = firstCustomerEntry.lines.find(
-      ({ account }: { account: { code: string } }) =>
-        account.code === "572000",
+      ({ account }: { account: { code: string } }) => account.code === "572000",
     );
     expect(customerSuggestions.body[0]).toMatchObject({
       journalLineId: customerBankLine.id,
@@ -1063,24 +1142,15 @@ describe("platform integrity", () => {
       debit: "60.5",
       credit: "0",
     });
-    const customerReconciliation = await authed(
-      accountA.accessToken,
-      tenantA,
-    )
-      .post(
-        `/v1/banking/transactions/${customerBankTransaction.id}/reconcile`,
-      )
+    const customerReconciliation = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/banking/transactions/${customerBankTransaction.id}/reconcile`)
       .send({ journalLineId: customerBankLine.id })
       .expect(200);
     const retriedReconciliation = await authed(accountA.accessToken, tenantA)
-      .post(
-        `/v1/banking/transactions/${customerBankTransaction.id}/reconcile`,
-      )
+      .post(`/v1/banking/transactions/${customerBankTransaction.id}/reconcile`)
       .send({ journalLineId: customerBankLine.id })
       .expect(200);
-    expect(retriedReconciliation.body.id).toBe(
-      customerReconciliation.body.id,
-    );
+    expect(retriedReconciliation.body.id).toBe(customerReconciliation.body.id);
     await expect(
       admin.bankReconciliation.update({
         where: { id: customerReconciliation.body.id },
@@ -1107,23 +1177,18 @@ describe("platform integrity", () => {
       /bank reconciliation must match an unreconciled transaction to an equal posted bank line/,
     );
     await authed(accountA.accessToken, tenantA)
-      .post(
-        `/v1/banking/transactions/${supplierBankTransaction.id}/reconcile`,
-      )
+      .post(`/v1/banking/transactions/${supplierBankTransaction.id}/reconcile`)
       .send({ journalLineId: customerBankLine.id })
       .expect(409);
     const supplierSuggestions = await authed(accountA.accessToken, tenantA)
-      .get(
-        `/v1/banking/transactions/${supplierBankTransaction.id}/suggestions`,
-      )
+      .get(`/v1/banking/transactions/${supplierBankTransaction.id}/suggestions`)
       .expect(200);
     const firstSupplierEntry = supplierPaymentEntries.body.data.find(
       ({ sourceId }: { sourceId: string }) =>
         sourceId === firstSupplierPayment.body.id,
     );
     const supplierBankLine = firstSupplierEntry.lines.find(
-      ({ account }: { account: { code: string } }) =>
-        account.code === "572000",
+      ({ account }: { account: { code: string } }) => account.code === "572000",
     );
     expect(supplierSuggestions.body[0]).toMatchObject({
       journalLineId: supplierBankLine.id,
@@ -1132,15 +1197,10 @@ describe("platform integrity", () => {
       credit: "100",
     });
     await authed(accountA.accessToken, tenantA)
-      .post(
-        `/v1/banking/transactions/${supplierBankTransaction.id}/reconcile`,
-      )
+      .post(`/v1/banking/transactions/${supplierBankTransaction.id}/reconcile`)
       .send({ journalLineId: supplierBankLine.id })
       .expect(200);
-    const reconciledTransactions = await authed(
-      accountA.accessToken,
-      tenantA,
-    )
+    const reconciledTransactions = await authed(accountA.accessToken, tenantA)
       .get("/v1/banking/transactions?status=RECONCILED")
       .expect(200);
     expect(reconciledTransactions.body.data).toHaveLength(2);
@@ -1255,18 +1315,14 @@ describe("platform integrity", () => {
       .get("/v1/accounting/reports/journal?from=2025-01-01&to=2026-12-31")
       .expect(400);
     const journalCsv = await authed(accountA.accessToken, tenantA)
-      .get(
-        "/v1/accounting/reports/journal.csv?from=2026-01-01&to=2026-12-31",
-      )
+      .get("/v1/accounting/reports/journal.csv?from=2026-01-01&to=2026-12-31")
       .expect("content-type", /text\/csv/)
       .expect(
         "content-disposition",
         'attachment; filename="journal-2026-01-01-2026-12-31.csv"',
       )
       .expect(200);
-    expect(journalCsv.text).toContain(
-      `"'=Manual; ""bank"" adjustment"`,
-    );
+    expect(journalCsv.text).toContain(`"'=Manual; ""bank"" adjustment"`);
     const bankLedger = await authed(accountA.accessToken, tenantA)
       .get(
         `/v1/accounting/reports/general-ledger?accountId=${bankAccount.id}&from=2026-01-01&to=2026-12-31`,
@@ -1304,8 +1360,7 @@ describe("platform integrity", () => {
       .expect(200);
     expect(
       trialBalance.body.reduce(
-        (sum: number, row: { balance: string }) =>
-          sum + Number(row.balance),
+        (sum: number, row: { balance: string }) => sum + Number(row.balance),
         0,
       ),
     ).toBe(0);

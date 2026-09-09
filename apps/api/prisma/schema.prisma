@@ -170,9 +170,9 @@ enum BankTransactionStatus {
 }
 
 model Organization {
-  id                   String                 @id @default(uuid()) @db.Uuid
+  id                   String                       @id @default(uuid()) @db.Uuid
   name                 String
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt            DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
   companies            Company[]
   memberships          Membership[]
   auditEvents          AuditEvent[]
@@ -193,6 +193,7 @@ model Organization {
   purchaseInvoiceLines PurchaseInvoiceLine[]
   purchaseTaxLines     PurchaseTaxLine[]
   purchaseInstallments PurchaseInvoiceInstallment[]
+  purchaseAttachments  PurchaseInvoiceAttachment[]
   supplierAllocations  SupplierPaymentAllocation[]
   accounts             Account[]
   fiscalYears          FiscalYear[]
@@ -209,15 +210,15 @@ model Organization {
 }
 
 model Company {
-  id                   String                 @id @default(uuid()) @db.Uuid
-  organizationId       String                 @map("organization_id") @db.Uuid
-  legalName            String                 @map("legal_name")
-  taxId                String                 @map("tax_id") @db.VarChar(40)
-  country              String                 @default("ES") @db.Char(2)
-  baseCurrency         String                 @default("EUR") @map("base_currency") @db.Char(3)
-  timezone             String                 @default("Europe/Madrid") @db.VarChar(64)
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                   String                       @id @default(uuid()) @db.Uuid
+  organizationId       String                       @map("organization_id") @db.Uuid
+  legalName            String                       @map("legal_name")
+  taxId                String                       @map("tax_id") @db.VarChar(40)
+  country              String                       @default("ES") @db.Char(2)
+  baseCurrency         String                       @default("EUR") @map("base_currency") @db.Char(3)
+  timezone             String                       @default("Europe/Madrid") @db.VarChar(64)
+  createdAt            DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization         Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   memberships          Membership[]
   auditEvents          AuditEvent[]
   contacts             Contact[]
@@ -237,6 +238,7 @@ model Company {
   purchaseInvoiceLines PurchaseInvoiceLine[]
   purchaseTaxLines     PurchaseTaxLine[]
   purchaseInstallments PurchaseInvoiceInstallment[]
+  purchaseAttachments  PurchaseInvoiceAttachment[]
   supplierAllocations  SupplierPaymentAllocation[]
   accounts             Account[]
   fiscalYears          FiscalYear[]
@@ -519,46 +521,47 @@ model TaxLedgerAmount {
 }
 
 model PurchaseInvoice {
-  id                    String                @id @default(uuid()) @db.Uuid
-  organizationId        String                @map("organization_id") @db.Uuid
-  companyId             String                @map("company_id") @db.Uuid
-  supplierId            String                @map("supplier_id") @db.Uuid
-  sequenceId            String?               @map("sequence_id") @db.Uuid
-  draftCode             String                @default(cuid()) @map("draft_code") @db.VarChar(40)
-  supplierInvoiceNumber String                @map("supplier_invoice_number") @db.VarChar(100)
-  receptionSeries       String?               @map("reception_series") @db.VarChar(30)
-  receptionNumber       BigInt?               @map("reception_number")
-  receptionFullNumber   String?               @map("reception_full_number") @db.VarChar(80)
-  approvalKey           String?               @map("approval_key") @db.VarChar(128)
-  status                PurchaseInvoiceStatus @default(DRAFT)
-  supplierLegalName     String                @map("supplier_legal_name") @db.VarChar(240)
-  supplierTaxId         String?               @map("supplier_tax_id") @db.VarChar(40)
-  issueDate             DateTime              @map("issue_date") @db.Date
-  operationDate         DateTime              @map("operation_date") @db.Date
-  receivedDate          DateTime              @map("received_date") @db.Date
-  deductionDate         DateTime              @map("deduction_date") @db.Date
-  dueDate               DateTime?             @map("due_date") @db.Date
-  currency              String                @default("EUR") @db.Char(3)
+  id                    String                       @id @default(uuid()) @db.Uuid
+  organizationId        String                       @map("organization_id") @db.Uuid
+  companyId             String                       @map("company_id") @db.Uuid
+  supplierId            String                       @map("supplier_id") @db.Uuid
+  sequenceId            String?                      @map("sequence_id") @db.Uuid
+  draftCode             String                       @default(cuid()) @map("draft_code") @db.VarChar(40)
+  supplierInvoiceNumber String                       @map("supplier_invoice_number") @db.VarChar(100)
+  receptionSeries       String?                      @map("reception_series") @db.VarChar(30)
+  receptionNumber       BigInt?                      @map("reception_number")
+  receptionFullNumber   String?                      @map("reception_full_number") @db.VarChar(80)
+  approvalKey           String?                      @map("approval_key") @db.VarChar(128)
+  status                PurchaseInvoiceStatus        @default(DRAFT)
+  supplierLegalName     String                       @map("supplier_legal_name") @db.VarChar(240)
+  supplierTaxId         String?                      @map("supplier_tax_id") @db.VarChar(40)
+  issueDate             DateTime                     @map("issue_date") @db.Date
+  operationDate         DateTime                     @map("operation_date") @db.Date
+  receivedDate          DateTime                     @map("received_date") @db.Date
+  deductionDate         DateTime                     @map("deduction_date") @db.Date
+  dueDate               DateTime?                    @map("due_date") @db.Date
+  currency              String                       @default("EUR") @db.Char(3)
   notes                 String?
-  subtotal              Decimal               @db.Decimal(14, 2)
-  discountTotal         Decimal               @map("discount_total") @db.Decimal(14, 2)
-  taxTotal              Decimal               @map("tax_total") @db.Decimal(14, 2)
-  deductibleTaxTotal    Decimal               @map("deductible_tax_total") @db.Decimal(14, 2)
-  total                 Decimal               @db.Decimal(14, 2)
-  amountPaid            Decimal               @default(0) @map("amount_paid") @db.Decimal(14, 2)
-  amountDue             Decimal               @default(0) @map("amount_due") @db.Decimal(14, 2)
-  approvedAt            DateTime?             @map("approved_at") @db.Timestamptz(6)
-  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company               Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  supplier              Contact               @relation(fields: [supplierId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
-  sequence              DocumentSequence?     @relation(fields: [sequenceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  subtotal              Decimal                      @db.Decimal(14, 2)
+  discountTotal         Decimal                      @map("discount_total") @db.Decimal(14, 2)
+  taxTotal              Decimal                      @map("tax_total") @db.Decimal(14, 2)
+  deductibleTaxTotal    Decimal                      @map("deductible_tax_total") @db.Decimal(14, 2)
+  total                 Decimal                      @db.Decimal(14, 2)
+  amountPaid            Decimal                      @default(0) @map("amount_paid") @db.Decimal(14, 2)
+  amountDue             Decimal                      @default(0) @map("amount_due") @db.Decimal(14, 2)
+  approvedAt            DateTime?                    @map("approved_at") @db.Timestamptz(6)
+  createdAt             DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization          Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company               Company                      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  supplier              Contact                      @relation(fields: [supplierId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  sequence              DocumentSequence?            @relation(fields: [sequenceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   lines                 PurchaseInvoiceLine[]
   taxLines              PurchaseTaxLine[]
   taxLedgerEntry        TaxLedgerEntry?
   supplierPayments      SupplierPayment[]
   installments          PurchaseInvoiceInstallment[]
+  attachments           PurchaseInvoiceAttachment[]
 
   @@unique([companyId, draftCode])
   @@unique([companyId, supplierId, supplierInvoiceNumber])
@@ -569,22 +572,45 @@ model PurchaseInvoice {
   @@map("purchase_invoices")
 }
 
-model SupplierPayment {
+model PurchaseInvoiceAttachment {
   id                String          @id @default(uuid()) @db.Uuid
   organizationId    String          @map("organization_id") @db.Uuid
   companyId         String          @map("company_id") @db.Uuid
   purchaseInvoiceId String          @map("purchase_invoice_id") @db.Uuid
-  idempotencyKey    String          @map("idempotency_key") @db.VarChar(128)
-  amount            Decimal         @db.Decimal(14, 2)
-  currency          String          @db.Char(3)
-  paidAt            DateTime        @map("paid_at") @db.Timestamptz(6)
-  method            PaymentMethod
-  reference         String?         @db.VarChar(240)
-  notes             String?         @db.VarChar(1000)
+  originalName      String          @map("original_name") @db.VarChar(240)
+  mediaType         String          @map("media_type") @db.VarChar(100)
+  sizeBytes         Int             @map("size_bytes")
+  sha256            String          @db.Char(64)
+  content           Bytes           @db.ByteA
+  createdById       String          @map("created_by_id") @db.Uuid
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  createdBy         User            @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([purchaseInvoiceId, sha256])
+  @@unique([id, organizationId, companyId])
+  @@index([purchaseInvoiceId, createdAt])
+  @@map("purchase_invoice_attachments")
+}
+
+model SupplierPayment {
+  id                String                      @id @default(uuid()) @db.Uuid
+  organizationId    String                      @map("organization_id") @db.Uuid
+  companyId         String                      @map("company_id") @db.Uuid
+  purchaseInvoiceId String                      @map("purchase_invoice_id") @db.Uuid
+  idempotencyKey    String                      @map("idempotency_key") @db.VarChar(128)
+  amount            Decimal                     @db.Decimal(14, 2)
+  currency          String                      @db.Char(3)
+  paidAt            DateTime                    @map("paid_at") @db.Timestamptz(6)
+  method            PaymentMethod
+  reference         String?                     @db.VarChar(240)
+  notes             String?                     @db.VarChar(1000)
+  createdAt         DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization      Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company                     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseInvoice   PurchaseInvoice             @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   allocations       SupplierPaymentAllocation[]
 
   @@unique([companyId, idempotencyKey])
@@ -762,22 +788,22 @@ model PurchaseTaxLine {
 }
 
 model Account {
-  id             String          @id @default(uuid()) @db.Uuid
-  organizationId String          @map("organization_id") @db.Uuid
-  companyId      String          @map("company_id") @db.Uuid
-  code           String          @db.VarChar(20)
-  name           String          @db.VarChar(240)
-  accountClass   AccountClass    @map("account_class")
-  systemRole     AccountingRole? @map("system_role")
-  parentId       String?         @map("parent_id") @db.Uuid
-  isReconcilable Boolean         @default(false) @map("is_reconcilable")
-  active         Boolean         @default(true)
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company        Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  parent         Account?        @relation("AccountHierarchy", fields: [parentId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
-  children       Account[]       @relation("AccountHierarchy")
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  companyId      String           @map("company_id") @db.Uuid
+  code           String           @db.VarChar(20)
+  name           String           @db.VarChar(240)
+  accountClass   AccountClass     @map("account_class")
+  systemRole     AccountingRole?  @map("system_role")
+  parentId       String?          @map("parent_id") @db.Uuid
+  isReconcilable Boolean          @default(false) @map("is_reconcilable")
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  parent         Account?         @relation("AccountHierarchy", fields: [parentId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  children       Account[]        @relation("AccountHierarchy")
   journalLines   JournalLine[]
   bankAccounts   BankAccount[]
   postingRules   AccountingRule[]
@@ -886,22 +912,22 @@ model JournalEntry {
 }
 
 model JournalLine {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  companyId      String       @map("company_id") @db.Uuid
-  journalEntryId String       @map("journal_entry_id") @db.Uuid
-  accountId      String       @map("account_id") @db.Uuid
-  contactId      String?      @map("contact_id") @db.Uuid
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  companyId      String              @map("company_id") @db.Uuid
+  journalEntryId String              @map("journal_entry_id") @db.Uuid
+  accountId      String              @map("account_id") @db.Uuid
+  contactId      String?             @map("contact_id") @db.Uuid
   position       Int
-  description    String?      @db.VarChar(1000)
-  debit          Decimal      @default(0) @db.Decimal(19, 4)
-  credit         Decimal      @default(0) @db.Decimal(19, 4)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company        Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  entry          JournalEntry @relation(fields: [journalEntryId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
-  account        Account      @relation(fields: [accountId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
-  contact        Contact?     @relation(fields: [contactId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  description    String?             @db.VarChar(1000)
+  debit          Decimal             @default(0) @db.Decimal(19, 4)
+  credit         Decimal             @default(0) @db.Decimal(19, 4)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  entry          JournalEntry        @relation(fields: [journalEntryId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  account        Account             @relation(fields: [accountId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  contact        Contact?            @relation(fields: [contactId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   reconciliation BankReconciliation?
 
   @@unique([journalEntryId, position])
@@ -1104,14 +1130,15 @@ model ContactAddress {
 }
 
 model User {
-  id           String       @id @default(uuid()) @db.Uuid
-  email        String       @unique @db.Citext
-  passwordHash String?      @map("password_hash")
-  status       UserStatus   @default(ACTIVE)
-  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  memberships  Membership[]
-  auditEvents  AuditEvent[] @relation("actor_audit_events")
-  sessions     Session[]
+  id                  String                      @id @default(uuid()) @db.Uuid
+  email               String                      @unique @db.Citext
+  passwordHash        String?                     @map("password_hash")
+  status              UserStatus                  @default(ACTIVE)
+  createdAt           DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  memberships         Membership[]
+  auditEvents         AuditEvent[]                @relation("actor_audit_events")
+  sessions            Session[]
+  purchaseAttachments PurchaseInvoiceAttachment[]
 
   @@map("users")
 }
