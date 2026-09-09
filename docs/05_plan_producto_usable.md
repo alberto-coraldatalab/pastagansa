@@ -129,8 +129,10 @@ tenant en servidor y presenta NIF o SKU duplicados como conflictos recuperables.
 También existe listado de facturas por estado y creación de borradores con cliente,
 fechas y múltiples líneas, reutilizando catálogo y mostrando el total confirmado por
 el API. El detalle permite editar borradores, crear o seleccionar una serie, confirmar
-la emisión idempotente y descargar el PDF oficial. Falta registrar el cobro y proteger
-el recorrido completo con E2E de navegador para superar el gate.
+la emisión idempotente y descargar el PDF oficial. El recorrido funcional se completa
+con vencimiento, saldo, historial y registro idempotente de cobros parciales o totales.
+Faltan el E2E de navegador y los enlaces de trazabilidad contable/fiscal para superar
+formalmente el gate.
 
 Entregables:
 

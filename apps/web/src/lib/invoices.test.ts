@@ -4,6 +4,9 @@ import {
   invoiceInputSchema,
   invoiceIssueKey,
   invoiceStatusLabel,
+  paymentInputSchema,
+  paymentKey,
+  paymentMethodLabel,
   todayIso,
 } from "./invoices";
 
@@ -48,5 +51,19 @@ describe("invoice presentation", () => {
 
   it("preserves an issuance key across a retry", () => {
     expect(invoiceIssueKey("invoice-1", "saved-key")).toBe("saved-key");
+  });
+
+  it("validates and presents payments", () => {
+    expect(
+      paymentInputSchema.safeParse({
+        amount: 121,
+        paidAt: "2026-09-09",
+        method: "BANK_TRANSFER",
+      }).success,
+    ).toBe(true);
+    expect(paymentMethodLabel("BANK_TRANSFER")).toBe("Transferencia");
+    expect(paymentKey("invoice-1", "saved-payment-key")).toBe(
+      "saved-payment-key",
+    );
   });
 });

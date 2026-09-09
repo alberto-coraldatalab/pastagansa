@@ -71,6 +71,36 @@ export interface DocumentSequence {
   active: boolean;
 }
 
+export const paymentInputSchema = z.object({
+  amount: z.number().positive().multipleOf(0.01),
+  paidAt: z.iso.date(),
+  method: z.enum(["BANK_TRANSFER", "DIRECT_DEBIT", "CASH", "CARD", "OTHER"]),
+  reference: z.string().trim().max(240).optional(),
+  notes: z.string().trim().max(1_000).optional(),
+});
+
+export type PaymentInput = z.infer<typeof paymentInputSchema>;
+
+export interface Payment {
+  id: string;
+  amount: string;
+  currency: string;
+  paidAt: string;
+  method: PaymentInput["method"];
+  reference: string | null;
+  notes: string | null;
+  allocations: Array<{ id: string; amount: string }>;
+}
+
+export interface PaymentInstallment {
+  id: string;
+  position: number;
+  dueDate: string;
+  amount: string;
+  paidAmount: string;
+  status: "PENDING" | "PARTIALLY_PAID" | "PAID";
+}
+
 export interface InvoicePage {
   data: Invoice[];
   nextCursor: string | null;
@@ -106,4 +136,19 @@ export function invoiceStatusLabel(status: Invoice["status"]) {
 export function invoiceIssueKey(invoiceId: string, existing?: string | null) {
   if (existing) return existing;
   return `issue-${invoiceId}-${crypto.randomUUID()}`;
+}
+
+export function paymentKey(invoiceId: string, existing?: string | null) {
+  if (existing) return existing;
+  return `payment-${invoiceId}-${crypto.randomUUID()}`;
+}
+
+export function paymentMethodLabel(method: PaymentInput["method"]) {
+  return {
+    BANK_TRANSFER: "Transferencia",
+    DIRECT_DEBIT: "Domiciliación",
+    CASH: "Efectivo",
+    CARD: "Tarjeta",
+    OTHER: "Otro",
+  }[method];
 }

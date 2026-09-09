@@ -19,3 +19,7 @@ Each document has a detail view. Drafts can be edited and issued after an explic
 confirmation, using an existing invoice series or creating the first one in context.
 Issuance retries reuse their idempotency key. Issued documents expose their official
 PDF through the authenticated server route.
+
+Issued invoices also show their payment schedule, outstanding balance, and payment
+history. Partial and final payments can be recorded with method and reference;
+browser retries preserve the idempotency key so the same payment is not duplicated.

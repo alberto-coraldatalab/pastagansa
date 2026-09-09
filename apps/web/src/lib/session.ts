@@ -70,6 +70,12 @@ function translateApiError(message: string) {
       "La factura ya no existe o ha dejado de ser un borrador.",
     "dueDate cannot precede issueDate":
       "El vencimiento no puede ser anterior a la fecha de emisión.",
+    "Payment amount cannot exceed the invoice amount due":
+      "El cobro no puede superar el saldo pendiente de la factura.",
+    "Invoice is not eligible for a payment":
+      "Esta factura no admite nuevos cobros en su estado actual.",
+    "Idempotency-Key has already been used for another payment":
+      "La referencia segura del cobro ya se utilizó en otra operación.",
   };
   return translations[message] ?? message;
 }
