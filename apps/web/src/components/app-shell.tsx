@@ -23,7 +23,13 @@ export function AppShell({
   active,
   children,
 }: {
-  active: "inicio" | "clientes" | "catalogo" | "facturas" | "compras";
+  active:
+    | "inicio"
+    | "clientes"
+    | "catalogo"
+    | "facturas"
+    | "compras"
+    | "contabilidad";
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -86,9 +92,13 @@ export function AppShell({
           <NavLink active={active === "compras"} href="/compras" number="05">
             Compras
           </NavLink>
-          <span className="nav-item disabled">
-            <span>06</span>Contabilidad
-          </span>
+          <NavLink
+            active={active === "contabilidad"}
+            href="/contabilidad"
+            number="06"
+          >
+            Contabilidad
+          </NavLink>
         </nav>
         <div className="sidebar-company">
           <span>{organization.name}</span>
@@ -124,7 +134,13 @@ function NavLink({
   children,
 }: {
   active: boolean;
-  href: "/inicio" | "/clientes" | "/catalogo" | "/facturas" | "/compras";
+  href:
+    | "/inicio"
+    | "/clientes"
+    | "/catalogo"
+    | "/facturas"
+    | "/compras"
+    | "/contabilidad";
   number: string;
   children: React.ReactNode;
 }) {

@@ -204,6 +204,13 @@ Gate:
 - cero bloqueadores de severidad crítica o alta en el recorrido usable;
 - incidencias de la prueba moderada clasificadas antes de cerrar el hito.
 
+Estado real: en curso. El inicio ya resume ventas emitidas, compras aprobadas y saldos
+pendientes de cobro/pago con agregados exactos y aislados por tenant. La navegación
+incluye vistas read-only de diario y mayor por periodo y cuenta; el E2E de compra
+comprueba que resumen y libros reflejan los movimientos contabilizados. Falta la vista
+de conciliación, SMTP observable, despliegue reproducible de staging, backup/restauración
+y la prueba moderada para cerrar U4.
+
 ## Orden inmediato de implementación
 
 1. Crear `apps/web` y el pipeline de build/test.

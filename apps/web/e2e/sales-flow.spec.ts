@@ -239,4 +239,33 @@ test("completes a purchase from supplier to approval and payment", async ({
   await page.getByRole("link", { name: "Ver trazabilidad" }).click();
   await expect(page.getByText(/Asiento #\d+/)).toBeVisible();
   await expect(page.getByText("Libro de IVA recibido")).toBeVisible();
+
+  await page.getByRole("link", { name: /Inicio/ }).click();
+  await expect(
+    page.locator(".dashboard-grid article").filter({
+      hasText: "Compras aprobadas",
+    }),
+  ).toContainText("1");
+  await expect(
+    page.locator(".dashboard-grid article").filter({
+      hasText: "Pendiente de pago",
+    }),
+  ).toContainText("0,00 €");
+
+  await page.getByRole("link", { name: /Contabilidad/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Libro diario" }),
+  ).toBeVisible();
+  await expect(page.getByText(/Asiento #\d+/).first()).toBeVisible();
+  const supplierAccount = page
+    .getByLabel("Cuenta para el mayor")
+    .locator("option")
+    .filter({ hasText: "400" })
+    .first();
+  const supplierAccountId = await supplierAccount.getAttribute("value");
+  expect(supplierAccountId).toBeTruthy();
+  await page
+    .getByLabel("Cuenta para el mayor")
+    .selectOption(supplierAccountId!);
+  await expect(page.getByText("Saldo final")).toBeVisible();
 });
