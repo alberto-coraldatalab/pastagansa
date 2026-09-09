@@ -126,7 +126,9 @@ productos/servicios, ambos con navegación desde el shell, búsqueda, paginació
 cursor, estados de carga/vacío/error y alta validada. El catálogo conserva precio,
 unidad, IVA sugerido y cuenta de ingresos reutilizables. La web mantiene tokens y
 tenant en servidor y presenta NIF o SKU duplicados como conflictos recuperables.
-Falta el recorrido de factura para superar el gate.
+También existe listado de facturas por estado y creación de borradores con cliente,
+fechas y múltiples líneas, reutilizando catálogo y mostrando el total confirmado por
+el API. Faltan edición, emisión, PDF y cobro para superar el gate.
 
 Entregables:
 

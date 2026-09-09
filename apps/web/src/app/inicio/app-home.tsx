@@ -11,7 +11,8 @@ export function AppHome() {
         <h1>Hola, ya tienes la base preparada.</h1>
         <p>
           Tu sesión y el contexto de empresa están conectados de forma segura.
-          Empieza creando el cliente de tu primera factura.
+          Ya puedes crear clientes, servicios y preparar una factura. El
+          siguiente paso del producto será emitirla y descargar su PDF oficial.
         </p>
       </section>
       <section className="progress-card" aria-labelledby="progress-title">
@@ -19,7 +20,7 @@ export function AppHome() {
           <p className="eyebrow">Puesta en marcha</p>
           <h2 id="progress-title">Primer recorrido usable</h2>
         </div>
-        <strong>1 de 4</strong>
+        <strong>2 de 4</strong>
         <div className="progress-track">
           <span />
         </div>
@@ -30,16 +31,16 @@ export function AppHome() {
           <p>Acceso seguro</p>
           <small>Sesión y empresa activa</small>
         </article>
-        <Link className="next-card current card-link" href="/clientes">
-          <span className="step-mark">2</span>
+        <Link className="next-card done card-link" href="/clientes">
+          <span className="step-mark">✓</span>
           <p>Crear cliente y servicio</p>
           <small>Maestros ya disponibles</small>
         </Link>
-        <article className="next-card">
+        <Link className="next-card current card-link" href="/facturas">
           <span className="step-mark">3</span>
           <p>Preparar factura</p>
-          <small>Líneas, IVA y vencimiento</small>
-        </article>
+          <small>Borradores ya disponibles</small>
+        </Link>
         <article className="next-card">
           <span className="step-mark">4</span>
           <p>Emitir y descargar</p>

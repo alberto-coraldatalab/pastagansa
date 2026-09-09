@@ -385,7 +385,7 @@ a {
   background: var(--lime);
   display: block;
   height: 100%;
-  width: 25%;
+  width: 50%;
 }
 .next-grid {
   display: grid;
@@ -734,6 +734,9 @@ a {
   padding: 1.6rem;
   width: 100%;
 }
+.invoice-dialog {
+  max-width: 1040px;
+}
 .dialog > header {
   align-items: start;
   display: flex;
@@ -762,6 +765,95 @@ a {
 }
 .contact-form .full {
   grid-column: 1 / -1;
+}
+.filter-field {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+}
+.filter-field span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+.filter-field select {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  min-height: 40px;
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+}
+.invoice-form {
+  display: grid;
+  gap: 1.25rem;
+}
+.invoice-basics {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(220px, 2fr) 1fr 1fr;
+}
+.invoice-lines-heading,
+.invoice-line-title {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+.invoice-lines-heading small {
+  color: var(--muted);
+  display: block;
+  font-size: 0.7rem;
+  margin-top: 0.2rem;
+}
+.invoice-lines {
+  display: grid;
+  gap: 0.75rem;
+}
+.invoice-line {
+  background: #f7f8f4;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 1rem;
+}
+.invoice-line-title,
+.invoice-item,
+.invoice-description {
+  grid-column: span 2;
+}
+.invoice-line-title {
+  grid-column: 1 / -1;
+}
+.invoice-line-title strong {
+  font-size: 0.78rem;
+}
+.invoice-line-title button {
+  background: none;
+  border: 0;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 0.7rem;
+}
+.invoice-prerequisites {
+  background: #f7f8f4;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 1.2rem;
+}
+.invoice-prerequisites p,
+.dialog-helper {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.invoice-prerequisites div {
+  display: flex;
+  gap: 0.75rem;
+}
+.invoice-prerequisites a {
+  color: var(--lime-dark);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 .check-field {
   align-items: center;
@@ -840,6 +932,10 @@ a {
     align-items: stretch;
     flex-direction: column;
   }
+  .invoice-basics,
+  .invoice-line {
+    grid-template-columns: 1fr 1fr;
+  }
   .search-form {
     max-width: none;
   }
@@ -859,6 +955,15 @@ a {
   }
   .contact-form {
     grid-template-columns: 1fr;
+  }
+  .invoice-basics,
+  .invoice-line {
+    grid-template-columns: 1fr;
+  }
+  .invoice-line-title,
+  .invoice-item,
+  .invoice-description {
+    grid-column: auto;
   }
   .contact-form .full,
   .dialog-actions {

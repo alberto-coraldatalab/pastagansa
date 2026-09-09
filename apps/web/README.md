@@ -10,3 +10,7 @@ tenant context.
 
 `/catalogo` provides the equivalent workflow for products and services, including
 reusable price, unit, VAT suggestion, and revenue account defaults.
+
+`/facturas` lists sales documents by status and creates invoice drafts with multiple
+lines. Customer and catalog selection stay in the browser workflow, while tax and
+document totals remain calculated and validated by the API.
