@@ -112,6 +112,24 @@ describe("platform integrity", () => {
       })
       .expect(201);
     expect(contactA.body.paymentTermsDays).toBe(30);
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/contacts")
+      .send({
+        legalName: "Tax ID owner",
+        taxId: "12345678Z",
+        isCustomer: true,
+        isSupplier: false,
+      })
+      .expect(201);
+    await authed(accountA.accessToken, tenantA)
+      .post("/v1/contacts")
+      .send({
+        legalName: "Duplicate tax ID",
+        taxId: "12345678Z",
+        isCustomer: true,
+        isSupplier: false,
+      })
+      .expect(409);
     const contactB = await authed(accountB.accessToken, tenantB)
       .post("/v1/contacts")
       .send({ legalName: "Customer B", isCustomer: true, isSupplier: false })
@@ -125,6 +143,14 @@ describe("platform integrity", () => {
         isSupplier: true,
       })
       .expect(201);
+    const customerContacts = await authed(accountA.accessToken, tenantA)
+      .get("/v1/contacts?kind=CUSTOMER")
+      .expect(200);
+    expect(
+      customerContacts.body.data.some(
+        ({ id }: { id: string }) => id === supplierA.body.id,
+      ),
+    ).toBe(false);
     const itemB = await authed(accountB.accessToken, tenantB)
       .post("/v1/catalog-items")
       .send({

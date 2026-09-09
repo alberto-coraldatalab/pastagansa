@@ -121,6 +121,12 @@ Gate:
 
 Resultado: el usuario convierte datos maestros en una factura real descargable.
 
+Estado real: en curso. Ya está disponible la cartera de clientes con navegación desde
+el shell, búsqueda, paginación por cursor, estados de carga/vacío/error y alta con
+datos comerciales. La web mantiene tokens y tenant en servidor, valida el formulario
+antes de delegar al API y presenta como conflicto recuperable un NIF duplicado. Falta
+catálogo y el recorrido de factura para superar el gate.
+
 Entregables:
 
 - listas y formularios mínimos de clientes y catálogo;

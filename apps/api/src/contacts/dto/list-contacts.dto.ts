@@ -1,5 +1,6 @@
 import { Type } from "class-transformer";
 import {
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -8,7 +9,16 @@ import {
   Min,
 } from "class-validator";
 
+export enum ContactKind {
+  CUSTOMER = "CUSTOMER",
+  SUPPLIER = "SUPPLIER",
+}
+
 export class ListContactsDto {
+  @IsOptional()
+  @IsEnum(ContactKind)
+  kind?: ContactKind;
+
   @IsOptional()
   @IsString()
   @MaxLength(100)

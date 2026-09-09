@@ -48,6 +48,25 @@ export async function authenticate(
 }
 
 export async function currentSession() {
+  const session = await resolveSession();
+  return { user: session.user, membership: session.membership };
+}
+
+export async function tenantApiRequest(path: string, init?: RequestInit) {
+  const { accessToken, membership } = await resolveSession();
+  return fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      authorization: `Bearer ${accessToken}`,
+      "x-organization-id": membership.organization.id,
+      "x-company-id": membership.company.id,
+    },
+    cache: "no-store",
+  });
+}
+
+async function resolveSession() {
   const store = await cookies();
   let accessToken = store.get("pg_access")?.value;
   const refreshToken = store.get("pg_refresh")?.value;
@@ -84,7 +103,11 @@ export async function currentSession() {
   const membership = selectMembership(context, selection);
   if (!membership)
     throw new SessionError("Tu usuario no tiene ninguna empresa activa.", 403);
-  return { user: { id: context.id, email: context.email }, membership };
+  return {
+    accessToken,
+    user: { id: context.id, email: context.email },
+    membership,
+  };
 }
 
 export async function logoutSession() {

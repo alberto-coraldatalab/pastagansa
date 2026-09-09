@@ -50,4 +50,12 @@ describe("session helpers", () => {
       }),
     ).toBe("Email inválido Revisa el NIF");
   });
+
+  it("translates a known domain conflict", () => {
+    expect(
+      normalizeApiError({
+        error: { message: "A contact with this tax ID already exists" },
+      }),
+    ).toBe("Ya existe un contacto con este NIF.");
+  });
 });

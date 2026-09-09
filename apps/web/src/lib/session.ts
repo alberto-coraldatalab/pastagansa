@@ -48,11 +48,19 @@ export function normalizeApiError(body: unknown) {
   if (!body || typeof body !== "object" || !("error" in body))
     return "No hemos podido completar la operación.";
   const detail = body.error;
-  if (typeof detail === "string") return detail;
+  if (typeof detail === "string") return translateApiError(detail);
   if (detail && typeof detail === "object" && "message" in detail) {
     const message = detail.message;
     if (Array.isArray(message)) return message.join(" ");
-    if (typeof message === "string") return message;
+    if (typeof message === "string") return translateApiError(message);
   }
   return "No hemos podido completar la operación.";
+}
+
+function translateApiError(message: string) {
+  const translations: Record<string, string> = {
+    "A contact with this tax ID already exists":
+      "Ya existe un contacto con este NIF.",
+  };
+  return translations[message] ?? message;
 }

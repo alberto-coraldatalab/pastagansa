@@ -8,7 +8,7 @@ import { ContactStatus, Prisma } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 import { CreateContactDto } from "./dto/create-contact.dto";
-import { ListContactsDto } from "./dto/list-contacts.dto";
+import { ContactKind, ListContactsDto } from "./dto/list-contacts.dto";
 import { UpdateContactDto } from "./dto/update-contact.dto";
 import { ImportContactsDto } from "./dto/import-contacts.dto";
 import { parseContactCsv } from "./csv";
@@ -26,14 +26,18 @@ export class ContactsService {
   async list(query: ListContactsDto) {
     const scope = this.scope();
     const search = query.search?.trim() ?? "";
+    const cursorScope = query.kind ? `${query.kind}:${search}` : search;
     const cursor = query.cursor
-      ? decodeCursor(query.cursor, search)
+      ? decodeCursor(query.cursor, cursorScope)
       : undefined;
-    if (cursor) await this.assertCursorInScope(cursor.id, cursor.sort);
+    if (cursor)
+      await this.assertCursorInScope(cursor.id, cursor.sort, query.kind);
     const contacts = await this.tenant.db.contact.findMany({
       where: {
         ...scope,
         status: ContactStatus.ACTIVE,
+        ...(query.kind === ContactKind.CUSTOMER ? { isCustomer: true } : {}),
+        ...(query.kind === ContactKind.SUPPLIER ? { isSupplier: true } : {}),
         ...(search
           ? {
               OR: [
@@ -54,7 +58,9 @@ export class ContactsService {
     return {
       data,
       nextCursor:
-        hasMore && last ? encodeCursor(last.id, last.legalName, search) : null,
+        hasMore && last
+          ? encodeCursor(last.id, last.legalName, cursorScope)
+          : null,
     };
   }
 
@@ -67,20 +73,32 @@ export class ContactsService {
       throw new BadRequestException(
         "A contact must be a customer, a supplier, or both",
       );
-    const contact = await this.tenant.db.contact.create({
-      data: {
-        ...this.scope(),
-        legalName: input.legalName.trim(),
-        tradeName: input.tradeName?.trim() || null,
-        taxId: input.taxId?.trim().toUpperCase() || null,
-        email: input.email?.trim().toLowerCase() || null,
-        phone: input.phone?.trim() || null,
-        paymentTermsDays: input.paymentTermsDays,
-        paymentMethod: input.paymentMethod,
-        isCustomer: input.isCustomer,
-        isSupplier: input.isSupplier,
-      },
-    });
+    let contact;
+    try {
+      contact = await this.tenant.db.contact.create({
+        data: {
+          ...this.scope(),
+          legalName: input.legalName.trim(),
+          tradeName: input.tradeName?.trim() || null,
+          taxId: input.taxId?.trim().toUpperCase() || null,
+          email: input.email?.trim().toLowerCase() || null,
+          phone: input.phone?.trim() || null,
+          paymentTermsDays: input.paymentTermsDays,
+          paymentMethod: input.paymentMethod,
+          isCustomer: input.isCustomer,
+          isSupplier: input.isSupplier,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      )
+        throw new ConflictException(
+          "A contact with this tax ID already exists",
+        );
+      throw error;
+    }
     await this.audit.record("contact.created", "contact", contact.id, {
       isCustomer: contact.isCustomer,
       isSupplier: contact.isSupplier,
@@ -273,13 +291,19 @@ export class ContactsService {
     return contact;
   }
 
-  private async assertCursorInScope(id: string, sort: string) {
+  private async assertCursorInScope(
+    id: string,
+    sort: string,
+    kind?: ContactKind,
+  ) {
     const cursor = await this.tenant.db.contact.findFirst({
       where: {
         id,
         legalName: sort,
         ...this.scope(),
         status: ContactStatus.ACTIVE,
+        ...(kind === ContactKind.CUSTOMER ? { isCustomer: true } : {}),
+        ...(kind === ContactKind.SUPPLIER ? { isSupplier: true } : {}),
       },
       select: { id: true },
     });
