@@ -492,6 +492,153 @@ a {
   color: var(--ink);
   font-size: 0.9rem;
 }
+.banking-toolbar {
+  align-items: end;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(240px, 1fr) 220px;
+  margin-bottom: 1rem;
+  padding: 1rem 1.25rem;
+}
+.banking-onboarding {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: 0.8fr 1.2fr;
+  padding: 1.5rem;
+}
+.banking-onboarding h2 {
+  margin: 0.25rem 0 0.75rem;
+}
+.banking-onboarding > div > p:last-child {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+.banking-onboarding form {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: 1fr 1fr;
+}
+.banking-onboarding form .primary-button,
+.banking-onboarding form .form-error {
+  grid-column: 1 / -1;
+}
+.bank-import {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  padding: 1rem 1.25rem;
+}
+.bank-import summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.bank-import form {
+  align-items: end;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+.bank-import .wide {
+  grid-column: span 2;
+}
+.reconciliation-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(330px, 0.8fr) minmax(440px, 1.2fr);
+}
+.bank-inbox,
+.suggestion-panel {
+  min-height: 480px;
+}
+.bank-transaction-list {
+  display: grid;
+}
+.bank-transaction-list > button {
+  background: white;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem 1.5rem;
+  position: relative;
+  text-align: left;
+}
+.bank-transaction-list > button:hover,
+.bank-transaction-list > button.selected {
+  background: #f5faee;
+}
+.bank-transaction-list strong {
+  color: var(--lime-dark);
+  font-size: 1rem;
+}
+.bank-transaction-list strong.negative {
+  color: #9a3b2d;
+}
+.bank-transaction-list span {
+  font-size: 0.76rem;
+  font-weight: 750;
+  padding-right: 6rem;
+}
+.bank-transaction-list small {
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+.bank-transaction-list em {
+  background: #fff3d3;
+  border-radius: 99px;
+  color: #785b0b;
+  font-size: 0.61rem;
+  font-style: normal;
+  font-weight: 800;
+  padding: 0.3rem 0.55rem;
+  position: absolute;
+  right: 1.5rem;
+  top: 1rem;
+}
+.suggestion-list {
+  display: grid;
+}
+.suggestion-list article {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 54px 1fr auto;
+  padding: 1rem 1.5rem;
+}
+.suggestion-list article > strong {
+  align-items: center;
+  background: var(--lime-soft);
+  border-radius: 50%;
+  color: var(--lime-dark);
+  display: flex;
+  font-size: 0.72rem;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+.suggestion-list article > div {
+  display: grid;
+  gap: 0.2rem;
+}
+.suggestion-list span,
+.suggestion-list b {
+  font-size: 0.76rem;
+}
+.suggestion-list small {
+  color: var(--muted);
+  font-size: 0.65rem;
+}
 .next-card {
   background: transparent;
   border: 1px solid var(--line);
@@ -1409,6 +1556,12 @@ a {
   .ledger-summary {
     grid-template-columns: repeat(2, 1fr);
   }
+  .reconciliation-layout {
+    grid-template-columns: 1fr;
+  }
+  .bank-import form {
+    grid-template-columns: 1fr 1fr;
+  }
   .accounting-filters {
     grid-template-columns: 1fr 1fr;
   }
@@ -1429,8 +1582,15 @@ a {
   }
   .dashboard-grid,
   .ledger-summary,
-  .accounting-filters {
+  .accounting-filters,
+  .banking-toolbar,
+  .banking-onboarding,
+  .banking-onboarding form,
+  .bank-import form {
     grid-template-columns: 1fr;
+  }
+  .bank-import .wide {
+    grid-column: auto;
   }
   .account-filter {
     grid-column: auto;

@@ -3,6 +3,7 @@ export interface Account {
   code: string;
   name: string;
   accountClass: string;
+  isReconcilable: boolean;
   active: boolean;
 }
 

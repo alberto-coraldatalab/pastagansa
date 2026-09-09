@@ -207,9 +207,10 @@ Gate:
 Estado real: en curso. El inicio ya resume ventas emitidas, compras aprobadas y saldos
 pendientes de cobro/pago con agregados exactos y aislados por tenant. La navegación
 incluye vistas read-only de diario y mayor por periodo y cuenta; el E2E de compra
-comprueba que resumen y libros reflejan los movimientos contabilizados. Falta la vista
-de conciliación, SMTP observable, despliegue reproducible de staging, backup/restauración
-y la prueba moderada para cerrar U4.
+comprueba que resumen y libros reflejan los movimientos contabilizados. La vista de
+tesorería ya permite configurar la cuenta bancaria, importar un movimiento normalizado,
+revisar sugerencias y confirmar una conciliación uno-a-uno. Faltan SMTP observable,
+despliegue reproducible de staging, backup/restauración y la prueba moderada para cerrar U4.
 
 ## Orden inmediato de implementación
 

@@ -29,6 +29,7 @@ export function AppShell({
     | "catalogo"
     | "facturas"
     | "compras"
+    | "tesoreria"
     | "contabilidad";
   children: React.ReactNode;
 }) {
@@ -93,9 +94,16 @@ export function AppShell({
             Compras
           </NavLink>
           <NavLink
+            active={active === "tesoreria"}
+            href="/tesoreria"
+            number="06"
+          >
+            Tesorería
+          </NavLink>
+          <NavLink
             active={active === "contabilidad"}
             href="/contabilidad"
-            number="06"
+            number="07"
           >
             Contabilidad
           </NavLink>
@@ -140,6 +148,7 @@ function NavLink({
     | "/catalogo"
     | "/facturas"
     | "/compras"
+    | "/tesoreria"
     | "/contabilidad";
   number: string;
   children: React.ReactNode;

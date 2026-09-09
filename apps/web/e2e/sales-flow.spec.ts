@@ -97,10 +97,10 @@ test("completes the sales flow from registration to payment", async ({
   await expect(page.getByText("Libro de IVA")).toBeVisible();
 });
 
-test("completes a purchase from supplier to approval and payment", async ({
+test("completes a purchase through payment and bank reconciliation", async ({
   page,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   const suffix = Date.now();
   await page.goto("/acceso");
   await page.getByRole("button", { name: "Crear cuenta" }).click();
@@ -268,4 +268,37 @@ test("completes a purchase from supplier to approval and payment", async ({
     .getByLabel("Cuenta para el mayor")
     .selectOption(supplierAccountId!);
   await expect(page.getByText("Saldo final")).toBeVisible();
+
+  await page.getByRole("link", { name: /Tesorería/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Conecta tu cuenta contable de banco" }),
+  ).toBeVisible();
+  const bankLedgerSelect = page.locator('select[name="accountId"]');
+  const bankLedgerOption = bankLedgerSelect
+    .locator("option")
+    .filter({ hasText: "572000" });
+  const bankLedgerId = await bankLedgerOption.getAttribute("value");
+  expect(bankLedgerId).toBeTruthy();
+  await bankLedgerSelect.selectOption(bankLedgerId!);
+  await page.getByLabel("Nombre").fill("Cuenta E2E");
+  await page.getByRole("button", { name: "Crear cuenta bancaria" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "Cuenta E2E ya está lista",
+  );
+  await page.getByText("Importar un movimiento manualmente").click();
+  await page.getByLabel("Identificador único").fill(`BANK-E2E-${suffix}`);
+  await page.getByLabel("Importe").fill("-121");
+  await page.getByLabel("Contraparte").fill("Proveedor E2E SL");
+  await page.getByLabel("Descripción").fill("Pago PROV-E2E-001");
+  await page.getByLabel("Referencia (opcional)").fill("E2E-PAGO-001");
+  await page.getByRole("button", { name: "Importar movimiento" }).click();
+  await expect(page.getByRole("status")).toContainText("Movimiento importado");
+  await page.getByRole("button", { name: /Proveedor E2E SL/ }).click();
+  await expect(page.getByText(/Asiento #\d+/)).toBeVisible();
+  await page.getByRole("button", { name: "Conciliar", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Movimiento conciliado");
+  await page.getByLabel("Estado").selectOption("RECONCILED");
+  await expect(
+    page.getByRole("button", { name: /Proveedor E2E SL/ }),
+  ).toBeVisible();
 });
