@@ -37,6 +37,7 @@ export interface Invoice {
   documentType: "INVOICE" | "CREDIT_NOTE";
   customerLegalName: string;
   customerTaxId: string | null;
+  customerEmail: string | null;
   issueDate: string;
   dueDate: string | null;
   currency: string;
@@ -60,6 +61,25 @@ export interface Invoice {
     taxAmount: string;
     totalAmount: string;
   }>;
+}
+
+export const invoiceEmailInputSchema = z.object({
+  recipient: z.email().max(320),
+  subject: z.string().trim().min(1).max(300),
+});
+
+export type InvoiceEmailInput = z.infer<typeof invoiceEmailInputSchema>;
+
+export interface InvoiceEmailDelivery {
+  id: string;
+  recipient: string;
+  subject: string;
+  status: "PENDING" | "PROCESSING" | "SENT" | "FAILED";
+  attempts: number;
+  sentAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DocumentSequence {
@@ -164,6 +184,11 @@ export function invoiceStatusLabel(status: Invoice["status"]) {
 export function invoiceIssueKey(invoiceId: string, existing?: string | null) {
   if (existing) return existing;
   return `issue-${invoiceId}-${crypto.randomUUID()}`;
+}
+
+export function invoiceEmailKey(invoiceId: string, existing?: string | null) {
+  if (existing) return existing;
+  return `email-${invoiceId}-${crypto.randomUUID()}`;
 }
 
 export function paymentKey(invoiceId: string, existing?: string | null) {

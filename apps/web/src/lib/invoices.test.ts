@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   formatInvoiceDate,
+  invoiceEmailInputSchema,
+  invoiceEmailKey,
   invoiceInputSchema,
   invoiceIssueKey,
   invoiceStatusLabel,
@@ -51,6 +53,24 @@ describe("invoice presentation", () => {
 
   it("preserves an issuance key across a retry", () => {
     expect(invoiceIssueKey("invoice-1", "saved-key")).toBe("saved-key");
+  });
+
+  it("validates email delivery and preserves its retry key", () => {
+    expect(
+      invoiceEmailInputSchema.safeParse({
+        recipient: "billing@example.com",
+        subject: "Factura F-001",
+      }).success,
+    ).toBe(true);
+    expect(
+      invoiceEmailInputSchema.safeParse({
+        recipient: "not-an-email",
+        subject: "Factura F-001",
+      }).success,
+    ).toBe(false);
+    expect(invoiceEmailKey("invoice-1", "saved-email-key")).toBe(
+      "saved-email-key",
+    );
   });
 
   it("validates and presents payments", () => {

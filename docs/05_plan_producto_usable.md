@@ -209,8 +209,10 @@ pendientes de cobro/pago con agregados exactos y aislados por tenant. La navegac
 incluye vistas read-only de diario y mayor por periodo y cuenta; el E2E de compra
 comprueba que resumen y libros reflejan los movimientos contabilizados. La vista de
 tesorería ya permite configurar la cuenta bancaria, importar un movimiento normalizado,
-revisar sugerencias y confirmar una conciliación uno-a-uno. Faltan SMTP observable,
-despliegue reproducible de staging, backup/restauración y la prueba moderada para cerrar U4.
+revisar sugerencias y confirmar una conciliación uno-a-uno. El detalle de venta permite
+encolar el correo de forma idempotente y observar destinatario, asunto, estado, intentos,
+error y fecha de entrega. Faltan configurar SMTP real y desplegar staging, ensayar
+backup/restauración y ejecutar la prueba moderada para cerrar U4.
 
 ## Orden inmediato de implementación
 

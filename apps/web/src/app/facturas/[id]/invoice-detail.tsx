@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { formatMoney } from "@/lib/catalog";
 import {
   formatInvoiceDate,
+  invoiceEmailKey,
   invoiceIssueKey,
   invoiceStatusLabel,
   paymentKey,
@@ -14,6 +15,8 @@ import {
   todayIso,
   type DocumentSequence,
   type Invoice,
+  type InvoiceEmailDelivery,
+  type InvoiceEmailInput,
   type InvoiceInput,
   type InvoiceTrace,
   type Payment,
@@ -149,6 +152,7 @@ export function InvoiceDetail({ id }: { id: string }) {
           <strong>{formatMoney(document.amountDue, document.currency)}</strong>
         </article>
       </section>
+      {document.status !== "DRAFT" && <EmailPanel invoice={document} />}
       {document.status !== "DRAFT" && <PaymentsPanel invoice={document} />}
       <section className="invoice-detail-panel">
         <header>
@@ -240,6 +244,252 @@ export function InvoiceDetail({ id }: { id: string }) {
       )}
     </AppShell>
   );
+}
+
+function EmailPanel({ invoice }: { invoice: Invoice }) {
+  const queryClient = useQueryClient();
+  const [composing, setComposing] = useState(false);
+  const [notice, setNotice] = useState("");
+  const deliveries = useQuery({
+    queryKey: ["invoice-email-deliveries", invoice.id],
+    queryFn: () =>
+      requestJson<InvoiceEmailDelivery[]>(
+        `/api/invoices/${invoice.id}/email-deliveries`,
+      ),
+    refetchInterval: (query) =>
+      query.state.data?.some(({ status }) =>
+        ["PENDING", "PROCESSING"].includes(status),
+      )
+        ? 5_000
+        : false,
+  });
+  const send = useMutation({
+    mutationFn: async (payload: InvoiceEmailInput) => {
+      const storageName = `pastagansa:email:${invoice.id}`;
+      const key = invoiceEmailKey(
+        invoice.id,
+        sessionStorage.getItem(storageName),
+      );
+      sessionStorage.setItem(storageName, key);
+      const delivery = await requestJson<InvoiceEmailDelivery>(
+        `/api/invoices/${invoice.id}/email`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...payload, idempotencyKey: key }),
+        },
+      );
+      sessionStorage.removeItem(storageName);
+      return delivery;
+    },
+    onSuccess: async (delivery) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["invoice-email-deliveries", invoice.id],
+      });
+      setComposing(false);
+      setNotice(`Correo preparado para ${delivery.recipient}.`);
+    },
+  });
+  return (
+    <section className="email-panel" aria-labelledby="email-title">
+      <header>
+        <div>
+          <p className="eyebrow">Entrega</p>
+          <h2 id="email-title">Envío por correo</h2>
+          <p>El PDF se genera al enviar y cada intento queda registrado.</p>
+        </div>
+        <button
+          className="primary-button compact"
+          onClick={() => setComposing(true)}
+        >
+          Enviar por email
+        </button>
+      </header>
+      {notice && (
+        <div className="notice payment-notice" role="status">
+          <span>✓</span>
+          {notice}
+          <button onClick={() => setNotice("")} aria-label="Cerrar aviso">
+            ×
+          </button>
+        </div>
+      )}
+      {deliveries.error && (
+        <div className="inline-error" role="alert">
+          <strong>No se pudo cargar el historial de envíos</strong>
+          <p>{deliveries.error.message}</p>
+        </div>
+      )}
+      {deliveries.isPending && (
+        <p className="dialog-helper">Cargando envíos…</p>
+      )}
+      {deliveries.data?.length === 0 && (
+        <div className="payments-empty">
+          <strong>La factura aún no se ha enviado</strong>
+          <p>Cuando la envíes podrás seguir aquí su estado.</p>
+        </div>
+      )}
+      {!!deliveries.data?.length && (
+        <div className="table-scroll">
+          <table className="data-table email-table">
+            <thead>
+              <tr>
+                <th>Destinatario</th>
+                <th>Asunto</th>
+                <th>Estado</th>
+                <th>Intentos</th>
+                <th>Actualizado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deliveries.data.map((delivery) => (
+                <tr key={delivery.id}>
+                  <td>{delivery.recipient}</td>
+                  <td>{delivery.subject}</td>
+                  <td>
+                    <span
+                      className={`delivery-status ${delivery.status.toLowerCase()}`}
+                    >
+                      {deliveryStatusLabel(delivery.status)}
+                    </span>
+                    {delivery.lastError && <small>{delivery.lastError}</small>}
+                  </td>
+                  <td>{delivery.attempts}</td>
+                  <td>
+                    {formatInvoiceDate(delivery.sentAt ?? delivery.updatedAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {composing && (
+        <EmailDialog
+          invoice={invoice}
+          pending={send.isPending}
+          error={send.error?.message}
+          onClose={() => {
+            setComposing(false);
+            send.reset();
+          }}
+          onSubmit={(payload) => send.mutate(payload)}
+        />
+      )}
+    </section>
+  );
+}
+
+function EmailDialog({
+  invoice,
+  pending,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  invoice: Invoice;
+  pending: boolean;
+  error?: string;
+  onClose(): void;
+  onSubmit(input: InvoiceEmailInput): void;
+}) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    onSubmit({
+      recipient: String(values.get("recipient") ?? "").trim(),
+      subject: String(values.get("subject") ?? "").trim(),
+    });
+  }
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section
+        className="dialog email-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="email-dialog-title"
+      >
+        <header>
+          <div>
+            <p className="eyebrow">Factura {invoice.fullNumber}</p>
+            <h2 id="email-dialog-title">Enviar por email</h2>
+          </div>
+          <button
+            className="icon-button"
+            onClick={onClose}
+            disabled={pending}
+            aria-label="Cerrar"
+          >
+            ×
+          </button>
+        </header>
+        <form className="invoice-form" onSubmit={submit}>
+          <label className="field">
+            <span>Destinatario</span>
+            <input
+              name="recipient"
+              type="email"
+              required
+              maxLength={320}
+              defaultValue={invoice.customerEmail ?? ""}
+              autoComplete="email"
+            />
+          </label>
+          <label className="field">
+            <span>Asunto</span>
+            <input
+              name="subject"
+              required
+              maxLength={300}
+              defaultValue={`Factura ${invoice.fullNumber}`}
+            />
+          </label>
+          <p className="dialog-helper">
+            Se adjuntará el PDF oficial. Podrás comprobar el estado en el
+            historial de esta factura.
+          </p>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="dialog-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onClose}
+              disabled={pending}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="primary-button compact"
+              disabled={pending}
+            >
+              {pending ? "Preparando…" : "Confirmar envío"}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function deliveryStatusLabel(status: InvoiceEmailDelivery["status"]) {
+  return {
+    PENDING: "Pendiente",
+    PROCESSING: "Enviando",
+    SENT: "Enviado",
+    FAILED: "Fallido",
+  }[status];
 }
 
 function TracePanel({ invoice }: { invoice: Invoice }) {

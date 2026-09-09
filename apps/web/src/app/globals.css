@@ -1270,7 +1270,8 @@ a {
   color: var(--lime-dark);
   font-size: 1.25rem;
 }
-.payments-panel {
+.payments-panel,
+.email-panel {
   background: white;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1358,26 +1359,57 @@ a {
   font-size: 0.78rem;
   padding: 0.8rem 1rem;
 }
-.payments-panel > header {
+.payments-panel > header,
+.email-panel > header {
   align-items: center;
   display: flex;
   justify-content: space-between;
   padding: 1.3rem 1.5rem;
 }
-.payments-panel h2 {
+.payments-panel h2,
+.email-panel h2 {
   font-size: 1rem;
   margin: 0;
 }
-.payments-panel header .eyebrow {
+.payments-panel header .eyebrow,
+.email-panel header .eyebrow {
   margin-bottom: 0.35rem;
 }
-.payments-panel header p:last-child {
+.payments-panel header p:last-child,
+.email-panel header p:last-child {
   color: var(--muted);
   font-size: 0.7rem;
   margin: 0.25rem 0 0;
 }
-.payments-panel > .dialog-helper {
+.payments-panel > .dialog-helper,
+.email-panel > .dialog-helper {
   padding: 0 1.5rem 1rem;
+}
+.email-table {
+  min-width: 850px;
+}
+.delivery-status {
+  border-radius: 99px;
+  display: inline-block;
+  font-size: 0.63rem;
+  font-weight: 800;
+  padding: 0.3rem 0.55rem;
+}
+.delivery-status.pending,
+.delivery-status.processing {
+  background: #fff3d3;
+  color: #785b0b;
+}
+.delivery-status.sent {
+  background: var(--lime-soft);
+  color: var(--lime-dark);
+}
+.delivery-status.failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.email-dialog {
+  max-width: 580px;
 }
 .payments-empty {
   border-top: 1px solid var(--line);
@@ -1617,7 +1649,8 @@ a {
   .detail-actions {
     display: grid;
   }
-  .payments-panel > header {
+  .payments-panel > header,
+  .email-panel > header {
     align-items: stretch;
     flex-direction: column;
     gap: 1rem;
