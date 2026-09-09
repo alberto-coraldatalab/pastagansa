@@ -630,6 +630,7 @@ describe("platform integrity", () => {
       operationDate: "2026-08-31",
       receivedDate: "2026-09-05",
       deductionDate: "2026-10-01",
+      dueDate: "2026-10-31",
       currency: "EUR",
       lines: [
         {
@@ -654,6 +655,7 @@ describe("platform integrity", () => {
       taxTotal: "42",
       deductibleTaxTotal: "21",
       total: "242",
+      dueDate: "2026-10-31T00:00:00.000Z",
     });
     expect(purchaseDraft.body.lines[0].taxLines[0]).toMatchObject({
       taxCode: "ES_VAT_GENERAL_21",
@@ -667,6 +669,31 @@ describe("platform integrity", () => {
       .post("/v1/purchase-invoices")
       .send(purchaseInput)
       .expect(409);
+    await authed(accountA.accessToken, tenantA)
+      .put(`/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule`)
+      .send({
+        installments: [
+          { dueDate: "2026-09-30", amount: 100 },
+          { dueDate: "2026-10-31", amount: 100 },
+        ],
+      })
+      .expect(400);
+    const purchaseSchedule = await authed(accountA.accessToken, tenantA)
+      .put(`/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule`)
+      .send({
+        installments: [
+          { dueDate: "2026-09-30", amount: 100 },
+          { dueDate: "2026-10-31", amount: 142 },
+        ],
+      })
+      .expect(200);
+    expect(purchaseSchedule.body.installments).toHaveLength(2);
+    expect(purchaseSchedule.body.installments[1]).toMatchObject({
+      position: 2,
+      amount: "142",
+      paidAmount: "0",
+      status: "PENDING",
+    });
     await authed(accountA.accessToken, tenantA)
       .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/approve`)
       .set("idempotency-key", "approve-purchase-a")
@@ -684,6 +711,38 @@ describe("platform integrity", () => {
       amountPaid: "0",
       amountDue: "242",
     });
+    expect(approvedPurchase.body.installments).toHaveLength(2);
+    await authed(accountA.accessToken, tenantA)
+      .put(`/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule`)
+      .send({ installments: [{ dueDate: "2026-10-31", amount: 242 }] })
+      .expect(409);
+    await authed(accountB.accessToken, tenantB)
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule?asOf=2026-10-15`,
+      )
+      .expect(404);
+    const overduePurchaseSchedule = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule?asOf=2026-10-15`,
+      )
+      .expect(200);
+    expect(overduePurchaseSchedule.body.asOf).toBe("2026-10-15");
+    expect(
+      overduePurchaseSchedule.body.installments.map(
+        ({ overdue }: { overdue: boolean }) => overdue,
+      ),
+    ).toEqual([true, false]);
+    await expect(
+      admin.purchaseInvoiceInstallment.update({
+        where: { id: approvedPurchase.body.installments[0].id },
+        data: { dueDate: new Date("2026-12-31") },
+      }),
+    ).rejects.toThrow(
+      /approved purchase invoice payment schedules are immutable/,
+    );
     const retriedPurchaseApproval = await authed(accountA.accessToken, tenantA)
       .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/approve`)
       .set("idempotency-key", "approve-purchase-a")
@@ -749,6 +808,28 @@ describe("platform integrity", () => {
       amount: "100",
       currency: "EUR",
     });
+    expect(firstSupplierPayment.body.allocations).toHaveLength(1);
+    expect(firstSupplierPayment.body.allocations[0].amount).toBe("100");
+    const partlyPaidPurchaseSchedule = await authed(
+      accountA.accessToken,
+      tenantA,
+    )
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule?asOf=2026-10-15`,
+      )
+      .expect(200);
+    expect(partlyPaidPurchaseSchedule.body.installments).toEqual([
+      expect.objectContaining({
+        status: "PAID",
+        paidAmount: "100",
+        overdue: false,
+      }),
+      expect.objectContaining({
+        status: "PENDING",
+        paidAmount: "0",
+        overdue: false,
+      }),
+    ]);
     let supplierPaymentEntries = await authed(accountA.accessToken, tenantA)
       .get("/v1/accounting/journal-entries?sourceType=SUPPLIER_PAYMENT")
       .expect(200);
@@ -768,6 +849,12 @@ describe("platform integrity", () => {
         data: { reference: "TAMPERED" },
       }),
     ).rejects.toThrow(/recorded supplier payments are immutable/);
+    await expect(
+      admin.supplierPaymentAllocation.update({
+        where: { id: firstSupplierPayment.body.allocations[0].id },
+        data: { amount: "1" },
+      }),
+    ).rejects.toThrow(/recorded supplier payment allocations are immutable/);
     const retriedSupplierPayment = await authed(
       accountA.accessToken,
       tenantA,
@@ -819,6 +906,23 @@ describe("platform integrity", () => {
       amountPaid: "242",
       amountDue: "0",
     });
+    const paidPurchaseSchedule = await authed(accountA.accessToken, tenantA)
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/payment-schedule?asOf=2026-12-31`,
+      )
+      .expect(200);
+    expect(paidPurchaseSchedule.body.installments).toEqual([
+      expect.objectContaining({
+        status: "PAID",
+        paidAmount: "100",
+        overdue: false,
+      }),
+      expect.objectContaining({
+        status: "PAID",
+        paidAmount: "142",
+        overdue: false,
+      }),
+    ]);
     supplierPaymentEntries = await authed(accountA.accessToken, tenantA)
       .get("/v1/accounting/journal-entries?sourceType=SUPPLIER_PAYMENT")
       .expect(200);

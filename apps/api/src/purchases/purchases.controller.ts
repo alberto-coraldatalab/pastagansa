@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from "@nestjs/common";
 import { RequirePermissions } from "../authorization/permissions.decorator";
@@ -17,6 +18,10 @@ import { TenantProtected } from "../tenancy/tenant.decorator";
 import { ApprovePurchaseInvoiceDto } from "./dto/approve-purchase-invoice.dto";
 import { ListPurchaseInvoicesDto } from "./dto/list-purchase-invoices.dto";
 import { RecordSupplierPaymentDto } from "./dto/record-supplier-payment.dto";
+import {
+  PurchasePaymentScheduleQueryDto,
+  SetPurchasePaymentScheduleDto,
+} from "./dto/purchase-payment-schedule.dto";
 import {
   CreatePurchaseInvoiceDto,
   UpdatePurchaseInvoiceDto,
@@ -72,6 +77,24 @@ export class PurchasesController {
       input,
       requireIdempotencyKey(idempotencyKey),
     );
+  }
+
+  @Get(":id/payment-schedule")
+  @RequirePermissions("purchase_invoice.read")
+  paymentSchedule(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: PurchasePaymentScheduleQueryDto,
+  ) {
+    return this.supplierPayments.getSchedule(id, query);
+  }
+
+  @Put(":id/payment-schedule")
+  @RequirePermissions("purchase_invoice.update")
+  setPaymentSchedule(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: SetPurchasePaymentScheduleDto,
+  ) {
+    return this.supplierPayments.setSchedule(id, input);
   }
 
   @Get(":id/payments")

@@ -192,6 +192,8 @@ model Organization {
   purchaseInvoices     PurchaseInvoice[]
   purchaseInvoiceLines PurchaseInvoiceLine[]
   purchaseTaxLines     PurchaseTaxLine[]
+  purchaseInstallments PurchaseInvoiceInstallment[]
+  supplierAllocations  SupplierPaymentAllocation[]
   accounts             Account[]
   fiscalYears          FiscalYear[]
   accountingPeriods    AccountingPeriod[]
@@ -234,6 +236,8 @@ model Company {
   purchaseInvoices     PurchaseInvoice[]
   purchaseInvoiceLines PurchaseInvoiceLine[]
   purchaseTaxLines     PurchaseTaxLine[]
+  purchaseInstallments PurchaseInvoiceInstallment[]
+  supplierAllocations  SupplierPaymentAllocation[]
   accounts             Account[]
   fiscalYears          FiscalYear[]
   accountingPeriods    AccountingPeriod[]
@@ -533,6 +537,7 @@ model PurchaseInvoice {
   operationDate         DateTime              @map("operation_date") @db.Date
   receivedDate          DateTime              @map("received_date") @db.Date
   deductionDate         DateTime              @map("deduction_date") @db.Date
+  dueDate               DateTime?             @map("due_date") @db.Date
   currency              String                @default("EUR") @db.Char(3)
   notes                 String?
   subtotal              Decimal               @db.Decimal(14, 2)
@@ -553,6 +558,7 @@ model PurchaseInvoice {
   taxLines              PurchaseTaxLine[]
   taxLedgerEntry        TaxLedgerEntry?
   supplierPayments      SupplierPayment[]
+  installments          PurchaseInvoiceInstallment[]
 
   @@unique([companyId, draftCode])
   @@unique([companyId, supplierId, supplierInvoiceNumber])
@@ -579,12 +585,57 @@ model SupplierPayment {
   organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  allocations       SupplierPaymentAllocation[]
 
   @@unique([companyId, idempotencyKey])
   @@unique([id, organizationId, companyId])
+  @@unique([id, purchaseInvoiceId, organizationId, companyId])
   @@index([purchaseInvoiceId, paidAt])
   @@index([companyId, paidAt])
   @@map("supplier_payments")
+}
+
+model PurchaseInvoiceInstallment {
+  id                String                      @id @default(uuid()) @db.Uuid
+  organizationId    String                      @map("organization_id") @db.Uuid
+  companyId         String                      @map("company_id") @db.Uuid
+  purchaseInvoiceId String                      @map("purchase_invoice_id") @db.Uuid
+  position          Int
+  dueDate           DateTime                    @map("due_date") @db.Date
+  amount            Decimal                     @db.Decimal(14, 2)
+  paidAmount        Decimal                     @default(0) @map("paid_amount") @db.Decimal(14, 2)
+  status            InstallmentStatus           @default(PENDING)
+  createdAt         DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization      Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company                     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseInvoice   PurchaseInvoice             @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  allocations       SupplierPaymentAllocation[]
+
+  @@unique([purchaseInvoiceId, position])
+  @@unique([id, organizationId, companyId])
+  @@unique([id, purchaseInvoiceId, organizationId, companyId])
+  @@index([companyId, status, dueDate])
+  @@map("purchase_invoice_installments")
+}
+
+model SupplierPaymentAllocation {
+  id                String                     @id @default(uuid()) @db.Uuid
+  organizationId    String                     @map("organization_id") @db.Uuid
+  companyId         String                     @map("company_id") @db.Uuid
+  supplierPaymentId String                     @map("supplier_payment_id") @db.Uuid
+  purchaseInvoiceId String                     @map("purchase_invoice_id") @db.Uuid
+  installmentId     String                     @map("installment_id") @db.Uuid
+  amount            Decimal                    @db.Decimal(14, 2)
+  createdAt         DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company                    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  supplierPayment   SupplierPayment            @relation(fields: [supplierPaymentId, purchaseInvoiceId, organizationId, companyId], references: [id, purchaseInvoiceId, organizationId, companyId], onDelete: Restrict)
+  installment       PurchaseInvoiceInstallment @relation(fields: [installmentId, purchaseInvoiceId, organizationId, companyId], references: [id, purchaseInvoiceId, organizationId, companyId], onDelete: Restrict)
+
+  @@unique([supplierPaymentId, installmentId])
+  @@index([purchaseInvoiceId, createdAt])
+  @@map("supplier_payment_allocations")
 }
 
 model BankAccount {

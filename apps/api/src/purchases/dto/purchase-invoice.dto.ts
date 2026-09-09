@@ -55,6 +55,7 @@ export class CreatePurchaseInvoiceDto {
   @IsOptional() @IsDateString() operationDate?: string;
   @IsDateString() receivedDate!: string;
   @IsOptional() @IsDateString() deductionDate?: string;
+  @IsOptional() @IsDateString() dueDate?: string;
   @IsOptional() @IsCurrencyCode() currency?: string;
   @IsOptional() @IsString() @MaxLength(5000) notes?: string;
   @IsArray()

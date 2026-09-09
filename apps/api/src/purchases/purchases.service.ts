@@ -100,6 +100,7 @@ export class PurchasesService {
           orderBy: { position: "asc" },
           include: { taxLines: true },
         },
+        installments: { orderBy: { position: "asc" } },
       },
     });
     if (!purchase) throw new NotFoundException("Purchase invoice not found");
@@ -222,6 +223,32 @@ export class PurchasesService {
       where: { id: sequence.id },
       data: { nextNumber: { increment: 1 } },
     });
+    const installments =
+      await this.tenant.db.purchaseInvoiceInstallment.findMany({
+        where: { purchaseInvoiceId: id, ...scope },
+        select: { amount: true },
+      });
+    if (!installments.length && purchase.total.greaterThan(0))
+      await this.tenant.db.purchaseInvoiceInstallment.create({
+        data: {
+          ...scope,
+          purchaseInvoiceId: id,
+          position: 1,
+          dueDate: purchase.dueDate ?? purchase.issueDate,
+          amount: purchase.total,
+        },
+      });
+    else if (
+      !installments
+        .reduce(
+          (sum, installment) => sum.plus(installment.amount),
+          new Decimal(0),
+        )
+        .equals(purchase.total)
+    )
+      throw new ConflictException(
+        "Payment schedule total must equal the purchase invoice total",
+      );
     await this.tenant.db.purchaseInvoice.update({
       where: { id },
       data: {
@@ -272,6 +299,8 @@ export class PurchasesService {
       throw new BadRequestException(
         "deductionDate cannot precede receivedDate",
       );
+    if (input.dueDate && input.dueDate < input.issueDate)
+      throw new BadRequestException("dueDate cannot precede issueDate");
     const scope = this.scope();
     const supplier = await this.tenant.db.contact.findFirst({
       where: {
@@ -318,6 +347,7 @@ export class PurchasesService {
         operationDate: new Date(operationDate),
         receivedDate: new Date(input.receivedDate),
         deductionDate: new Date(deductionDate),
+        dueDate: input.dueDate ? new Date(input.dueDate) : null,
         currency: input.currency ?? "EUR",
         notes: input.notes?.trim() || null,
         ...totals,
