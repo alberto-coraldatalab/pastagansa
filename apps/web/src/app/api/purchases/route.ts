@@ -1,37 +1,34 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
+import { NextRequest, NextResponse } from "next/server";
+import { purchaseInputSchema } from "@/lib/purchases";
 import { normalizeApiError } from "@/lib/session";
 import { SessionError, tenantApiRequest } from "@/lib/server-session";
 
-const createSchema = z.object({
-  documentType: z.enum(["INVOICE", "PURCHASE_INVOICE"]),
-  series: z
-    .string()
-    .trim()
-    .min(1)
-    .max(30)
-    .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/),
-  startingNumber: z.number().int().min(1).optional(),
-  padding: z.number().int().min(1).max(12).optional(),
-});
-
-export async function GET() {
-  return forward("/v1/document-sequences");
+export async function GET(request: NextRequest) {
+  const params = new URLSearchParams();
+  for (const name of ["status", "cursor", "limit"] as const) {
+    const value = request.nextUrl.searchParams.get(name);
+    if (value) params.set(name, value);
+  }
+  return forward(`/v1/purchase-invoices?${params}`);
 }
 
 export async function POST(request: Request) {
-  const input = createSchema.safeParse(
+  const input = purchaseInputSchema.safeParse(
     await request.json().catch(() => undefined),
   );
   if (!input.success)
     return NextResponse.json(
-      { error: "La serie debe empezar por una letra o número." },
+      { error: "Revisa el proveedor, número, fechas y conceptos." },
       { status: 400 },
     );
-  return forward("/v1/document-sequences", {
+  return forward("/v1/purchase-invoices", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(input.data),
+    body: JSON.stringify({
+      ...input.data,
+      dueDate: input.data.dueDate || undefined,
+      notes: input.data.notes || undefined,
+    }),
   });
 }
 

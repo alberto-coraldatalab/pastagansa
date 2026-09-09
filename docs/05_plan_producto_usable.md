@@ -174,6 +174,13 @@ Gate:
 - permisos y estado explican por qué una acción no está disponible;
 - PDF se acepta como adjunto y no se ofrece falsamente como OCR compatible.
 
+Estado real: en curso. Ya existe el recorrido web proveedor → borrador editable →
+aprobación → pago, con serie de recepción, IVA soportado/deducible, saldo, historial y
+trazabilidad exacta hacia el asiento y el libro de IVA. Un E2E de Chromium verifica el
+recorrido y su persistencia tras recarga. Faltan la subida/descarga de adjuntos y la
+solicitud, progreso, reintento y revisión humana del OCR para superar formalmente el
+gate.
+
 ### U4 — Visibilidad y staging
 
 Resultado: los recorridos se pueden evaluar de forma autónoma en un entorno estable.

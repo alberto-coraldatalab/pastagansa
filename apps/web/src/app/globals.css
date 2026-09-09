@@ -792,6 +792,14 @@ a {
   gap: 0.8rem;
   grid-template-columns: minmax(220px, 2fr) 1fr 1fr;
 }
+.purchase-basics {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr;
+}
+.purchase-description {
+  grid-column: span 2;
+}
 .invoice-lines-heading,
 .invoice-line-title {
   align-items: center;
@@ -1222,6 +1230,7 @@ a {
     flex-direction: column;
   }
   .invoice-basics,
+  .purchase-basics,
   .invoice-line {
     grid-template-columns: 1fr 1fr;
   }
@@ -1274,6 +1283,7 @@ a {
     grid-template-columns: 1fr;
   }
   .invoice-basics,
+  .purchase-basics,
   .invoice-line {
     grid-template-columns: 1fr;
   }

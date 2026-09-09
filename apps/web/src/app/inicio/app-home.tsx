@@ -11,8 +11,8 @@ export function AppHome() {
         <h1>Hola, ya tienes la base preparada.</h1>
         <p>
           Tu sesión y el contexto de empresa están conectados de forma segura.
-          Ya puedes completar la venta: crear clientes, preparar una factura,
-          emitirla, descargar su PDF y registrar cobros parciales o totales.
+          Ya puedes completar la venta y también registrar una factura de
+          proveedor, aprobarla y pagarla con su contabilidad conectada.
         </p>
       </section>
       <section className="progress-card" aria-labelledby="progress-title">
@@ -45,6 +45,11 @@ export function AppHome() {
           <span className="step-mark">✓</span>
           <p>Registrar cobro</p>
           <small>Saldo e historial disponibles</small>
+        </Link>
+        <Link className="next-card done card-link" href="/compras">
+          <span className="step-mark">→</span>
+          <p>Registrar una compra</p>
+          <small>Aprobación, pago y trazabilidad</small>
         </Link>
       </section>
     </AppShell>

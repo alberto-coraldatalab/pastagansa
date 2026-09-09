@@ -28,3 +28,8 @@ Issued invoice details also expose the journal entry and VAT ledger record gener
 by the API. The complete sales flow is covered by Playwright in `e2e/`; after building
 both workspaces and preparing PostgreSQL, install Chromium with
 `npx playwright install chromium` and run `npm run test:e2e` from the repository root.
+
+`/compras` provides the first purchase workflow: it lists invoices received from
+suppliers, creates and edits drafts with deductible VAT, approves them into a
+reception series, records outgoing payments, and exposes the resulting journal and
+received-VAT entries. Playwright verifies the state again after a page reload.

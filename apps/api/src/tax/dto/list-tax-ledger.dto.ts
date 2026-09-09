@@ -13,6 +13,7 @@ import {
 
 export class ListTaxLedgerDto {
   @IsOptional() @IsUUID() invoiceId?: string;
+  @IsOptional() @IsUUID() purchaseInvoiceId?: string;
   @IsOptional() @IsEnum(TaxLedgerDirection) direction?: TaxLedgerDirection;
   @IsOptional() @IsEnum(TaxBookType) bookType?: TaxBookType;
   @IsOptional() @IsDateString() from?: string;
