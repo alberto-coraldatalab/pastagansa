@@ -8,15 +8,26 @@ import { SupplierPaymentsService } from "./supplier-payments.service";
 import { PurchaseAttachmentsService } from "./purchase-attachments.service";
 import { PurchaseApprovalPolicyController } from "./purchase-approval-policy.controller";
 import { PurchaseApprovalPolicyService } from "./purchase-approval-policy.service";
+import { PurchaseOcrController } from "./purchase-ocr.controller";
+import { PurchaseOcrEngine } from "./purchase-ocr-engine.service";
+import { PurchaseOcrService } from "./purchase-ocr.service";
+import { PurchaseOcrWorker } from "./purchase-ocr.worker";
 
 @Module({
   imports: [AuditModule, TaxModule, AccountingModule],
-  controllers: [PurchasesController, PurchaseApprovalPolicyController],
+  controllers: [
+    PurchasesController,
+    PurchaseApprovalPolicyController,
+    PurchaseOcrController,
+  ],
   providers: [
     PurchasesService,
     SupplierPaymentsService,
     PurchaseAttachmentsService,
     PurchaseApprovalPolicyService,
+    PurchaseOcrService,
+    PurchaseOcrEngine,
+    PurchaseOcrWorker,
   ],
 })
 export class PurchasesModule {}

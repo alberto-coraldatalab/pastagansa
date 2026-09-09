@@ -124,6 +124,14 @@ enum PurchaseInvoiceStatus {
   CANCELLED
 }
 
+enum PurchaseOcrStatus {
+  PENDING
+  PROCESSING
+  REVIEW_REQUIRED
+  REVIEWED
+  FAILED
+}
+
 enum AccountClass {
   ASSET
   LIABILITY
@@ -197,6 +205,7 @@ model Organization {
   purchaseAttachments  PurchaseInvoiceAttachment[]
   purchaseApprovalTiers PurchaseApprovalTier[]
   purchaseApprovals     PurchaseInvoiceApproval[]
+  purchaseOcrJobs       PurchaseInvoiceOcrJob[]
   supplierAllocations  SupplierPaymentAllocation[]
   accounts             Account[]
   fiscalYears          FiscalYear[]
@@ -244,6 +253,7 @@ model Company {
   purchaseAttachments  PurchaseInvoiceAttachment[]
   purchaseApprovalTiers PurchaseApprovalTier[]
   purchaseApprovals     PurchaseInvoiceApproval[]
+  purchaseOcrJobs       PurchaseInvoiceOcrJob[]
   supplierAllocations  SupplierPaymentAllocation[]
   accounts             Account[]
   fiscalYears          FiscalYear[]
@@ -573,6 +583,7 @@ model PurchaseInvoice {
   installments          PurchaseInvoiceInstallment[]
   attachments           PurchaseInvoiceAttachment[]
   approvals             PurchaseInvoiceApproval[]
+  ocrJobs               PurchaseInvoiceOcrJob[]
 
   @@unique([companyId, draftCode])
   @@unique([companyId, supplierId, supplierInvoiceNumber])
@@ -638,11 +649,48 @@ model PurchaseInvoiceAttachment {
   company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
   createdBy         User            @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  ocrJob            PurchaseInvoiceOcrJob?
 
   @@unique([purchaseInvoiceId, sha256])
   @@unique([id, organizationId, companyId])
   @@index([purchaseInvoiceId, createdAt])
   @@map("purchase_invoice_attachments")
+}
+
+model PurchaseInvoiceOcrJob {
+  id                String          @id @default(uuid()) @db.Uuid
+  organizationId    String          @map("organization_id") @db.Uuid
+  companyId         String          @map("company_id") @db.Uuid
+  purchaseInvoiceId String          @map("purchase_invoice_id") @db.Uuid
+  attachmentId      String          @unique @map("attachment_id") @db.Uuid
+  status            PurchaseOcrStatus @default(PENDING)
+  engine            String          @default("tesseract.js") @db.VarChar(80)
+  engineVersion     String          @default("7.0.0") @map("engine_version") @db.VarChar(40)
+  rawText           String?         @map("raw_text")
+  extractedFields   Json?           @map("extracted_fields")
+  overallConfidence Decimal?        @map("overall_confidence") @db.Decimal(5, 2)
+  reviewFields      Json?           @map("review_fields")
+  requestedById     String          @map("requested_by_id") @db.Uuid
+  reviewedById      String?         @map("reviewed_by_id") @db.Uuid
+  reviewedAt        DateTime?       @map("reviewed_at") @db.Timestamptz(6)
+  attempts          Int             @default(0)
+  availableAt       DateTime        @default(now()) @map("available_at") @db.Timestamptz(6)
+  lockedAt          DateTime?       @map("locked_at") @db.Timestamptz(6)
+  lastError         String?         @map("last_error") @db.VarChar(1000)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  attachment        PurchaseInvoiceAttachment @relation(fields: [attachmentId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  requestedBy       User            @relation("requested_purchase_ocr", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy        User?           @relation("reviewed_purchase_ocr", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@unique([id, organizationId, companyId])
+  @@unique([attachmentId, organizationId, companyId])
+  @@index([purchaseInvoiceId, createdAt])
+  @@index([status, availableAt])
+  @@map("purchase_invoice_ocr_jobs")
 }
 
 model SupplierPayment {
@@ -1190,6 +1238,8 @@ model User {
   sessions            Session[]
   purchaseAttachments PurchaseInvoiceAttachment[]
   purchaseApprovals   PurchaseInvoiceApproval[]
+  requestedPurchaseOcr PurchaseInvoiceOcrJob[] @relation("requested_purchase_ocr")
+  reviewedPurchaseOcr  PurchaseInvoiceOcrJob[] @relation("reviewed_purchase_ocr")
 
   @@map("users")
 }

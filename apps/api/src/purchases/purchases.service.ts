@@ -224,6 +224,17 @@ export class PurchasesService {
       throw new ConflictException(
         "Every purchase invoice line must have one fiscal breakdown",
       );
+    const unreviewedOcrJobs = await this.tenant.db.purchaseInvoiceOcrJob.count({
+      where: {
+        purchaseInvoiceId: id,
+        ...scope,
+        status: { not: "REVIEWED" },
+      },
+    });
+    if (unreviewedOcrJobs)
+      throw new ConflictException(
+        "Every requested OCR extraction must be reviewed before approval",
+      );
     const requestedSequenceId =
       purchase.status === PurchaseInvoiceStatus.PENDING_APPROVAL
         ? purchase.requestedSequenceId

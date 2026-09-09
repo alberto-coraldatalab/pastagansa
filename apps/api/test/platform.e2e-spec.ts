@@ -737,6 +737,102 @@ describe("platform integrity", () => {
       )
       .expect(404);
     await authed(accountA.accessToken, tenantA)
+      .post(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/attachments/${purchaseAttachment.body.id}`,
+      )
+      .expect(400);
+    const ocrAttachment = await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/attachments`)
+      .attach(
+        "file",
+        Buffer.from([
+          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01,
+        ]),
+        { filename: "invoice-scan.png", contentType: "image/png" },
+      )
+      .expect(201);
+    const ocrJob = await authed(accountA.accessToken, tenantA)
+      .post(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/attachments/${ocrAttachment.body.id}`,
+      )
+      .expect(201);
+    expect(ocrJob.body).toMatchObject({
+      status: "PENDING",
+      engine: "tesseract.js",
+      engineVersion: "7.0.0",
+      attempts: 0,
+    });
+    await authed(accountA.accessToken, tenantA)
+      .post(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/attachments/${ocrAttachment.body.id}`,
+      )
+      .expect(409);
+    await authed(accountB.accessToken, tenantB)
+      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/${ocrJob.body.id}`)
+      .expect(404);
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/approve`)
+      .set("idempotency-key", "approve-before-ocr-review")
+      .send({ sequenceId: purchaseSequence.body.id })
+      .expect(409);
+    await admin.purchaseInvoiceOcrJob.update({
+      where: { id: ocrJob.body.id },
+      data: {
+        status: "REVIEW_REQUIRED",
+        attempts: 1,
+        rawText: "FACTURA: PROV-2026-0042\nTOTAL: 242,00 EUR",
+        extractedFields: {
+          invoiceNumber: {
+            value: "PROV-2026-0042",
+            confidence: 91.25,
+            evidence: "FACTURA: PROV-2026-0042",
+          },
+          total: {
+            value: "242.00",
+            confidence: 91.25,
+            evidence: "TOTAL: 242,00 EUR",
+          },
+        },
+        overallConfidence: 91.25,
+      },
+    });
+    const extractedOcr = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/${ocrJob.body.id}`)
+      .expect(200);
+    expect(extractedOcr.body).toMatchObject({
+      status: "REVIEW_REQUIRED",
+      overallConfidence: "91.25",
+      rawText: "FACTURA: PROV-2026-0042\nTOTAL: 242,00 EUR",
+    });
+    await authed(accountA.accessToken, tenantA)
+      .post(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/${ocrJob.body.id}/review`,
+      )
+      .send({ fields: { executable: "no" }, notes: "Invalid field" })
+      .expect(400);
+    const reviewedOcr = await authed(accountA.accessToken, tenantA)
+      .post(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/${ocrJob.body.id}/review`,
+      )
+      .send({
+        fields: { invoiceNumber: "PROV-2026-0042", total: "242.00" },
+        notes: "Compared with the original document",
+      })
+      .expect(201);
+    expect(reviewedOcr.body).toMatchObject({
+      status: "REVIEWED",
+      reviewFields: {
+        fields: { invoiceNumber: "PROV-2026-0042", total: "242.00" },
+        notes: "Compared with the original document",
+      },
+    });
+    await expect(
+      admin.purchaseInvoiceOcrJob.update({
+        where: { id: ocrJob.body.id },
+        data: { overallConfidence: 100 },
+      }),
+    ).rejects.toThrow(/reviewed OCR records are immutable/);
+    await authed(accountA.accessToken, tenantA)
       .post("/v1/purchase-invoices")
       .send(purchaseInput)
       .expect(409);

@@ -68,6 +68,7 @@ export class IdentityService {
           ["purchase_invoice.create", "Create purchase invoices"],
           ["purchase_invoice.update", "Update purchase invoices"],
           ["purchase_invoice.approve", "Approve purchase invoices"],
+          ["purchase_invoice.ocr", "Request and review purchase invoice OCR"],
           [
             "purchase_invoice.approval_policy.manage",
             "Manage purchase approval policy",

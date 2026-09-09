@@ -24,6 +24,18 @@ export function validateConfiguration(values: Record<string, unknown>) {
     throw new Error(
       "DIRECT_DATABASE_URL is required for the email outbox worker",
     );
+  if (
+    values.OCR_WORKER_ENABLED &&
+    !["true", "false"].includes(String(values.OCR_WORKER_ENABLED))
+  )
+    throw new Error("OCR_WORKER_ENABLED must be true or false");
+  if (
+    String(values.OCR_WORKER_ENABLED) === "true" &&
+    !values.DIRECT_DATABASE_URL
+  )
+    throw new Error(
+      "DIRECT_DATABASE_URL is required when the OCR worker is enabled",
+    );
   return values;
 }
 function positiveInteger(
