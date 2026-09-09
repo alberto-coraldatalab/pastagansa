@@ -190,7 +190,7 @@ Entregables:
 
 - inicio con ventas, compras y saldos pendientes básicos;
 - vistas mínimas de diario, mayor y conciliación bancaria existente;
-- configuración SMTP de staging y estado observable del envío;
+- capacidad de correo observable y alternativa explícita mediante descarga PDF;
 - despliegue repetible de web, API y PostgreSQL;
 - logs correlacionados, healthcheck, métricas y alertas mínimas;
 - backup y restauración ensayados;
@@ -199,7 +199,7 @@ Entregables:
 Gate:
 
 - los E2E críticos pasan contra staging;
-- una factura puede enviarse a una bandeja de pruebas y auditarse;
+- una factura puede descargarse y compartirse sin depender de infraestructura de correo;
 - restauración documentada y ensayada;
 - cero bloqueadores de severidad crítica o alta en el recorrido usable;
 - incidencias de la prueba moderada clasificadas antes de cerrar el hito.
@@ -209,10 +209,11 @@ pendientes de cobro/pago con agregados exactos y aislados por tenant. La navegac
 incluye vistas read-only de diario y mayor por periodo y cuenta; el E2E de compra
 comprueba que resumen y libros reflejan los movimientos contabilizados. La vista de
 tesorería ya permite configurar la cuenta bancaria, importar un movimiento normalizado,
-revisar sugerencias y confirmar una conciliación uno-a-uno. El detalle de venta permite
-encolar el correo de forma idempotente y observar destinatario, asunto, estado, intentos,
-error y fecha de entrega. Faltan configurar SMTP real y desplegar staging, ensayar
-backup/restauración y ejecutar la prueba moderada para cerrar U4.
+revisar sugerencias y confirmar una conciliación uno-a-uno. El detalle de venta detecta
+si el correo está disponible, evita encolar entregas sin proveedor y ofrece la descarga
+PDF como recorrido soportado; si se configura SMTP conserva el historial observable.
+SMTP real queda aplazado por decisión de producto y deja de bloquear el hito. Faltan
+desplegar staging, ensayar backup/restauración y ejecutar la prueba moderada para cerrar U4.
 
 ## Orden inmediato de implementación
 

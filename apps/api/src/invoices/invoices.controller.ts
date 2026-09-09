@@ -37,6 +37,12 @@ export class InvoicesController {
     return this.invoices.list(query);
   }
 
+  @Get("email-capability")
+  @RequirePermissions("invoice.read")
+  emailCapability() {
+    return this.emails.capability();
+  }
+
   @Get(":id")
   @RequirePermissions("invoice.read")
   get(@Param("id", ParseUUIDPipe) id: string) {

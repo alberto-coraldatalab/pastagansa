@@ -8,13 +8,19 @@ import { InvoiceStatus, Prisma } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 import { SendInvoiceEmailDto } from "./dto/send-invoice-email.dto";
+import { SmtpInvoiceMailer } from "./smtp-invoice-mailer.service";
 
 @Injectable()
 export class InvoiceEmailService {
   constructor(
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
+    private readonly mailer: SmtpInvoiceMailer,
   ) {}
+
+  capability() {
+    return { enabled: this.mailer.enabled };
+  }
 
   async enqueue(
     invoiceId: string,

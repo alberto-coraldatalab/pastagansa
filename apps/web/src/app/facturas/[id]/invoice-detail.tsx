@@ -15,6 +15,7 @@ import {
   todayIso,
   type DocumentSequence,
   type Invoice,
+  type InvoiceEmailCapability,
   type InvoiceEmailDelivery,
   type InvoiceEmailInput,
   type InvoiceInput,
@@ -250,6 +251,12 @@ function EmailPanel({ invoice }: { invoice: Invoice }) {
   const queryClient = useQueryClient();
   const [composing, setComposing] = useState(false);
   const [notice, setNotice] = useState("");
+  const capability = useQuery({
+    queryKey: ["invoice-email-capability"],
+    queryFn: () =>
+      requestJson<InvoiceEmailCapability>("/api/invoices/email-capability"),
+    staleTime: 60_000,
+  });
   const deliveries = useQuery({
     queryKey: ["invoice-email-deliveries", invoice.id],
     queryFn: () =>
@@ -301,10 +308,25 @@ function EmailPanel({ invoice }: { invoice: Invoice }) {
         <button
           className="primary-button compact"
           onClick={() => setComposing(true)}
+          disabled={!capability.data?.enabled}
+          title={
+            capability.data?.enabled
+              ? undefined
+              : "El envío por correo no está configurado"
+          }
         >
           Enviar por email
         </button>
       </header>
+      {capability.data && !capability.data.enabled && (
+        <div className="email-unavailable" role="note">
+          <strong>Correo no configurado</strong>
+          <span>
+            Descarga el PDF para compartirlo manualmente. El envío directo se
+            activará cuando haya un proveedor disponible.
+          </span>
+        </div>
+      )}
       {notice && (
         <div className="notice payment-notice" role="status">
           <span>✓</span>

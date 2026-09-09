@@ -379,6 +379,9 @@ describe("platform integrity", () => {
       .expect(200);
     expect(invoicePdf.body.subarray(0, 5).toString()).toBe("%PDF-");
     await authed(accountA.accessToken, tenantA)
+      .get("/v1/invoices/email-capability")
+      .expect(200, { enabled: false });
+    await authed(accountA.accessToken, tenantA)
       .post(`/v1/invoices/${invoiceDraft.body.id}/email`)
       .send({})
       .expect(400);

@@ -1388,6 +1388,22 @@ a {
 .email-table {
   min-width: 850px;
 }
+.email-unavailable {
+  align-items: center;
+  background: #fff8e6;
+  border-top: 1px solid #f1dfae;
+  color: #624f1c;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0.85rem 1.5rem;
+}
+.email-unavailable strong {
+  font-size: 0.76rem;
+}
+.email-unavailable span {
+  font-size: 0.68rem;
+}
 .delivery-status {
   border-radius: 99px;
   display: inline-block;

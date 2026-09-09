@@ -79,17 +79,13 @@ test("completes the sales flow from registration to payment", async ({
   const pdf = await readFile(downloadPath!);
   expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
 
-  await page.getByRole("button", { name: "Enviar por email" }).click();
-  await page.getByLabel("Destinatario").fill("cliente-e2e@example.com");
-  await page.getByRole("button", { name: "Confirmar envío" }).click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Correo preparado" }),
-  ).toContainText("cliente-e2e@example.com");
-  const deliveryRow = page.locator(".email-table tbody tr").filter({
-    hasText: "cliente-e2e@example.com",
-  });
-  await expect(deliveryRow).toContainText("Pendiente");
-  await expect(deliveryRow).toContainText("0");
+    page.getByRole("button", { name: "Enviar por email" }),
+  ).toBeDisabled();
+  await expect(page.getByText("Correo no configurado")).toBeVisible();
+  await expect(
+    page.getByText("Descarga el PDF para compartirlo manualmente"),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Registrar cobro" }).click();
   await expect(page.getByLabel("Importe")).toHaveValue("121.00");

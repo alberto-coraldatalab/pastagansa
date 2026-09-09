@@ -82,6 +82,10 @@ export interface InvoiceEmailDelivery {
   updatedAt: string;
 }
 
+export interface InvoiceEmailCapability {
+  enabled: boolean;
+}
+
 export interface DocumentSequence {
   id: string;
   documentType: "INVOICE" | "CREDIT_NOTE" | "PURCHASE_INVOICE";
