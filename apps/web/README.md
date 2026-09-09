@@ -23,3 +23,8 @@ PDF through the authenticated server route.
 Issued invoices also show their payment schedule, outstanding balance, and payment
 history. Partial and final payments can be recorded with method and reference;
 browser retries preserve the idempotency key so the same payment is not duplicated.
+
+Issued invoice details also expose the journal entry and VAT ledger record generated
+by the API. The complete sales flow is covered by Playwright in `e2e/`; after building
+both workspaces and preparing PostgreSQL, install Chromium with
+`npx playwright install chromium` and run `npm run test:e2e` from the repository root.

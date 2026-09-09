@@ -15,6 +15,7 @@ import {
   type DocumentSequence,
   type Invoice,
   type InvoiceInput,
+  type InvoiceTrace,
   type Payment,
   type PaymentInput,
   type PaymentInstallment,
@@ -98,13 +99,18 @@ export function InvoiceDetail({ id }: { id: string }) {
               </button>
             </>
           ) : (
-            <a
-              className="primary-link compact"
-              href={`/api/invoices/${id}/pdf`}
-              download
-            >
-              Descargar PDF
-            </a>
+            <>
+              <a className="secondary-button trace-link" href="#trazabilidad">
+                Ver trazabilidad
+              </a>
+              <a
+                className="primary-link compact"
+                href={`/api/invoices/${id}/pdf`}
+                download
+              >
+                Descargar PDF
+              </a>
+            </>
           )}
         </div>
       </section>
@@ -207,6 +213,7 @@ export function InvoiceDetail({ id }: { id: string }) {
           </p>
         )}
       </section>
+      {document.status !== "DRAFT" && <TracePanel invoice={document} />}
       {editing && (
         <InvoiceDialog
           initial={document}
@@ -232,6 +239,99 @@ export function InvoiceDetail({ id }: { id: string }) {
         />
       )}
     </AppShell>
+  );
+}
+
+function TracePanel({ invoice }: { invoice: Invoice }) {
+  const trace = useQuery({
+    queryKey: ["invoice-trace", invoice.id],
+    queryFn: () =>
+      requestJson<InvoiceTrace>(`/api/invoices/${invoice.id}/trace`),
+  });
+  return (
+    <section
+      className="trace-panel"
+      id="trazabilidad"
+      aria-labelledby="trace-title"
+    >
+      <header>
+        <p className="eyebrow">Trazabilidad</p>
+        <h2 id="trace-title">Impacto fiscal y contable</h2>
+        <p>Registros generados automáticamente al emitir.</p>
+      </header>
+      {trace.isPending && (
+        <p className="dialog-helper">Cargando trazabilidad…</p>
+      )}
+      {trace.error && <p className="form-error">{trace.error.message}</p>}
+      {trace.data && (
+        <div className="trace-grid">
+          <article>
+            <span>Asiento contable</span>
+            {trace.data.journalEntry ? (
+              <>
+                <strong>Asiento #{trace.data.journalEntry.entryNumber}</strong>
+                <small>{trace.data.journalEntry.description}</small>
+                <dl>
+                  <div>
+                    <dt>Debe</dt>
+                    <dd>
+                      {formatMoney(
+                        sumJournal(trace.data.journalEntry.lines, "debit"),
+                        invoice.currency,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Haber</dt>
+                    <dd>
+                      {formatMoney(
+                        sumJournal(trace.data.journalEntry.lines, "credit"),
+                        invoice.currency,
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <strong>No encontrado</strong>
+            )}
+          </article>
+          <article>
+            <span>Libro de IVA</span>
+            {trace.data.taxEntry ? (
+              <>
+                <strong>{trace.data.taxEntry.documentNumber}</strong>
+                <small>
+                  Ventas · {formatInvoiceDate(trace.data.taxEntry.taxPointDate)}
+                </small>
+                <dl>
+                  <div>
+                    <dt>Base</dt>
+                    <dd>
+                      {formatMoney(
+                        sumTax(trace.data.taxEntry.amounts, "taxableBase"),
+                        invoice.currency,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Cuota</dt>
+                    <dd>
+                      {formatMoney(
+                        sumTax(trace.data.taxEntry.amounts, "taxAmount"),
+                        invoice.currency,
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <strong>No encontrado</strong>
+            )}
+          </article>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -710,4 +810,20 @@ function nextInstallmentText(
   if (!open) return "Todos los vencimientos están cobrados.";
   const pending = Number(open.amount) - Number(open.paidAmount);
   return `Próximo vencimiento: ${formatInvoiceDate(open.dueDate)} · ${formatMoney(String(pending), currency)}`;
+}
+
+function sumJournal(
+  lines: Array<{ debit: string; credit: string }>,
+  field: "debit" | "credit",
+) {
+  return String(lines.reduce((sum, line) => sum + Number(line[field]), 0));
+}
+
+function sumTax(
+  amounts: Array<{ taxableBase: string; taxAmount: string }>,
+  field: "taxableBase" | "taxAmount",
+) {
+  return String(
+    amounts.reduce((sum, amount) => sum + Number(amount[field]), 0),
+  );
 }

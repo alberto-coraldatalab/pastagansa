@@ -6,11 +6,13 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   Min,
 } from "class-validator";
 
 export class ListTaxLedgerDto {
+  @IsOptional() @IsUUID() invoiceId?: string;
   @IsOptional() @IsEnum(TaxLedgerDirection) direction?: TaxLedgerDirection;
   @IsOptional() @IsEnum(TaxBookType) bookType?: TaxBookType;
   @IsOptional() @IsDateString() from?: string;

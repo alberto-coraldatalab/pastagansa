@@ -213,13 +213,14 @@ export class AccountingService {
   async listEntries(query: ListJournalEntriesDto) {
     if (query.from && query.to && query.from > query.to)
       throw new BadRequestException("from cannot be after to");
-    const filter = `${query.sourceType ?? ""}:${query.from ?? ""}:${query.to ?? ""}`;
+    const filter = `${query.sourceType ?? ""}:${query.sourceId ?? ""}:${query.from ?? ""}:${query.to ?? ""}`;
     const cursor = query.cursor
       ? decodeCursor(query.cursor, filter)
       : undefined;
     const where: Prisma.JournalEntryWhereInput = {
       ...this.scope(),
       ...(query.sourceType ? { sourceType: query.sourceType } : {}),
+      ...(query.sourceId ? { sourceId: query.sourceId } : {}),
       ...(query.from || query.to
         ? {
             entryDate: {

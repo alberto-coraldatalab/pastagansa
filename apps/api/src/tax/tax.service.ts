@@ -100,6 +100,7 @@ export class TaxService {
     if (query.from && query.to && query.from > query.to)
       throw new BadRequestException("from cannot be after to");
     const filter = JSON.stringify({
+      invoiceId: query.invoiceId ?? null,
       direction: query.direction ?? null,
       bookType: query.bookType ?? null,
       from: query.from ?? null,
@@ -307,6 +308,7 @@ export class TaxService {
 
   private ledgerFilters(query: ListTaxLedgerDto) {
     return {
+      ...(query.invoiceId ? { invoiceId: query.invoiceId } : {}),
       ...(query.direction ? { direction: query.direction } : {}),
       ...(query.bookType ? { bookType: query.bookType } : {}),
       ...(query.from || query.to

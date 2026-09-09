@@ -6,6 +6,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -13,6 +14,7 @@ import {
 
 export class ListJournalEntriesDto {
   @IsOptional() @IsEnum(JournalSourceType) sourceType?: JournalSourceType;
+  @IsOptional() @IsUUID() sourceId?: string;
   @IsOptional() @IsDateString() from?: string;
   @IsOptional() @IsDateString() to?: string;
   @IsOptional() @IsString() @MaxLength(500) cursor?: string;

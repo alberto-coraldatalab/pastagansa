@@ -121,7 +121,7 @@ Gate:
 
 Resultado: el usuario convierte datos maestros en una factura real descargable.
 
-Estado real: en curso. Ya están disponibles la cartera de clientes y el catálogo de
+Estado real: completada. Están disponibles la cartera de clientes y el catálogo de
 productos/servicios, ambos con navegación desde el shell, búsqueda, paginación por
 cursor, estados de carga/vacío/error y alta validada. El catálogo conserva precio,
 unidad, IVA sugerido y cuenta de ingresos reutilizables. La web mantiene tokens y
@@ -131,8 +131,9 @@ fechas y múltiples líneas, reutilizando catálogo y mostrando el total confirm
 el API. El detalle permite editar borradores, crear o seleccionar una serie, confirmar
 la emisión idempotente y descargar el PDF oficial. El recorrido funcional se completa
 con vencimiento, saldo, historial y registro idempotente de cobros parciales o totales.
-Faltan el E2E de navegador y los enlaces de trazabilidad contable/fiscal para superar
-formalmente el gate.
+El detalle enlaza y resume el asiento contable y el apunte del libro de IVA creados al
+emitir. Un E2E de Chromium ejecutado en CI cubre registro, cliente, catálogo, borrador,
+emisión, PDF y cobro, y recarga el documento para comprobar el estado persistido.
 
 Entregables:
 

@@ -886,6 +886,11 @@ a {
   display: flex;
   gap: 0.65rem;
 }
+.trace-link {
+  align-items: center;
+  display: inline-flex;
+  text-decoration: none;
+}
 .primary-link.compact {
   min-height: auto;
 }
@@ -1084,6 +1089,61 @@ a {
 .payment-fields .full {
   grid-column: 1 / -1;
 }
+.trace-panel {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-top: 1rem;
+  padding: 1.5rem;
+  scroll-margin-top: 1rem;
+}
+.trace-panel > header h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+.trace-panel > header p:last-child {
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin: 0.3rem 0 0;
+}
+.trace-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 1.2rem;
+}
+.trace-grid article {
+  background: #f7f8f4;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+}
+.trace-grid article > span,
+.trace-grid article > small {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+.trace-grid dl {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0;
+  padding-top: 0.6rem;
+}
+.trace-grid dl div {
+  display: flex;
+  font-size: 0.72rem;
+  justify-content: space-between;
+}
+.trace-grid dt {
+  color: var(--muted);
+}
+.trace-grid dd {
+  font-weight: 750;
+  margin: 0;
+}
 .check-field {
   align-items: center;
   display: flex;
@@ -1199,6 +1259,9 @@ a {
     grid-template-columns: 1fr;
   }
   .payment-fields {
+    grid-template-columns: 1fr;
+  }
+  .trace-grid {
     grid-template-columns: 1fr;
   }
   .payment-fields .full {

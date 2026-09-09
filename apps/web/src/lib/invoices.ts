@@ -101,6 +101,34 @@ export interface PaymentInstallment {
   status: "PENDING" | "PARTIALLY_PAID" | "PAID";
 }
 
+export interface InvoiceTrace {
+  journalEntry: null | {
+    id: string;
+    entryNumber: string;
+    entryDate: string;
+    description: string;
+    status: string;
+    lines: Array<{
+      id: string;
+      debit: string;
+      credit: string;
+      account: { code: string; name: string };
+    }>;
+  };
+  taxEntry: null | {
+    id: string;
+    documentNumber: string;
+    taxPointDate: string;
+    status: string;
+    amounts: Array<{
+      id: string;
+      taxableBase: string;
+      rate: string | null;
+      taxAmount: string;
+    }>;
+  };
+}
+
 export interface InvoicePage {
   data: Invoice[];
   nextCursor: string | null;
