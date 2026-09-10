@@ -21,6 +21,18 @@ Abre `http://localhost:3001`, crea una cuenta y la aplicación te llevará a la 
 creada. El API queda en `http://localhost:3000`, con OpenAPI en
 `http://localhost:3000/docs`.
 
+Para entrar directamente con una empresa y maestros demo, deja API y web arrancadas y
+ejecuta:
+
+```bash
+npm run demo:seed
+```
+
+Después inicia sesión en `http://localhost:3001/acceso` con
+`demo@pastagansa.local` / `DemoPastagansa2026!`. El comando se puede repetir: reutiliza
+los mismos datos y no duplica recursos. Consulta [la guía para probar el producto](docs/07_probar_producto.md)
+para el recorrido y el reinicio seguro.
+
 ## Verificación
 
 ```bash
@@ -44,6 +56,7 @@ PostgreSQL, migraciones automáticas y healthchecks:
 cp .env.staging.example .env.staging
 # Sustituye todos los valores replace-with
 ./scripts/staging-up.sh
+./scripts/seed-demo.sh
 backup_file="$(./scripts/backup-database.sh)"
 ./scripts/restore-drill.sh "$backup_file"
 ```

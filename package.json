@@ -17,7 +17,8 @@
     "test:integration": "npm run test:integration --workspace=@pastagansa/api",
     "db:generate": "npm run db:generate --workspace=@pastagansa/api",
     "db:migrate": "npm run db:migrate --workspace=@pastagansa/api",
-    "db:deploy": "npm run db:deploy --workspace=@pastagansa/api"
+    "db:deploy": "npm run db:deploy --workspace=@pastagansa/api",
+    "demo:seed": "node scripts/seed-demo.mjs"
   },
   "dependencies": {
     "@nestjs/platform-express": "11.2.3",

@@ -75,6 +75,12 @@ fuente de verdad y la web muestra sus resultados y conflictos.
 Resultado: cualquier colaborador puede levantar la aplicación y obtener una empresa
 demo coherente con un procedimiento documentado.
 
+Estado real: completada. Los comandos raíz levantan API y web; el stack reproducible
+aplica migraciones y comprueba readiness; y el seed público crea una empresa, usuario,
+cliente, proveedor, servicio, dos series y una cuenta bancaria. CI lo ejecuta dos veces
+y exige que la segunda pasada reutilice los seis recursos. Las credenciales, recorridos
+y reinicio destructivo limitado al volumen local están documentados.
+
 Entregables:
 
 - comandos raíz para desarrollo coordinado de API y web;
@@ -97,9 +103,9 @@ Resultado: el usuario entra en una aplicación reconocible y aterriza en su empr
 Estado real: en curso. Ya existen el workspace Next.js integrado en lint, build y
 tests del monorepo; registro/login/logout; renovación de sesión mediante cookies
 HTTP-only; descubrimiento autenticado de membresías bajo RLS; selección de la primera
-empresa activa; shell responsive y estados de carga/error. Pendientes selector
-multiempresa, pruebas E2E de navegador y comprobaciones automáticas de accesibilidad
-para superar el gate completo.
+empresa activa; shell responsive y estados de carga/error. Los E2E críticos ejercitan
+el acceso y la persistencia de sesión. Pendientes selector multiempresa y
+comprobaciones automáticas de accesibilidad para superar el gate completo.
 
 Entregables:
 
@@ -224,7 +230,7 @@ tablas críticas y recuentos de datos; CI repite ese ensayo en cada cambio.
 1. Crear `apps/web` y el pipeline de build/test.
 2. Implementar cliente API, sesión y contexto tenant.
 3. Entregar login/registro y shell navegable.
-4. Añadir seed/demo reproducible.
+4. Añadir seed/demo reproducible. ✓
 5. Construir el recorrido de venta hasta PDF y cobro.
 6. Construir el recorrido de compra hasta OCR, aprobación y pago.
 7. Desplegar staging, completar visibilidad y ejecutar la prueba moderada.

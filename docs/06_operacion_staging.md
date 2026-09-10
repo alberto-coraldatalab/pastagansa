@@ -41,6 +41,15 @@ pendientes antes de arrancar la API, espera los healthchecks y comprueba `/acces
 Una actualización usa el mismo comando. Las migraciones son forward-only; antes de una
 actualización con cambios de esquema se debe crear y verificar un backup.
 
+En un entorno destinado a evaluación, cargar o verificar los datos demo con:
+
+```bash
+./scripts/seed-demo.sh
+```
+
+El seed es idempotente y se ejecuta dentro de la red privada del stack. Sus credenciales
+y el recorrido guiado están en [Probar el producto](07_probar_producto.md).
+
 Comprobaciones operativas:
 
 ```bash

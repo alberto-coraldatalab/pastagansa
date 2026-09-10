@@ -50,6 +50,12 @@ jobs:
         run: |
           touch .env.staging
           ./scripts/staging-up.sh
+          first_seed="$(./scripts/seed-demo.sh)"
+          second_seed="$(./scripts/seed-demo.sh)"
+          echo "$first_seed"
+          echo "$second_seed"
+          echo "$second_seed" | grep '"created": 0'
+          echo "$second_seed" | grep '"existing": 6'
           backup_file="$(./scripts/backup-database.sh)"
           ./scripts/restore-drill.sh "$backup_file"
       - name: Stop staging stack

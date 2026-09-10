@@ -19,6 +19,7 @@ COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/api/prisma apps/api/prisma
 COPY --from=build /app/apps/api/node_modules apps/api/node_modules
 COPY --from=build /app/node_modules node_modules
+COPY scripts/seed-demo.mjs scripts/seed-demo.mjs
 COPY --chmod=755 docker/api-entrypoint.sh /usr/local/bin/api-entrypoint
 USER node
 EXPOSE 3000
