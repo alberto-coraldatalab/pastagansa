@@ -4,8 +4,8 @@
   --paper: #f6f7f2;
   --surface: #ffffff;
   --line: #dde2d7;
-  --lime: #65a30d;
-  --lime-dark: #3f6212;
+  --lime: #4d7c0f;
+  --lime-dark: #365314;
   --lime-soft: #ecfccb;
   --danger: #b42318;
   --radius: 18px;
@@ -270,7 +270,7 @@ a {
   text-decoration: none;
 }
 .nav-item > span {
-  color: #71806b;
+  color: #aebca7;
   font-size: 0.65rem;
   font-weight: 800;
 }

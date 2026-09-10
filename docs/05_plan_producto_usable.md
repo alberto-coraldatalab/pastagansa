@@ -104,8 +104,9 @@ Estado real: en curso. Ya existen el workspace Next.js integrado en lint, build 
 tests del monorepo; registro/login/logout; renovación de sesión mediante cookies
 HTTP-only; descubrimiento autenticado de membresías bajo RLS; selección de la primera
 empresa activa; shell responsive y estados de carga/error. Los E2E críticos ejercitan
-el acceso y la persistencia de sesión. Pendientes selector multiempresa y
-comprobaciones automáticas de accesibilidad para superar el gate completo.
+el acceso, la persistencia de sesión y auditorías WCAG automatizadas con axe en acceso,
+inicio y estados clave de venta y compra. Queda pendiente el selector multiempresa para
+superar el gate completo.
 
 Entregables:
 

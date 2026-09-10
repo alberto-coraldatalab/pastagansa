@@ -1,11 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { expectNoSeriousAccessibilityViolations } from "./accessibility";
 
 test("completes the sales flow from registration to payment", async ({
   page,
 }) => {
   const suffix = Date.now();
   await page.goto("/acceso");
+  await expectNoSeriousAccessibilityViolations(page, "access screen");
   await page.getByRole("button", { name: "Crear cuenta" }).click();
   await page.getByLabel("Nombre de la organización").fill("Organización E2E");
   await page.getByLabel("Razón social").fill("PastaGansa E2E SL");
@@ -19,6 +21,7 @@ test("completes the sales flow from registration to payment", async ({
     .getByRole("button", { name: "Crear cuenta" })
     .click();
   await expect(page).toHaveURL(/\/inicio$/);
+  await expectNoSeriousAccessibilityViolations(page, "authenticated home");
 
   await page.getByRole("link", { name: /Clientes/ }).click();
   await page
@@ -58,6 +61,7 @@ test("completes the sales flow from registration to payment", async ({
   await expect(
     page.getByRole("heading", { name: "Factura en borrador" }),
   ).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, "sales draft");
 
   await page.getByRole("button", { name: "Emitir factura" }).click();
   await expect(
@@ -69,6 +73,7 @@ test("completes the sales flow from registration to payment", async ({
   await expect(
     page.getByRole("link", { name: "Ver trazabilidad" }),
   ).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, "issued invoice");
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("link", { name: "Descargar PDF" }).click();
@@ -160,6 +165,7 @@ test("completes a purchase through payment and bank reconciliation", async ({
   await expect(
     page.getByRole("heading", { name: "Compra en borrador" }),
   ).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, "purchase draft");
 
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles({
@@ -229,6 +235,7 @@ test("completes a purchase through payment and bank reconciliation", async ({
   await expect(
     page.getByRole("link", { name: "Ver trazabilidad" }),
   ).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, "approved purchase");
 
   await page.getByRole("button", { name: "Registrar pago" }).click();
   await expect(page.getByLabel("Importe")).toHaveValue("121.00");
