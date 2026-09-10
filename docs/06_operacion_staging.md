@@ -50,6 +50,20 @@ En un entorno destinado a evaluación, cargar o verificar los datos demo con:
 El seed es idempotente y se ejecuta dentro de la red privada del stack. Sus credenciales
 y el recorrido guiado están en [Probar el producto](07_probar_producto.md).
 
+Cuando el proxy HTTPS esté publicado, ejecutar los recorridos reales contra esa URL
+desde GitHub Actions mediante **Staging acceptance**, o localmente:
+
+```bash
+E2E_BASE_URL=https://staging.example.com \
+E2E_ALLOW_REMOTE_WRITE=1 \
+npm run test:staging
+```
+
+La confirmación `E2E_ALLOW_REMOTE_WRITE=1` es obligatoria porque la prueba crea dos
+organizaciones y documentos ficticios. Solo debe apuntar a un staging aislado, nunca a
+producción. El guion de evaluación humana está en
+[Prueba moderada](08_prueba_moderada.md).
+
 Comprobaciones operativas:
 
 ```bash

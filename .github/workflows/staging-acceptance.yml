@@ -1,0 +1,39 @@
+name: Staging acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: HTTPS base URL of the isolated staging environment
+        required: true
+        type: string
+
+jobs:
+  critical-flows:
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency: staging-acceptance
+    env:
+      E2E_BASE_URL: ${{ inputs.staging_url }}
+      E2E_ALLOW_REMOTE_WRITE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install --global npm@11.19.1
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Validate isolated staging target
+        run: |
+          node -e "const url=new URL(process.env.E2E_BASE_URL); if(url.protocol !== 'https:') throw new Error('Remote staging must use HTTPS')"
+      - name: Run critical flows and accessibility audits
+        run: npm run test:staging
+      - name: Preserve failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-acceptance-evidence
+          path: apps/web/test-results
+          retention-days: 7

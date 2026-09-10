@@ -10,7 +10,9 @@
     "start:e2e": "API_BASE_URL=http://127.0.0.1:3100 next start -p 3101",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "pretest:staging": "node -e \"if (!process.env.E2E_BASE_URL) throw new Error('E2E_BASE_URL is required')\"",
+    "test:staging": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "5.102.8",

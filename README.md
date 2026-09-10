@@ -62,4 +62,6 @@ backup_file="$(./scripts/backup-database.sh)"
 ```
 
 Consulta [la guía de operación](docs/06_operacion_staging.md) antes de exponer el
-entorno, actualizar el esquema o restaurar datos.
+entorno, actualizar el esquema o restaurar datos. Una vez publicado con HTTPS, el
+workflow manual **Staging acceptance** ejecuta los dos recorridos y las auditorías de
+accesibilidad contra la URL real.

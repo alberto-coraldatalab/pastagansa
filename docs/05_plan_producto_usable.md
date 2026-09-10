@@ -222,10 +222,13 @@ si el correo está disponible, evita encolar entregas sin proveedor y ofrece la 
 PDF como recorrido soportado; si se configura SMTP conserva el historial observable.
 SMTP real queda aplazado por decisión de producto y deja de bloquear el hito. Faltan
 publicar el stack en un host accesible y ejecutar la prueba moderada para cerrar U4. El
-stack reproducible de PostgreSQL, API y web ya construye imágenes desde el mismo commit,
-aplica 24 migraciones, espera readiness real y supera el smoke test. El 10/09/2026 se
-ensayó localmente un dump custom y su restauración aislada, verificando migraciones,
-tablas críticas y recuentos de datos; CI repite ese ensayo en cada cambio.
+workflow manual de aceptación ya puede ejecutar los dos recorridos y auditorías WCAG
+contra una URL HTTPS externa, con confirmación explícita de escritura. El guion moderado
+define consignas, métricas, evidencias y severidades. El stack reproducible de
+PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 24 migraciones,
+espera readiness real y supera el smoke test. El 10/09/2026 se ensayó localmente un dump
+custom y su restauración aislada, verificando migraciones, tablas críticas y recuentos
+de datos; CI repite ese ensayo en cada cambio.
 
 ## Orden inmediato de implementación
 
