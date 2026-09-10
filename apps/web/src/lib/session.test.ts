@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  findMembership,
   normalizeApiError,
   selectMembership,
   type IdentityContext,
@@ -41,6 +42,21 @@ describe("session helpers", () => {
         companyId: "other",
       })?.company.id,
     ).toBe("company-1");
+  });
+
+  it("does not authorize a forged tenant selection", () => {
+    expect(
+      findMembership(context, {
+        organizationId: "org-1",
+        companyId: "company-1",
+      })?.company.id,
+    ).toBe("company-1");
+    expect(
+      findMembership(context, {
+        organizationId: "other",
+        companyId: "company-1",
+      }),
+    ).toBeUndefined();
   });
 
   it("normalizes validation errors returned by the API", () => {

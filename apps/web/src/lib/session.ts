@@ -26,22 +26,33 @@ export function selectMembership(
   context: IdentityContext,
   selected?: TenantSelection,
 ) {
-  const companyMemberships = context.memberships.filter(
+  const companyMemberships = companyMembershipsFor(context);
+  if (selected) {
+    const current = findMembership(context, selected);
+    if (current) return current;
+  }
+  return companyMemberships[0];
+}
+
+export function companyMembershipsFor(context: IdentityContext) {
+  return context.memberships.filter(
     (
       membership,
     ): membership is Membership & {
       company: NonNullable<Membership["company"]>;
     } => membership.company !== null,
   );
-  if (selected) {
-    const current = companyMemberships.find(
-      ({ organization, company }) =>
-        organization.id === selected.organizationId &&
-        company.id === selected.companyId,
-    );
-    if (current) return current;
-  }
-  return companyMemberships[0];
+}
+
+export function findMembership(
+  context: IdentityContext,
+  selected: TenantSelection,
+) {
+  return companyMembershipsFor(context).find(
+    ({ organization, company }) =>
+      organization.id === selected.organizationId &&
+      company.id === selected.companyId,
+  );
 }
 
 export function normalizeApiError(body: unknown) {

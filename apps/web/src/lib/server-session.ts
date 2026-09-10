@@ -1,6 +1,8 @@
 import "server-only";
 import { cookies } from "next/headers";
 import {
+  companyMembershipsFor,
+  findMembership,
   normalizeApiError,
   selectMembership,
   type IdentityContext,
@@ -49,7 +51,21 @@ export async function authenticate(
 
 export async function currentSession() {
   const session = await resolveSession();
-  return { user: session.user, membership: session.membership };
+  return {
+    user: session.user,
+    membership: session.membership,
+    memberships: companyMembershipsFor(session.context),
+  };
+}
+
+export async function changeTenant(selection: TenantSelection) {
+  const session = await resolveSession();
+  const membership = findMembership(session.context, selection);
+  if (!membership)
+    throw new SessionError("No tienes acceso a la empresa seleccionada.", 403);
+  const store = await cookies();
+  writeTenant(store, selection);
+  return membership;
 }
 
 export async function tenantApiRequest(path: string, init?: RequestInit) {
@@ -105,6 +121,7 @@ async function resolveSession() {
     throw new SessionError("Tu usuario no tiene ninguna empresa activa.", 403);
   return {
     accessToken,
+    context,
     user: { id: context.id, email: context.email },
     membership,
   };
@@ -163,6 +180,13 @@ async function writeSession(tokens: TokenPair, tenant: TenantSelection) {
     ...cookieOptions,
     maxAge: 30 * 24 * 60 * 60,
   });
+  writeTenant(store, tenant);
+}
+
+function writeTenant(
+  store: Awaited<ReturnType<typeof cookies>>,
+  tenant: TenantSelection,
+) {
   store.set("pg_tenant", JSON.stringify(tenant), {
     ...cookieOptions,
     maxAge: 30 * 24 * 60 * 60,

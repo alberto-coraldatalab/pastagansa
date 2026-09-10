@@ -3,20 +3,23 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+type ActiveMembership = {
+  organization: { id: string; name: string };
+  company: {
+    id: string;
+    legalName: string;
+    taxId: string;
+    baseCurrency: string;
+  };
+  role: { code: string; name: string; permissions: string[] };
+};
 
 export interface SessionView {
   user: { id: string; email: string };
-  membership: {
-    organization: { id: string; name: string };
-    company: {
-      id: string;
-      legalName: string;
-      taxId: string;
-      baseCurrency: string;
-    };
-    role: { code: string; name: string; permissions: string[] };
-  };
+  membership: ActiveMembership;
+  memberships: ActiveMembership[];
 }
 
 export function AppShell({
@@ -34,6 +37,8 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const [switchingCompany, setSwitchingCompany] = useState(false);
+  const [switchError, setSwitchError] = useState<string>();
   const session = useQuery({
     queryKey: ["session"],
     queryFn: async () => {
@@ -71,6 +76,30 @@ export function AppShell({
     );
 
   const { company, organization } = session.data.membership;
+  async function switchCompany(companyId: string) {
+    const next = session.data!.memberships.find(
+      (membership) => membership.company.id === companyId,
+    );
+    if (!next || next.company.id === company.id) return;
+    setSwitchingCompany(true);
+    setSwitchError(undefined);
+    const response = await fetch("/api/auth/tenant", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        organizationId: next.organization.id,
+        companyId: next.company.id,
+      }),
+    });
+    const body = (await response.json().catch(() => undefined)) as
+      { error?: string } | undefined;
+    if (!response.ok) {
+      setSwitchError(body?.error ?? "No se pudo cambiar de empresa.");
+      setSwitchingCompany(false);
+      return;
+    }
+    window.location.reload();
+  }
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -116,10 +145,39 @@ export function AppShell({
       </aside>
       <main className="workspace">
         <header className="topbar">
-          <div className="company-pill">
-            <span className="status-dot" />
-            {company.legalName}
-          </div>
+          {session.data.memberships.length > 1 ? (
+            <label className="company-switcher">
+              <span>Empresa activa</span>
+              <select
+                aria-describedby={
+                  switchError ? "company-switch-error" : undefined
+                }
+                disabled={switchingCompany}
+                onChange={(event) => void switchCompany(event.target.value)}
+                value={company.id}
+              >
+                {session.data.memberships.map((membership) => (
+                  <option
+                    key={`${membership.organization.id}:${membership.company.id}`}
+                    value={membership.company.id}
+                  >
+                    {membership.company.legalName} ·{" "}
+                    {membership.organization.name}
+                  </option>
+                ))}
+              </select>
+              {switchError ? (
+                <small id="company-switch-error" role="alert">
+                  {switchError}
+                </small>
+              ) : null}
+            </label>
+          ) : (
+            <div className="company-pill">
+              <span className="status-dot" />
+              {company.legalName}
+            </div>
+          )}
           <form action="/api/auth/logout" method="post">
             <button className="text-button" type="submit">
               Cerrar sesión

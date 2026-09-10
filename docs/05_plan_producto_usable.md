@@ -105,8 +105,9 @@ tests del monorepo; registro/login/logout; renovación de sesión mediante cooki
 HTTP-only; descubrimiento autenticado de membresías bajo RLS; selección de la primera
 empresa activa; shell responsive y estados de carga/error. Los E2E críticos ejercitan
 el acceso, la persistencia de sesión y auditorías WCAG automatizadas con axe en acceso,
-inicio y estados clave de venta y compra. Queda pendiente el selector multiempresa para
-superar el gate completo.
+inicio y estados clave de venta y compra. El selector multiempresa solo aparece con más
+de una membresía, valida el nuevo tenant en servidor y recarga todos los datos para no
+mezclar cachés. U1 queda completada.
 
 Entregables:
 

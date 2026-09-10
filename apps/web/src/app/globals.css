@@ -323,6 +323,28 @@ a {
   font-weight: 750;
   gap: 0.5rem;
 }
+.company-switcher {
+  display: grid;
+  gap: 0.2rem;
+}
+.company-switcher > span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+.company-switcher select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  max-width: min(52vw, 420px);
+  min-height: 38px;
+  padding: 0.35rem 2rem 0.35rem 0.65rem;
+}
+.company-switcher small {
+  color: var(--danger);
+  font-size: 0.68rem;
+}
 .status-dot {
   background: var(--lime);
   border-radius: 50%;
