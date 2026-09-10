@@ -39,3 +39,25 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: npm audit --audit-level=high
+      - name: Verify staging images and restore drill
+        env:
+          POSTGRES_ADMIN_PASSWORD: ci-staging-admin-password
+          POSTGRES_APP_PASSWORD: ci-staging-app-password
+          DATABASE_URL: postgresql://pastagansa_app:ci-staging-app-password@postgres:5432/pastagansa?schema=public
+          DIRECT_DATABASE_URL: postgresql://pastagansa_admin:ci-staging-admin-password@postgres:5432/pastagansa?schema=public
+          JWT_SECRET: ci-staging-secret-with-at-least-32-characters
+          WEB_PORT: 3101
+        run: |
+          touch .env.staging
+          ./scripts/staging-up.sh
+          backup_file="$(./scripts/backup-database.sh)"
+          ./scripts/restore-drill.sh "$backup_file"
+      - name: Stop staging stack
+        if: always()
+        env:
+          POSTGRES_ADMIN_PASSWORD: ci-staging-admin-password
+          POSTGRES_APP_PASSWORD: ci-staging-app-password
+          DATABASE_URL: postgresql://pastagansa_app:ci-staging-app-password@postgres:5432/pastagansa?schema=public
+          DIRECT_DATABASE_URL: postgresql://pastagansa_admin:ci-staging-admin-password@postgres:5432/pastagansa?schema=public
+          JWT_SECRET: ci-staging-secret-with-at-least-32-characters
+        run: docker compose --env-file .env.staging -f docker-compose.staging.yml down -v

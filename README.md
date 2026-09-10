@@ -34,3 +34,19 @@ Las pruebas de integración requieren PostgreSQL y todas las migraciones aplicad
 Consulta [la guía del API](apps/api/README.md) para el detalle funcional y
 [el plan de producto usable](docs/05_plan_producto_usable.md) para el orden activo de
 entrega.
+
+## Staging y recuperación
+
+El repositorio incluye imágenes de producción para API/web y un stack reproducible con
+PostgreSQL, migraciones automáticas y healthchecks:
+
+```bash
+cp .env.staging.example .env.staging
+# Sustituye todos los valores replace-with
+./scripts/staging-up.sh
+backup_file="$(./scripts/backup-database.sh)"
+./scripts/restore-drill.sh "$backup_file"
+```
+
+Consulta [la guía de operación](docs/06_operacion_staging.md) antes de exponer el
+entorno, actualizar el esquema o restaurar datos.

@@ -213,7 +213,11 @@ revisar sugerencias y confirmar una conciliación uno-a-uno. El detalle de venta
 si el correo está disponible, evita encolar entregas sin proveedor y ofrece la descarga
 PDF como recorrido soportado; si se configura SMTP conserva el historial observable.
 SMTP real queda aplazado por decisión de producto y deja de bloquear el hito. Faltan
-desplegar staging, ensayar backup/restauración y ejecutar la prueba moderada para cerrar U4.
+publicar el stack en un host accesible y ejecutar la prueba moderada para cerrar U4. El
+stack reproducible de PostgreSQL, API y web ya construye imágenes desde el mismo commit,
+aplica 24 migraciones, espera readiness real y supera el smoke test. El 10/09/2026 se
+ensayó localmente un dump custom y su restauración aislada, verificando migraciones,
+tablas críticas y recuentos de datos; CI repite ese ensayo en cada cambio.
 
 ## Orden inmediato de implementación
 

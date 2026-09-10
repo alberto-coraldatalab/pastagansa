@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+if [ -z "${PASTAGANSA_APP_PASSWORD:-}" ]; then
+  echo "PASTAGANSA_APP_PASSWORD is required" >&2
+  exit 1
+fi
+
+psql --set=ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
+  --set=app_password="$PASTAGANSA_APP_PASSWORD" <<'SQL'
+CREATE ROLE pastagansa_app LOGIN PASSWORD :'app_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+GRANT CONNECT ON DATABASE pastagansa TO pastagansa_app;
+GRANT USAGE ON SCHEMA public TO pastagansa_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO pastagansa_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO pastagansa_app;
+SQL

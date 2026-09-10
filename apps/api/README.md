@@ -75,4 +75,4 @@ npm audit --audit-level=high
 
 The integration suite requires PostgreSQL with all migrations applied. CI provisions PostgreSQL, deploys migrations, and exercises tenant isolation, quotation persistence and races, refresh-token concurrency, revocation, invoice issuance concurrency, supplier-invoice approval and payment, fiscal snapshot immutability, issued/received Tax Ledger posting, automatic and manual accounting entries, reversal, period locking, bank-transaction import and reconciliation, and audit visibility.
 
-OpenAPI is served at `/docs` and Prometheus-format metrics at `/v1/metrics`. Every response receives an `x-request-id`; errors include the same identifier.
+OpenAPI is served at `/docs` and Prometheus-format metrics at `/v1/metrics`. Every response receives an `x-request-id`; errors include the same identifier. `GET /v1/health` checks process liveness, while `GET /v1/health/ready` also verifies a live database query and backs the staging readiness probe.

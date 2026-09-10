@@ -7,6 +7,8 @@ dist
 .env
 .env.*
 !.env.example
+!.env.staging.example
+backups/
 coverage
 .DS_Store
 /tmp/
