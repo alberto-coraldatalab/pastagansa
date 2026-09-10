@@ -12,7 +12,7 @@ export class HealthController {
 
   @Get("ready")
   async ready() {
-    await this.prisma.$queryRaw`SELECT 1`;
+    await this.prisma.$queryRaw`SELECT id FROM "users" LIMIT 1`;
     return { status: "ready" };
   }
 }

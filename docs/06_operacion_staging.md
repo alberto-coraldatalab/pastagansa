@@ -72,9 +72,10 @@ docker compose --env-file .env.staging -f docker-compose.staging.yml logs --tail
 curl --fail http://127.0.0.1:3101/acceso
 ```
 
-La API no publica puertos al host. Su healthcheck usa `/v1/health/ready`, que verifica
-también una consulta real a PostgreSQL. Los logs JSON de la API incluyen el request ID;
-las respuestas devuelven `x-request-id` para correlación.
+La API no publica puertos al host. Su healthcheck usa `/v1/health/ready`, que consulta
+la tabla `users` con el rol de runtime; así detecta tanto una caída de PostgreSQL como
+permisos incompletos en un volumen existente. Los logs JSON de la API incluyen el
+request ID; las respuestas devuelven `x-request-id` para correlación.
 
 ## Backup y ensayo de restauración
 

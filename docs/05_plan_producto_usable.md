@@ -212,7 +212,11 @@ Gate:
 - cero bloqueadores de severidad crítica o alta en el recorrido usable;
 - incidencias de la prueba moderada clasificadas antes de cerrar el hito.
 
-Estado real: en curso. El inicio ya resume ventas emitidas, compras aprobadas y saldos
+Estado real: en curso. El host `ledger.coraldatalab.com` ya responde mediante HTTPS,
+pero la primera aceptación remota detectó que el rol runtime de un volumen existente no
+podía consultar las tablas. La migración 25 repara los grants actuales y futuros, y
+readiness consulta ahora `users` para impedir que ese estado vuelva a parecer sano; se
+debe redesplegar y repetir la aceptación. El inicio ya resume ventas emitidas, compras aprobadas y saldos
 pendientes de cobro/pago con agregados exactos y aislados por tenant. La navegación
 incluye vistas read-only de diario y mayor por periodo y cuenta; el E2E de compra
 comprueba que resumen y libros reflejan los movimientos contabilizados. La vista de
@@ -221,11 +225,12 @@ revisar sugerencias y confirmar una conciliación uno-a-uno. El detalle de venta
 si el correo está disponible, evita encolar entregas sin proveedor y ofrece la descarga
 PDF como recorrido soportado; si se configura SMTP conserva el historial observable.
 SMTP real queda aplazado por decisión de producto y deja de bloquear el hito. Faltan
-publicar el stack en un host accesible y ejecutar la prueba moderada para cerrar U4. El
+superar la aceptación remota tras el redespliegue y ejecutar la prueba moderada para
+cerrar U4. El
 workflow manual de aceptación ya puede ejecutar los dos recorridos y auditorías WCAG
 contra una URL HTTPS externa, con confirmación explícita de escritura. El guion moderado
 define consignas, métricas, evidencias y severidades. El stack reproducible de
-PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 24 migraciones,
+PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 25 migraciones,
 espera readiness real y supera el smoke test. El 10/09/2026 se ensayó localmente un dump
 custom y su restauración aislada, verificando migraciones, tablas críticas y recuentos
 de datos; CI repite ese ensayo en cada cambio.
