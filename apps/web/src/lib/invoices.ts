@@ -41,6 +41,7 @@ export interface Invoice {
   rectificationReason: string | null;
   originalInvoiceId: string | null;
   originalInvoice?: { id: string; fullNumber: string | null } | null;
+  sourceQuote?: { id: string; code: string } | null;
   customerLegalName: string;
   customerTaxId: string | null;
   customerEmail: string | null;

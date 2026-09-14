@@ -93,8 +93,22 @@ test("completes the sales flow from registration to payment", async ({
   await expect(page.getByText("Enviado", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Registrar aceptación" }).click();
   await expect(page.getByText("Aceptado", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Crear factura borrador" }).click();
+  await page.getByRole("button", { name: "Crear factura", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Factura en borrador" }),
+  ).toBeVisible();
+  await expect(page.getByText("Creada desde el presupuesto")).toBeVisible();
+  await page.locator(".notice").getByRole("link", { name: /^PRE-/ }).click();
+  await expect(page.getByText("Convertido", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Convertido", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Ver factura creada" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Factura en borrador" }),
+  ).toBeVisible();
 
-  await page.getByRole("link", { name: /Facturas/ }).click();
+  await page.locator(".sidebar").getByRole("link", { name: /Facturas/ }).click();
   await page
     .locator(".page-heading")
     .getByRole("button", { name: "Nueva factura" })
@@ -105,7 +119,7 @@ test("completes the sales flow from registration to payment", async ({
   await expect(page.getByRole("status")).toContainText(
     "Borrador guardado por 121,00",
   );
-  await page.getByRole("link", { name: "Borrador" }).click();
+  await page.getByRole("link", { name: "Borrador" }).first().click();
   await expect(
     page.getByRole("heading", { name: "Factura en borrador" }),
   ).toBeVisible();

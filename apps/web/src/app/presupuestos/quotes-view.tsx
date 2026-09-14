@@ -93,6 +93,7 @@ export function QuotesView() {
               <option value="REJECTED">Rechazados</option>
               <option value="EXPIRED">Caducados</option>
               <option value="CANCELLED">Cancelados</option>
+              <option value="CONVERTED">Convertidos</option>
             </select>
           </label>
         </div>

@@ -23,5 +23,6 @@ import { SifModule } from "../sif/sif.module";
     SmtpInvoiceMailer,
     InvoiceEmailOutboxWorker,
   ],
+  exports: [InvoicesService],
 })
 export class InvoicesModule {}

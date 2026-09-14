@@ -311,6 +311,44 @@ describe("platform integrity", () => {
     expect(Buffer.isBuffer(quotePdf.body)).toBe(true);
     expect(quotePdf.body.subarray(0, 5).toString()).toBe("%PDF-");
 
+    const acceptedQuote = await authed(accountA.accessToken, tenantA)
+      .post("/v1/quotes")
+      .send(quote(contactA.body.id))
+      .expect(201);
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/quotes/${acceptedQuote.body.id}/status`)
+      .send({ expectedStatus: "DRAFT", status: "SENT" })
+      .expect(200);
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/quotes/${acceptedQuote.body.id}/status`)
+      .send({ expectedStatus: "SENT", status: "ACCEPTED" })
+      .expect(200);
+    const conversions = await Promise.all(
+      Array.from({ length: 2 }, () =>
+        authed(accountA.accessToken, tenantA)
+          .post(`/v1/quotes/${acceptedQuote.body.id}/convert-to-invoice`)
+          .send({ issueDate: "2026-09-09", dueDate: "2026-10-09" }),
+      ),
+    );
+    expect(conversions.map(({ status }) => status)).toEqual([200, 200]);
+    expect(conversions[0].body.id).toBe(conversions[1].body.id);
+    expect(conversions[0].body).toMatchObject({
+      status: "DRAFT",
+      customerLegalName: "Customer A",
+      total: "121",
+    });
+    const convertedQuote = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/quotes/${acceptedQuote.body.id}`)
+      .expect(200);
+    expect(convertedQuote.body.convertedInvoice.id).toBe(
+      conversions[0].body.id,
+    );
+    expect(convertedQuote.body.status).toBe("CONVERTED");
+    await authed(accountA.accessToken, tenantB)
+      .post(`/v1/quotes/${acceptedQuote.body.id}/convert-to-invoice`)
+      .send({ issueDate: "2026-09-09" })
+      .expect(403);
+
     const sequence = await authed(accountA.accessToken, tenantA)
       .post("/v1/document-sequences")
       .send({ documentType: "INVOICE", series: "F2026", padding: 5 })

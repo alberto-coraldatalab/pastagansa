@@ -97,6 +97,7 @@ export class InvoicesService {
         },
         installments: { orderBy: { position: "asc" } },
         originalInvoice: { select: { id: true, fullNumber: true } },
+        sourceQuote: { select: { id: true, code: true } },
       },
     });
     if (!invoice) throw new NotFoundException("Invoice not found");

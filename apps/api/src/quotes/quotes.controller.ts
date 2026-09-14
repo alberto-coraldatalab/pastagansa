@@ -19,6 +19,7 @@ import {
 } from "./dto/quote.dto";
 import { QuotesService } from "./quotes.service";
 import { ListQuotesDto } from "./dto/list-quotes.dto";
+import { ConvertQuoteDto } from "./dto/convert-quote.dto";
 @Controller("quotes")
 @TenantProtected()
 export class QuotesController {
@@ -60,5 +61,14 @@ export class QuotesController {
     @Body() input: ChangeQuoteStatusDto,
   ) {
     return this.quotes.changeStatus(id, input.status, input.expectedStatus);
+  }
+  @Post(":id/convert-to-invoice")
+  @HttpCode(200)
+  @RequirePermissions("quote.change_status", "invoice.create")
+  convertToInvoice(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: ConvertQuoteDto,
+  ) {
+    return this.quotes.convertToInvoice(id, input);
   }
 }

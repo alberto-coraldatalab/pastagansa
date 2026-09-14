@@ -28,6 +28,7 @@ import {
   sifInvoiceTypeLabel,
 } from "@/lib/invoices";
 import { InvoiceDialog } from "../invoices-view";
+import { quoteCode } from "@/lib/quotes";
 
 export function InvoiceDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -164,6 +165,15 @@ export function InvoiceDetail({ id }: { id: string }) {
             <strong>{sifInvoiceTypeLabel(document.sifInvoiceType)}</strong>
           </article>
         </section>
+      )}
+      {document.sourceQuote && (
+        <div className="notice" role="status">
+          <span>↗</span>
+          Creada desde el presupuesto
+          <Link href={`/presupuestos/${document.sourceQuote.id}`}>
+            {quoteCode(document.sourceQuote.code)}
+          </Link>
+        </div>
       )}
       {notice && (
         <div className="notice" role="status">

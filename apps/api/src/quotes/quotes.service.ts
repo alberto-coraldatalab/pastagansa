@@ -17,6 +17,8 @@ import { CreateQuoteDto, QuoteLineDto, UpdateQuoteDto } from "./dto/quote.dto";
 import { ListQuotesDto } from "./dto/list-quotes.dto";
 import { decodeCursor, encodeCursor } from "../common/cursor";
 import { QuotePdfService } from "./quote-pdf.service";
+import { InvoicesService } from "../invoices/invoices.service";
+import { ConvertQuoteDto } from "./dto/convert-quote.dto";
 
 @Injectable()
 export class QuotesService {
@@ -24,6 +26,7 @@ export class QuotesService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     private readonly quotePdf: QuotePdfService,
+    private readonly invoices: InvoicesService,
   ) {}
 
   async list(query: ListQuotesDto) {
@@ -70,7 +73,10 @@ export class QuotesService {
   async get(id: string) {
     const quote = await this.tenant.db.quote.findFirst({
       where: { id, ...this.scope() },
-      include: { lines: { orderBy: { position: "asc" } } },
+      include: {
+        lines: { orderBy: { position: "asc" } },
+        convertedInvoice: { select: { id: true, draftCode: true, status: true } },
+      },
     });
     if (!quote) throw new NotFoundException("Quote not found");
     return quote;
@@ -158,6 +164,52 @@ export class QuotesService {
       to: status,
     });
     return this.get(id);
+  }
+
+  async convertToInvoice(id: string, input: ConvertQuoteDto) {
+    if (input.dueDate && input.dueDate < input.issueDate)
+      throw new BadRequestException("dueDate cannot precede issueDate");
+    const scope = this.scope();
+    const locked = await this.tenant.db.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "quotes"
+      WHERE "id" = CAST(${id} AS uuid)
+        AND "organization_id" = CAST(${scope.organizationId} AS uuid)
+        AND "company_id" = CAST(${scope.companyId} AS uuid)
+      FOR UPDATE
+    `;
+    if (!locked.length) throw new NotFoundException("Quote not found");
+    const quote = await this.tenant.db.quote.findFirstOrThrow({
+      where: { id, ...scope },
+      include: { lines: { orderBy: { position: "asc" } } },
+    });
+    if (quote.convertedInvoiceId)
+      return this.invoices.get(quote.convertedInvoiceId);
+    if (quote.status !== QuoteStatus.ACCEPTED)
+      throw new ConflictException("Only an accepted quote can be converted");
+
+    const invoice = await this.invoices.create({
+      contactId: quote.contactId,
+      issueDate: input.issueDate,
+      dueDate: input.dueDate,
+      currency: quote.currency,
+      notes: quote.notes ?? undefined,
+      lines: quote.lines.map((line) => ({
+        catalogItemId: line.catalogItemId ?? undefined,
+        description: line.description,
+        quantity: Number(line.quantity),
+        unitPrice: Number(line.unitPrice),
+        discountPct: Number(line.discountPct),
+        taxRate: Number(line.taxRate),
+      })),
+    });
+    await this.tenant.db.quote.update({
+      where: { id },
+      data: { convertedInvoiceId: invoice.id, status: QuoteStatus.CONVERTED },
+    });
+    await this.audit.record("quote.converted_to_invoice", "quote", id, {
+      invoiceId: invoice.id,
+    });
+    return invoice;
   }
 
   private async build(input: CreateQuoteDto) {

@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect } from "react";
 import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { formatMoney } from "@/lib/catalog";
@@ -31,9 +33,11 @@ const actions: Partial<Record<QuoteStatus, StatusAction[]>> = {
 };
 
 export function QuoteDetail({ id }: { id: string }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [converting, setConverting] = useState(false);
   const quote = useQuery({
     queryKey: ["quote", id],
     queryFn: () => requestJson<Quote>(`/api/quotes/${id}`),
@@ -64,6 +68,27 @@ export function QuoteDetail({ id }: { id: string }) {
       queryClient.setQueryData(["quote", id], updated);
       await queryClient.invalidateQueries({ queryKey: ["quotes"] });
       setNotice(`El presupuesto ahora figura como ${quoteStatusLabel(updated.status).toLowerCase()}.`);
+    },
+  });
+  const convertQuote = useMutation({
+    mutationFn: (input: { issueDate: string; dueDate?: string }) =>
+      requestJson<{ id: string; draftCode: string; status: string }>(`/api/quotes/${id}/convert-to-invoice`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async (invoice) => {
+      queryClient.setQueryData<Quote>(["quote", id], (current) =>
+        current
+          ? {
+              ...current,
+              status: "CONVERTED",
+              convertedInvoice: invoice,
+            }
+          : current,
+      );
+      await queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      router.push(`/facturas/${invoice.id}`);
     },
   });
 
@@ -100,6 +125,15 @@ export function QuoteDetail({ id }: { id: string }) {
           {document.status === "DRAFT" && (
             <button className="secondary-button" onClick={() => setEditing(true)}>Editar borrador</button>
           )}
+          {document.convertedInvoice ? (
+            <Link className="primary-link compact" href={`/facturas/${document.convertedInvoice.id}`}>
+              Ver factura creada
+            </Link>
+          ) : document.status === "ACCEPTED" ? (
+            <button className="primary-button compact" onClick={() => setConverting(true)}>
+              Crear factura borrador
+            </button>
+          ) : null}
           <a className="secondary-button" href={`/api/quotes/${id}/pdf`} download>Descargar PDF</a>
           {availableActions.map((action) => (
             <button
@@ -163,7 +197,69 @@ export function QuoteDetail({ id }: { id: string }) {
           onSubmit={(payload) => updateQuote.mutate(payload)}
         />
       )}
+      {converting && (
+        <ConversionDialog
+          pending={convertQuote.isPending}
+          error={convertQuote.error?.message}
+          onClose={() => { setConverting(false); convertQuote.reset(); }}
+          onSubmit={(input) => convertQuote.mutate(input)}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function ConversionDialog({
+  pending,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  pending: boolean;
+  error?: string;
+  onClose(): void;
+  onSubmit(input: { issueDate: string; dueDate?: string }): void;
+}) {
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !pending) onClose();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, pending]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    onSubmit({
+      issueDate: String(values.get("issueDate")),
+      dueDate: String(values.get("dueDate") ?? "") || undefined,
+    });
+  }
+
+  return (
+    <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget && !pending) onClose();
+    }}>
+      <section className="dialog payment-dialog" role="dialog" aria-modal="true" aria-labelledby="conversion-title">
+        <header>
+          <div><p className="eyebrow">Presupuesto aceptado</p><h2 id="conversion-title">Crear factura borrador</h2></div>
+          <button className="icon-button" onClick={onClose} disabled={pending} aria-label="Cerrar">×</button>
+        </header>
+        <form className="invoice-form" onSubmit={submit}>
+          <p className="dialog-helper">Se copiarán el cliente, los conceptos, impuestos y condiciones. Podrás revisar el borrador antes de emitirlo.</p>
+          <div className="payment-fields">
+            <label className="field"><span>Fecha de factura</span><input name="issueDate" type="date" defaultValue={today()} required /></label>
+            <label className="field"><span>Vencimiento (opcional)</span><input name="dueDate" type="date" min={today()} /></label>
+          </div>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <div className="dialog-actions">
+            <button type="button" className="secondary-button" onClick={onClose} disabled={pending}>Cancelar</button>
+            <button type="submit" className="primary-button compact" disabled={pending}>{pending ? "Creando…" : "Crear factura"}</button>
+          </div>
+        </form>
+      </section>
+    </div>
   );
 }
 
@@ -176,4 +272,8 @@ async function requestJson<T>(path: string, init?: RequestInit) {
 
 function formatQuantity(value: string) {
   return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 3 }).format(Number(value));
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
 }

@@ -252,7 +252,7 @@ incidencia media —no poder convertir un cliente en proveedor desde la web— y
 staging. El workflow manual de aceptación puede ejecutar los dos recorridos y auditorías WCAG
 contra una URL HTTPS externa, con confirmación explícita de escritura. El guion moderado
 define consignas, métricas, evidencias y severidades. El stack reproducible de
-PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 26 migraciones,
+PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 30 migraciones,
 espera readiness real y supera el smoke test. El 10/09/2026 se ensayó localmente un dump
 custom y su restauración aislada, verificando migraciones, tablas críticas y recuentos
 de datos; CI repite ese ensayo en cada cambio.
@@ -265,12 +265,14 @@ cliente antes de facturar.
 Estado real: en curso. El API ya conservaba líneas, totales, snapshot del cliente,
 PDF y transiciones atómicas. La web expone ahora listado paginado y filtrable, alta y
 edición de borradores con catálogo o concepto libre, plazo de validez, condiciones,
-descarga PDF y los estados enviado, aceptado, rechazado, caducado y cancelado. El E2E
-de venta cubre creación, PDF y aceptación, incluida una auditoría WCAG del borrador.
+descarga PDF y los estados enviado, aceptado, rechazado, caducado y cancelado. Un
+presupuesto aceptado se convierte de forma atómica e idempotente en factura borrador,
+copiando cliente, conceptos, condiciones e impuestos y manteniendo navegación entre
+ambos documentos. El E2E de venta cubre creación, PDF, aceptación y conversión,
+incluida una auditoría WCAG del borrador.
 
 Pendiente para cerrar U5:
 
-- convertir un presupuesto aceptado en factura borrador sin reintroducir líneas;
 - sustituir el identificador técnico por una serie/numeración comercial configurable;
 - validar el recorrido actualizado en staging.
 

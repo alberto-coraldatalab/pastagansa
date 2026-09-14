@@ -60,6 +60,7 @@ enum QuoteStatus {
   REJECTED
   EXPIRED
   CANCELLED
+  CONVERTED
 }
 
 enum DocumentType {
@@ -420,6 +421,7 @@ model Invoice {
   taxLines            InvoiceTaxLine[]
   taxLedgerEntry      TaxLedgerEntry?
   sifRecords          SifRecord[]
+  sourceQuote         Quote?
 
   @@unique([companyId, draftCode])
   @@unique([companyId, series, number])
@@ -1208,6 +1210,7 @@ model Quote {
   organizationId    String       @map("organization_id") @db.Uuid
   companyId         String       @map("company_id") @db.Uuid
   contactId         String       @map("contact_id") @db.Uuid
+  convertedInvoiceId String?     @map("converted_invoice_id") @db.Uuid
   customerLegalName String       @map("customer_legal_name") @db.VarChar(240)
   customerTaxId     String?      @map("customer_tax_id") @db.VarChar(40)
   billingAddress    Json?        @map("billing_address")
@@ -1226,9 +1229,11 @@ model Quote {
   organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company           Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
   contact           Contact      @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  convertedInvoice  Invoice?     @relation(fields: [convertedInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   lines             QuoteLine[]
 
   @@unique([companyId, code])
+  @@unique([convertedInvoiceId, organizationId, companyId])
   @@index([companyId, status, issueDate])
   @@map("quotes")
 }

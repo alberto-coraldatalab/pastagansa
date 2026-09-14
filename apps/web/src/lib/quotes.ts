@@ -27,6 +27,7 @@ export const quoteStatuses = [
   "REJECTED",
   "EXPIRED",
   "CANCELLED",
+  "CONVERTED",
 ] as const;
 
 export type QuoteStatus = (typeof quoteStatuses)[number];
@@ -46,6 +47,11 @@ export interface Quote {
   taxTotal: string;
   total: string;
   notes: string | null;
+  convertedInvoice: {
+    id: string;
+    draftCode: string;
+    status: string;
+  } | null;
   lines?: Array<{
     id: string;
     catalogItemId: string | null;
@@ -73,6 +79,7 @@ export function quoteStatusLabel(status: QuoteStatus) {
     REJECTED: "Rechazado",
     EXPIRED: "Caducado",
     CANCELLED: "Cancelado",
+    CONVERTED: "Convertido",
   }[status];
 }
 
