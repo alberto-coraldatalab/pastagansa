@@ -209,6 +209,21 @@ describe("invoice issuance concurrency", () => {
           where: { companyId: tenant.companyId, status: "ISSUED" },
         }),
       ).toBe(101);
+      const sifRecords = await db.sifRecord.findMany({
+        where: { companyId: tenant.companyId },
+        orderBy: { chainPosition: "asc" },
+      });
+      expect(sifRecords).toHaveLength(101);
+      sifRecords.forEach((record, index) => {
+        expect(record.chainPosition).toBe(BigInt(index + 1));
+        expect(record.recordHash).toMatch(/^[0-9A-F]{64}$/);
+        expect(record.previousRecordId).toBe(
+          index === 0 ? null : sifRecords[index - 1].id,
+        );
+        expect(record.previousRecordHash).toBe(
+          index === 0 ? null : sifRecords[index - 1].recordHash,
+        );
+      });
     });
     await expect(
       admin.invoice.update({
@@ -231,6 +246,18 @@ describe("invoice issuance concurrency", () => {
     await expect(
       admin.invoiceLine.delete({ where: { id: issuedLine.id } }),
     ).rejects.toThrow(/issued invoice lines are immutable/);
+    const sifRecord = await admin.sifRecord.findFirstOrThrow({
+      where: { invoiceId: drafts[0] },
+    });
+    await expect(
+      admin.sifRecord.update({
+        where: { id: sifRecord.id },
+        data: { payload: { tampered: true } },
+      }),
+    ).rejects.toThrow(/SIF records are append-only/);
+    await expect(
+      admin.sifRecord.delete({ where: { id: sifRecord.id } }),
+    ).rejects.toThrow(/SIF records are append-only/);
   });
 
   function tenantRequest(

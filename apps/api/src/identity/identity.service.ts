@@ -68,6 +68,7 @@ export class IdentityService {
           ["payment.create", "Record invoice payments"],
           ["tax_rule.read", "Read versioned tax rules"],
           ["tax_ledger.read", "Read tax ledger"],
+          ["sif_record.read", "Read SIF records"],
           ["purchase_invoice.read", "Read purchase invoices"],
           ["purchase_invoice.create", "Create purchase invoices"],
           ["purchase_invoice.update", "Update purchase invoices"],

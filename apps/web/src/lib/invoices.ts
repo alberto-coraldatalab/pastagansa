@@ -151,6 +151,17 @@ export interface InvoiceTrace {
       taxAmount: string;
     }>;
   };
+  sifRecord: null | {
+    id: string;
+    recordType: "REGISTRATION" | "CANCELLATION";
+    chainPosition: string;
+    invoiceType: string;
+    generatedAt: string;
+    previousRecordHash: string | null;
+    recordHash: string;
+    hashAlgorithm: string;
+    specificationVersion: string;
+  };
 }
 
 export interface InvoicePage {

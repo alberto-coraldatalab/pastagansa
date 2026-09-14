@@ -10,9 +10,10 @@ import { InvoiceEmailOutboxWorker } from "./invoice-email-outbox.worker";
 import { SmtpInvoiceMailer } from "./smtp-invoice-mailer.service";
 import { TaxModule } from "../tax/tax.module";
 import { AccountingModule } from "../accounting/accounting.module";
+import { SifModule } from "../sif/sif.module";
 
 @Module({
-  imports: [AuditModule, TaxModule, AccountingModule],
+  imports: [AuditModule, TaxModule, AccountingModule, SifModule],
   controllers: [DocumentSequencesController, InvoicesController],
   providers: [
     DocumentSequencesService,

@@ -127,6 +127,9 @@ test("completes the sales flow from registration to payment", async ({
   await page.getByRole("link", { name: "Ver trazabilidad" }).click();
   await expect(page.getByText(/Asiento #\d+/)).toBeVisible();
   await expect(page.getByText("Libro de IVA")).toBeVisible();
+  await expect(page.getByText("Registro SIF")).toBeVisible();
+  await expect(page.getByText(/Alta · posición 1/)).toBeVisible();
+  await expect(page.getByText(/AEAT-HASH-0\.1\.2/)).toBeVisible();
 });
 
 test("completes a purchase through payment and bank reconciliation", async ({

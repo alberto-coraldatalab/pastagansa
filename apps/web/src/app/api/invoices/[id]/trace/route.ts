@@ -21,9 +21,13 @@ export async function GET(
     );
     if (!tax.ok) return apiError(tax);
     const taxPage = (await tax.json()) as { data: unknown[] };
+    const sif = await tenantApiRequest(`/v1/sif/records?invoiceId=${id.data}`);
+    if (!sif.ok) return apiError(sif);
+    const sifRecords = (await sif.json()) as unknown[];
     return NextResponse.json({
       journalEntry: journalPage.data[0] ?? null,
       taxEntry: taxPage.data[0] ?? null,
+      sifRecord: sifRecords[0] ?? null,
     });
   } catch (error) {
     if (error instanceof SessionError)

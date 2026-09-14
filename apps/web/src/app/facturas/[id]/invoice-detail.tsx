@@ -601,10 +601,42 @@ function TracePanel({ invoice }: { invoice: Invoice }) {
               <strong>No encontrado</strong>
             )}
           </article>
+          <article>
+            <span>Registro SIF</span>
+            {trace.data.sifRecord ? (
+              <>
+                <strong>
+                  Alta · posición {trace.data.sifRecord.chainPosition}
+                </strong>
+                <small>
+                  {trace.data.sifRecord.hashAlgorithm} · tipo{" "}
+                  {trace.data.sifRecord.invoiceType}
+                </small>
+                <dl>
+                  <div>
+                    <dt>Huella</dt>
+                    <dd title={trace.data.sifRecord.recordHash}>
+                      {shortHash(trace.data.sifRecord.recordHash)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Especificación</dt>
+                    <dd>{trace.data.sifRecord.specificationVersion}</dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <strong>No encontrado</strong>
+            )}
+          </article>
         </div>
       )}
     </section>
   );
+}
+
+function shortHash(value: string) {
+  return `${value.slice(0, 12)}…${value.slice(-8)}`;
 }
 
 function PaymentsPanel({ invoice }: { invoice: Invoice }) {

@@ -117,6 +117,11 @@ enum TaxBookType {
   RECEIVED_INVOICES
 }
 
+enum SifRecordType {
+  REGISTRATION
+  CANCELLATION
+}
+
 enum PurchaseInvoiceStatus {
   DRAFT
   PENDING_APPROVAL
@@ -179,92 +184,94 @@ enum BankTransactionStatus {
 }
 
 model Organization {
-  id                   String                       @id @default(uuid()) @db.Uuid
-  name                 String
-  createdAt            DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
-  companies            Company[]
-  memberships          Membership[]
-  auditEvents          AuditEvent[]
-  contacts             Contact[]
-  quotes               Quote[]
-  contactAddresses     ContactAddress[]
-  catalogItems         CatalogItem[]
-  documentSequences    DocumentSequence[]
-  invoices             Invoice[]
-  invoiceDeliveries    InvoiceEmailDelivery[]
-  invoiceInstallments  InvoiceInstallment[]
-  payments             Payment[]
-  paymentAllocations   PaymentAllocation[]
-  invoiceTaxLines      InvoiceTaxLine[]
-  taxLedgerEntries     TaxLedgerEntry[]
-  taxLedgerAmounts     TaxLedgerAmount[]
-  purchaseInvoices     PurchaseInvoice[]
-  purchaseInvoiceLines PurchaseInvoiceLine[]
-  purchaseTaxLines     PurchaseTaxLine[]
-  purchaseInstallments PurchaseInvoiceInstallment[]
-  purchaseAttachments  PurchaseInvoiceAttachment[]
+  id                    String                       @id @default(uuid()) @db.Uuid
+  name                  String
+  createdAt             DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  companies             Company[]
+  memberships           Membership[]
+  auditEvents           AuditEvent[]
+  contacts              Contact[]
+  quotes                Quote[]
+  contactAddresses      ContactAddress[]
+  catalogItems          CatalogItem[]
+  documentSequences     DocumentSequence[]
+  invoices              Invoice[]
+  invoiceDeliveries     InvoiceEmailDelivery[]
+  invoiceInstallments   InvoiceInstallment[]
+  payments              Payment[]
+  paymentAllocations    PaymentAllocation[]
+  invoiceTaxLines       InvoiceTaxLine[]
+  taxLedgerEntries      TaxLedgerEntry[]
+  taxLedgerAmounts      TaxLedgerAmount[]
+  sifRecords            SifRecord[]
+  purchaseInvoices      PurchaseInvoice[]
+  purchaseInvoiceLines  PurchaseInvoiceLine[]
+  purchaseTaxLines      PurchaseTaxLine[]
+  purchaseInstallments  PurchaseInvoiceInstallment[]
+  purchaseAttachments   PurchaseInvoiceAttachment[]
   purchaseApprovalTiers PurchaseApprovalTier[]
   purchaseApprovals     PurchaseInvoiceApproval[]
   purchaseOcrJobs       PurchaseInvoiceOcrJob[]
-  supplierAllocations  SupplierPaymentAllocation[]
-  accounts             Account[]
-  fiscalYears          FiscalYear[]
-  accountingPeriods    AccountingPeriod[]
-  journalEntries       JournalEntry[]
-  journalLines         JournalLine[]
-  accountingRules      AccountingRule[]
-  supplierPayments     SupplierPayment[]
-  bankAccounts         BankAccount[]
-  bankTransactions     BankTransaction[]
-  bankReconciliations  BankReconciliation[]
+  supplierAllocations   SupplierPaymentAllocation[]
+  accounts              Account[]
+  fiscalYears           FiscalYear[]
+  accountingPeriods     AccountingPeriod[]
+  journalEntries        JournalEntry[]
+  journalLines          JournalLine[]
+  accountingRules       AccountingRule[]
+  supplierPayments      SupplierPayment[]
+  bankAccounts          BankAccount[]
+  bankTransactions      BankTransaction[]
+  bankReconciliations   BankReconciliation[]
 
   @@map("organizations")
 }
 
 model Company {
-  id                   String                       @id @default(uuid()) @db.Uuid
-  organizationId       String                       @map("organization_id") @db.Uuid
-  legalName            String                       @map("legal_name")
-  taxId                String                       @map("tax_id") @db.VarChar(40)
-  country              String                       @default("ES") @db.Char(2)
-  baseCurrency         String                       @default("EUR") @map("base_currency") @db.Char(3)
-  timezone             String                       @default("Europe/Madrid") @db.VarChar(64)
-  createdAt            DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
-  organization         Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  memberships          Membership[]
-  auditEvents          AuditEvent[]
-  contacts             Contact[]
-  quotes               Quote[]
-  contactAddresses     ContactAddress[]
-  catalogItems         CatalogItem[]
-  documentSequences    DocumentSequence[]
-  invoices             Invoice[]
-  invoiceDeliveries    InvoiceEmailDelivery[]
-  invoiceInstallments  InvoiceInstallment[]
-  payments             Payment[]
-  paymentAllocations   PaymentAllocation[]
-  invoiceTaxLines      InvoiceTaxLine[]
-  taxLedgerEntries     TaxLedgerEntry[]
-  taxLedgerAmounts     TaxLedgerAmount[]
-  purchaseInvoices     PurchaseInvoice[]
-  purchaseInvoiceLines PurchaseInvoiceLine[]
-  purchaseTaxLines     PurchaseTaxLine[]
-  purchaseInstallments PurchaseInvoiceInstallment[]
-  purchaseAttachments  PurchaseInvoiceAttachment[]
+  id                    String                       @id @default(uuid()) @db.Uuid
+  organizationId        String                       @map("organization_id") @db.Uuid
+  legalName             String                       @map("legal_name")
+  taxId                 String                       @map("tax_id") @db.VarChar(40)
+  country               String                       @default("ES") @db.Char(2)
+  baseCurrency          String                       @default("EUR") @map("base_currency") @db.Char(3)
+  timezone              String                       @default("Europe/Madrid") @db.VarChar(64)
+  createdAt             DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization          Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships           Membership[]
+  auditEvents           AuditEvent[]
+  contacts              Contact[]
+  quotes                Quote[]
+  contactAddresses      ContactAddress[]
+  catalogItems          CatalogItem[]
+  documentSequences     DocumentSequence[]
+  invoices              Invoice[]
+  invoiceDeliveries     InvoiceEmailDelivery[]
+  invoiceInstallments   InvoiceInstallment[]
+  payments              Payment[]
+  paymentAllocations    PaymentAllocation[]
+  invoiceTaxLines       InvoiceTaxLine[]
+  taxLedgerEntries      TaxLedgerEntry[]
+  taxLedgerAmounts      TaxLedgerAmount[]
+  sifRecords            SifRecord[]
+  purchaseInvoices      PurchaseInvoice[]
+  purchaseInvoiceLines  PurchaseInvoiceLine[]
+  purchaseTaxLines      PurchaseTaxLine[]
+  purchaseInstallments  PurchaseInvoiceInstallment[]
+  purchaseAttachments   PurchaseInvoiceAttachment[]
   purchaseApprovalTiers PurchaseApprovalTier[]
   purchaseApprovals     PurchaseInvoiceApproval[]
   purchaseOcrJobs       PurchaseInvoiceOcrJob[]
-  supplierAllocations  SupplierPaymentAllocation[]
-  accounts             Account[]
-  fiscalYears          FiscalYear[]
-  accountingPeriods    AccountingPeriod[]
-  journalEntries       JournalEntry[]
-  journalLines         JournalLine[]
-  accountingRules      AccountingRule[]
-  supplierPayments     SupplierPayment[]
-  bankAccounts         BankAccount[]
-  bankTransactions     BankTransaction[]
-  bankReconciliations  BankReconciliation[]
+  supplierAllocations   SupplierPaymentAllocation[]
+  accounts              Account[]
+  fiscalYears           FiscalYear[]
+  accountingPeriods     AccountingPeriod[]
+  journalEntries        JournalEntry[]
+  journalLines          JournalLine[]
+  accountingRules       AccountingRule[]
+  supplierPayments      SupplierPayment[]
+  bankAccounts          BankAccount[]
+  bankTransactions      BankTransaction[]
+  bankReconciliations   BankReconciliation[]
 
   @@unique([organizationId, taxId])
   @@index([organizationId])
@@ -332,19 +339,19 @@ model Contact {
 }
 
 model DocumentSequence {
-  id               String            @id @default(uuid()) @db.Uuid
-  organizationId   String            @map("organization_id") @db.Uuid
-  companyId        String            @map("company_id") @db.Uuid
-  documentType     DocumentType      @map("document_type")
-  series           String            @db.VarChar(30)
-  nextNumber       BigInt            @default(1) @map("next_number")
-  padding          Int               @default(4)
-  active           Boolean           @default(true)
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company          Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  invoices         Invoice[]
+  id                      String            @id @default(uuid()) @db.Uuid
+  organizationId          String            @map("organization_id") @db.Uuid
+  companyId               String            @map("company_id") @db.Uuid
+  documentType            DocumentType      @map("document_type")
+  series                  String            @db.VarChar(30)
+  nextNumber              BigInt            @default(1) @map("next_number")
+  padding                 Int               @default(4)
+  active                  Boolean           @default(true)
+  createdAt               DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization            Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company                 Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invoices                Invoice[]
   purchaseInvoices        PurchaseInvoice[] @relation("PurchaseReceptionSequence")
   pendingPurchaseInvoices PurchaseInvoice[] @relation("PurchaseRequestedSequence")
 
@@ -402,6 +409,7 @@ model Invoice {
   paymentAllocations  PaymentAllocation[]
   taxLines            InvoiceTaxLine[]
   taxLedgerEntry      TaxLedgerEntry?
+  sifRecords          SifRecord[]
 
   @@unique([companyId, draftCode])
   @@unique([companyId, series, number])
@@ -410,6 +418,41 @@ model Invoice {
   @@index([companyId, status, issueDate])
   @@index([originalInvoiceId, createdAt])
   @@map("invoices")
+}
+
+model SifRecord {
+  id                   String        @id @default(uuid()) @db.Uuid
+  organizationId       String        @map("organization_id") @db.Uuid
+  companyId            String        @map("company_id") @db.Uuid
+  invoiceId            String        @map("invoice_id") @db.Uuid
+  recordType           SifRecordType @map("record_type")
+  chainPosition        BigInt        @map("chain_position")
+  issuerTaxId          String        @map("issuer_tax_id") @db.VarChar(40)
+  invoiceNumber        String        @map("invoice_number") @db.VarChar(80)
+  invoiceIssueDate     DateTime      @map("invoice_issue_date") @db.Date
+  invoiceType          String        @map("invoice_type") @db.VarChar(2)
+  taxTotal             Decimal       @map("tax_total") @db.Decimal(14, 2)
+  total                Decimal       @db.Decimal(14, 2)
+  generatedAt          DateTime      @map("generated_at") @db.Timestamptz(6)
+  previousRecordId     String?       @map("previous_record_id") @db.Uuid
+  previousRecordHash   String?       @map("previous_record_hash") @db.Char(64)
+  recordHash           String        @map("record_hash") @db.Char(64)
+  hashAlgorithm        String        @default("SHA-256") @map("hash_algorithm") @db.VarChar(20)
+  specificationVersion String        @default("AEAT-HASH-0.1.2") @map("specification_version") @db.VarChar(40)
+  payload              Json
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization         Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company              Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invoice              Invoice       @relation(fields: [invoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  previousRecord       SifRecord?    @relation("SifRecordChain", fields: [previousRecordId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  nextRecords          SifRecord[]   @relation("SifRecordChain")
+
+  @@unique([companyId, invoiceId, recordType])
+  @@unique([companyId, chainPosition])
+  @@unique([previousRecordId])
+  @@unique([id, organizationId, companyId])
+  @@index([companyId, generatedAt, id])
+  @@map("sif_records")
 }
 
 model TaxRule {
@@ -634,21 +677,21 @@ model PurchaseInvoiceApproval {
 }
 
 model PurchaseInvoiceAttachment {
-  id                String          @id @default(uuid()) @db.Uuid
-  organizationId    String          @map("organization_id") @db.Uuid
-  companyId         String          @map("company_id") @db.Uuid
-  purchaseInvoiceId String          @map("purchase_invoice_id") @db.Uuid
-  originalName      String          @map("original_name") @db.VarChar(240)
-  mediaType         String          @map("media_type") @db.VarChar(100)
-  sizeBytes         Int             @map("size_bytes")
-  sha256            String          @db.Char(64)
-  content           Bytes           @db.ByteA
-  createdById       String          @map("created_by_id") @db.Uuid
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
-  createdBy         User            @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  id                String                 @id @default(uuid()) @db.Uuid
+  organizationId    String                 @map("organization_id") @db.Uuid
+  companyId         String                 @map("company_id") @db.Uuid
+  purchaseInvoiceId String                 @map("purchase_invoice_id") @db.Uuid
+  originalName      String                 @map("original_name") @db.VarChar(240)
+  mediaType         String                 @map("media_type") @db.VarChar(100)
+  sizeBytes         Int                    @map("size_bytes")
+  sha256            String                 @db.Char(64)
+  content           Bytes                  @db.ByteA
+  createdById       String                 @map("created_by_id") @db.Uuid
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company                @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseInvoice   PurchaseInvoice        @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  createdBy         User                   @relation(fields: [createdById], references: [id], onDelete: Restrict)
   ocrJob            PurchaseInvoiceOcrJob?
 
   @@unique([purchaseInvoiceId, sha256])
@@ -658,33 +701,33 @@ model PurchaseInvoiceAttachment {
 }
 
 model PurchaseInvoiceOcrJob {
-  id                String          @id @default(uuid()) @db.Uuid
-  organizationId    String          @map("organization_id") @db.Uuid
-  companyId         String          @map("company_id") @db.Uuid
-  purchaseInvoiceId String          @map("purchase_invoice_id") @db.Uuid
-  attachmentId      String          @unique @map("attachment_id") @db.Uuid
-  status            PurchaseOcrStatus @default(PENDING)
-  engine            String          @default("tesseract.js") @db.VarChar(80)
-  engineVersion     String          @default("7.0.0") @map("engine_version") @db.VarChar(40)
-  rawText           String?         @map("raw_text")
-  extractedFields   Json?           @map("extracted_fields")
-  overallConfidence Decimal?        @map("overall_confidence") @db.Decimal(5, 2)
-  reviewFields      Json?           @map("review_fields")
-  requestedById     String          @map("requested_by_id") @db.Uuid
-  reviewedById      String?         @map("reviewed_by_id") @db.Uuid
-  reviewedAt        DateTime?       @map("reviewed_at") @db.Timestamptz(6)
-  attempts          Int             @default(0)
-  availableAt       DateTime        @default(now()) @map("available_at") @db.Timestamptz(6)
-  lockedAt          DateTime?       @map("locked_at") @db.Timestamptz(6)
-  lastError         String?         @map("last_error") @db.VarChar(1000)
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  id                String                    @id @default(uuid()) @db.Uuid
+  organizationId    String                    @map("organization_id") @db.Uuid
+  companyId         String                    @map("company_id") @db.Uuid
+  purchaseInvoiceId String                    @map("purchase_invoice_id") @db.Uuid
+  attachmentId      String                    @unique @map("attachment_id") @db.Uuid
+  status            PurchaseOcrStatus         @default(PENDING)
+  engine            String                    @default("tesseract.js") @db.VarChar(80)
+  engineVersion     String                    @default("7.0.0") @map("engine_version") @db.VarChar(40)
+  rawText           String?                   @map("raw_text")
+  extractedFields   Json?                     @map("extracted_fields")
+  overallConfidence Decimal?                  @map("overall_confidence") @db.Decimal(5, 2)
+  reviewFields      Json?                     @map("review_fields")
+  requestedById     String                    @map("requested_by_id") @db.Uuid
+  reviewedById      String?                   @map("reviewed_by_id") @db.Uuid
+  reviewedAt        DateTime?                 @map("reviewed_at") @db.Timestamptz(6)
+  attempts          Int                       @default(0)
+  availableAt       DateTime                  @default(now()) @map("available_at") @db.Timestamptz(6)
+  lockedAt          DateTime?                 @map("locked_at") @db.Timestamptz(6)
+  lastError         String?                   @map("last_error") @db.VarChar(1000)
+  createdAt         DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company           Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseInvoice   PurchaseInvoice           @relation(fields: [purchaseInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
   attachment        PurchaseInvoiceAttachment @relation(fields: [attachmentId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
-  requestedBy       User            @relation("requested_purchase_ocr", fields: [requestedById], references: [id], onDelete: Restrict)
-  reviewedBy        User?           @relation("reviewed_purchase_ocr", fields: [reviewedById], references: [id], onDelete: Restrict)
+  requestedBy       User                      @relation("requested_purchase_ocr", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy        User?                     @relation("reviewed_purchase_ocr", fields: [reviewedById], references: [id], onDelete: Restrict)
 
   @@unique([id, organizationId, companyId])
   @@unique([attachmentId, organizationId, companyId])
@@ -1228,19 +1271,19 @@ model ContactAddress {
 }
 
 model User {
-  id                  String                      @id @default(uuid()) @db.Uuid
-  email               String                      @unique @db.Citext
-  passwordHash        String?                     @map("password_hash")
-  status              UserStatus                  @default(ACTIVE)
-  createdAt           DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
-  memberships         Membership[]
-  auditEvents         AuditEvent[]                @relation("actor_audit_events")
-  sessions            Session[]
-  passwordResetTokens PasswordResetToken[]
-  purchaseAttachments PurchaseInvoiceAttachment[]
-  purchaseApprovals   PurchaseInvoiceApproval[]
-  requestedPurchaseOcr PurchaseInvoiceOcrJob[] @relation("requested_purchase_ocr")
-  reviewedPurchaseOcr  PurchaseInvoiceOcrJob[] @relation("reviewed_purchase_ocr")
+  id                   String                      @id @default(uuid()) @db.Uuid
+  email                String                      @unique @db.Citext
+  passwordHash         String?                     @map("password_hash")
+  status               UserStatus                  @default(ACTIVE)
+  createdAt            DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  memberships          Membership[]
+  auditEvents          AuditEvent[]                @relation("actor_audit_events")
+  sessions             Session[]
+  passwordResetTokens  PasswordResetToken[]
+  purchaseAttachments  PurchaseInvoiceAttachment[]
+  purchaseApprovals    PurchaseInvoiceApproval[]
+  requestedPurchaseOcr PurchaseInvoiceOcrJob[]     @relation("requested_purchase_ocr")
+  reviewedPurchaseOcr  PurchaseInvoiceOcrJob[]     @relation("reviewed_purchase_ocr")
 
   @@map("users")
 }
