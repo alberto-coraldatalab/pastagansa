@@ -46,6 +46,13 @@ test("changes the password and revokes another browser session", async ({
       page.getByRole("button", { name: "Cerrar", exact: true }),
     ).toHaveCount(0);
 
+    await expect
+      .poll(
+        async () =>
+          (await secondPage.request.get("/api/auth/session")).status(),
+        { message: "the revoked session must be rejected by the server" },
+      )
+      .toBe(401);
     await secondPage.goto("/seguridad");
     await expect(secondPage).toHaveURL(/\/acceso$/);
 
