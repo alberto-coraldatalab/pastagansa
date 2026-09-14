@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuditModule } from "./audit/audit.module";
 import { AuthorizationModule } from "./authorization/authorization.module";
 import { CompaniesModule } from "./companies/companies.module";
@@ -25,7 +25,15 @@ import { DashboardModule } from "./dashboard/dashboard.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateConfiguration }),
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: 60_000,
+          limit: Number(config.get<string>("THROTTLE_LIMIT") ?? 120),
+        },
+      ],
+    }),
     PrismaModule,
     IdentityModule,
     TenancyModule,
