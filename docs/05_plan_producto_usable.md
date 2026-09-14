@@ -112,6 +112,13 @@ La recuperación de contraseña funciona sin SMTP mediante enlaces temporales ge
 por el operador: el token se persiste como hash, solo admite un uso y el cambio revoca
 todas las sesiones anteriores.
 
+Pendiente cuando exista SMTP: convertir el inicio de la recuperación en autoservicio
+desde la UI. `/recuperar` pedirá el correo y responderá siempre de forma genérica para
+no revelar si la cuenta existe; la API generará el mismo token temporal y lo entregará
+por email mediante outbox, sin incluirlo en respuestas ni logs. Debe conservar rate
+limit, uso único, caducidad, revocación de sesiones y pruebas contra enumeración de
+cuentas. Hasta entonces se mantiene únicamente la generación administrativa documentada.
+
 Entregables:
 
 - shell responsive, navegación principal y dirección visual lima;
