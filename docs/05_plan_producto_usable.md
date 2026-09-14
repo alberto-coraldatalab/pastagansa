@@ -232,7 +232,7 @@ Gate:
 - cero bloqueadores de severidad crítica o alta en el recorrido usable;
 - incidencias de la prueba moderada clasificadas antes de cerrar el hito.
 
-Estado real: en curso. El host `ledger.coraldatalab.com` responde mediante HTTPS. La
+Estado real: completada. El host `ledger.coraldatalab.com` responde mediante HTTPS. La
 primera aceptación remota detectó permisos incompletos en el volumen; la migración 25
 los reparó y readiness consulta ahora `users` para impedir que ese estado vuelva a
 parecer sano. Tras el redespliegue, el 14/09/2026 pasaron 2/2 recorridos remotos de
@@ -245,10 +245,11 @@ tesorería ya permite configurar la cuenta bancaria, importar un movimiento norm
 revisar sugerencias y confirmar una conciliación uno-a-uno. El detalle de venta detecta
 si el correo está disponible, evita encolar entregas sin proveedor y ofrece la descarga
 PDF como recorrido soportado; si se configura SMTP conserva el historial observable.
-SMTP real queda aplazado por decisión de producto y deja de bloquear el hito. Solo
-falta ejecutar la prueba moderada con una persona externa y clasificar sus incidencias
-para cerrar U4. El
-workflow manual de aceptación ya puede ejecutar los dos recorridos y auditorías WCAG
+SMTP real queda aplazado por decisión de producto y deja de bloquear el hito. La prueba
+moderada con una persona externa se completó y validó el 14/09/2026. Identificó una
+incidencia media —no poder convertir un cliente en proveedor desde la web— y una baja
+—etiquetas contables técnicas en inglés—; ambas quedaron resueltas y verificadas en
+staging. El workflow manual de aceptación puede ejecutar los dos recorridos y auditorías WCAG
 contra una URL HTTPS externa, con confirmación explícita de escritura. El guion moderado
 define consignas, métricas, evidencias y severidades. El stack reproducible de
 PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 26 migraciones,
