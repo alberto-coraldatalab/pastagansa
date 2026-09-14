@@ -51,6 +51,8 @@ export function AppShell({
       return body;
     },
     retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   useEffect(() => {

@@ -41,7 +41,13 @@ test("changes the password and revokes another browser session", async ({
     ).toBeVisible();
     await expectNoSeriousAccessibilityViolations(page, "account security");
     await expect(page.getByText("Esta sesión")).toBeVisible();
+    const revoked = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().includes("/api/auth/sessions/"),
+    );
     await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+    expect((await revoked).status()).toBe(204);
     await expect(
       page.getByRole("button", { name: "Cerrar", exact: true }),
     ).toHaveCount(0);
