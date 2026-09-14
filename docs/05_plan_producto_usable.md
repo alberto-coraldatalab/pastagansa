@@ -257,25 +257,40 @@ espera readiness real y supera el smoke test. El 10/09/2026 se ensayó localment
 custom y su restauración aislada, verificando migraciones, tablas críticas y recuentos
 de datos; CI repite ese ensayo en cada cambio.
 
+### U5 — Presupuesto comercial usable
+
+Resultado: el usuario prepara una oferta, comparte su PDF y registra la decisión del
+cliente antes de facturar.
+
+Estado real: en curso. El API ya conservaba líneas, totales, snapshot del cliente,
+PDF y transiciones atómicas. La web expone ahora listado paginado y filtrable, alta y
+edición de borradores con catálogo o concepto libre, plazo de validez, condiciones,
+descarga PDF y los estados enviado, aceptado, rechazado, caducado y cancelado. El E2E
+de venta cubre creación, PDF y aceptación, incluida una auditoría WCAG del borrador.
+
+Pendiente para cerrar U5:
+
+- convertir un presupuesto aceptado en factura borrador sin reintroducir líneas;
+- sustituir el identificador técnico por una serie/numeración comercial configurable;
+- validar el recorrido actualizado en staging.
+
+Gate:
+
+- E2E `cliente → catálogo → presupuesto → PDF → aceptación → factura borrador`;
+- la conversión es idempotente y mantiene un enlace visible entre ambos documentos;
+- un presupuesto que ya no es borrador no puede editarse;
+- estado y documento convertido persisten tras recarga.
+
 ## Orden inmediato de implementación
 
-1. Crear `apps/web` y el pipeline de build/test.
-2. Implementar cliente API, sesión y contexto tenant.
-3. Entregar login/registro y shell navegable.
-4. Añadir seed/demo reproducible. ✓
-5. Construir el recorrido de venta hasta PDF y cobro.
-6. Construir el recorrido de compra hasta OCR, aprobación y pago.
-7. Desplegar staging, completar visibilidad y ejecutar la prueba moderada.
-
-U0 y U1 pueden avanzar en paralelo conceptualmente, pero cada commit debe dejar el
-repositorio arrancable. Dentro de U2 y U3 se priorizan slices verticales pequeños sobre
-la creación masiva de componentes o pantallas vacías.
+1. Completar presupuesto comercial usable (U5).
+2. Retomar SIF/VERI*FACTU una vez cerrado U5.
 
 ## Alcance aplazado hasta superar el hito
 
 - inversión del sujeto pasivo y casuística intracomunitaria avanzada;
 - modelos fiscales y libros completos;
-- SIF/VERI*FACTU;
+- SIF/VERI*FACTU (pausado hasta cerrar U5);
 - pedidos, albaranes y recurrencia;
 - conciliación parcial/combinada y Open Banking;
 - dashboards analíticos avanzados;

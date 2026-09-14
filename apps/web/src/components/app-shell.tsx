@@ -30,6 +30,7 @@ export function AppShell({
     | "inicio"
     | "clientes"
     | "catalogo"
+    | "presupuestos"
     | "facturas"
     | "compras"
     | "tesoreria"
@@ -119,30 +120,37 @@ export function AppShell({
           <NavLink active={active === "catalogo"} href="/catalogo" number="03">
             Catálogo
           </NavLink>
-          <NavLink active={active === "facturas"} href="/facturas" number="04">
+          <NavLink
+            active={active === "presupuestos"}
+            href="/presupuestos"
+            number="04"
+          >
+            Presupuestos
+          </NavLink>
+          <NavLink active={active === "facturas"} href="/facturas" number="05">
             Facturas
           </NavLink>
-          <NavLink active={active === "compras"} href="/compras" number="05">
+          <NavLink active={active === "compras"} href="/compras" number="06">
             Compras
           </NavLink>
           <NavLink
             active={active === "tesoreria"}
             href="/tesoreria"
-            number="06"
+            number="07"
           >
             Tesorería
           </NavLink>
           <NavLink
             active={active === "contabilidad"}
             href="/contabilidad"
-            number="07"
+            number="08"
           >
             Contabilidad
           </NavLink>
           <NavLink
             active={active === "seguridad"}
             href="/seguridad"
-            number="08"
+            number="09"
           >
             Seguridad
           </NavLink>
@@ -214,6 +222,7 @@ function NavLink({
     | "/inicio"
     | "/clientes"
     | "/catalogo"
+    | "/presupuestos"
     | "/facturas"
     | "/compras"
     | "/tesoreria"

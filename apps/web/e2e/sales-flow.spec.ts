@@ -65,6 +65,35 @@ test("completes the sales flow from registration to payment", async ({
     "Servicio E2E ya está disponible",
   );
 
+  await page.getByRole("link", { name: /Presupuestos/ }).click();
+  await page
+    .locator(".page-heading")
+    .getByRole("button", { name: "Nuevo presupuesto" })
+    .click();
+  await page.getByLabel("Cliente").selectOption({ label: "Cliente E2E SL" });
+  await page.getByLabel("Catálogo").selectOption({ label: "Servicio E2E" });
+  await page
+    .getByLabel("Condiciones y notas (opcional)")
+    .fill("Oferta válida durante 30 días");
+  await page.getByRole("button", { name: "Guardar borrador" }).click();
+  await expect(page.getByRole("status")).toContainText("guardado por 121,00");
+  await page.getByRole("link", { name: /^PRE-/ }).click();
+  await expect(page.getByText("Oferta válida durante 30 días")).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, "quote draft");
+
+  const quoteDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Descargar PDF" }).click();
+  const quoteDownload = await quoteDownloadPromise;
+  expect(quoteDownload.suggestedFilename()).toMatch(/^presupuesto-.+\.pdf$/);
+  const quotePath = await quoteDownload.path();
+  expect(quotePath).not.toBeNull();
+  expect((await readFile(quotePath!)).subarray(0, 5).toString()).toBe("%PDF-");
+
+  await page.getByRole("button", { name: "Marcar como enviado" }).click();
+  await expect(page.getByText("Enviado", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Registrar aceptación" }).click();
+  await expect(page.getByText("Aceptado", { exact: true })).toBeVisible();
+
   await page.getByRole("link", { name: /Facturas/ }).click();
   await page
     .locator(".page-heading")
@@ -116,12 +145,16 @@ test("completes the sales flow from registration to payment", async ({
   await page.getByLabel("Referencia (opcional)").fill("E2E-COBRO-001");
   await page.getByRole("button", { name: "Confirmar cobro" }).click();
   await expect(page.getByText("Cobrada", { exact: true })).toBeVisible();
-  await expect(page.getByText("0,00 €", { exact: true })).toBeVisible();
+  await expect(
+    page.locator(".summary-card").filter({ hasText: "Pendiente" }),
+  ).toContainText("0,00 €");
   await expect(page.getByText("E2E-COBRO-001", { exact: true })).toBeVisible();
 
   await page.reload();
   await expect(page.getByText("Cobrada", { exact: true })).toBeVisible();
-  await expect(page.getByText("0,00 €", { exact: true })).toBeVisible();
+  await expect(
+    page.locator(".summary-card").filter({ hasText: "Pendiente" }),
+  ).toContainText("0,00 €");
   await expect(page.getByText("E2E-COBRO-001", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "Ver trazabilidad" }).click();
