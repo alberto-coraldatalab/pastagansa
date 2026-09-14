@@ -1,4 +1,16 @@
-import { Body, Controller, Get, HttpCode, Post, Req } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Req,
+} from "@nestjs/common";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshDto } from "./dto/refresh.dto";
 import { RegisterDto } from "./dto/register.dto";
@@ -42,7 +54,31 @@ export class IdentityController {
   @Get("sessions")
   @Authenticated()
   sessions(@Req() request: AuthenticatedRequest) {
-    return this.identity.sessions(request.user!.id);
+    return this.identity.sessions(request.user!.id, request.user!.sessionId);
+  }
+
+  @HttpCode(204)
+  @Delete("sessions/:id")
+  @Authenticated()
+  revokeSession(
+    @Req() request: AuthenticatedRequest,
+    @Param("id", new ParseUUIDPipe()) sessionId: string,
+  ) {
+    return this.identity.revokeSession(request.user!.id, sessionId);
+  }
+
+  @HttpCode(204)
+  @Put("password")
+  @Authenticated()
+  changePassword(
+    @Req() request: AuthenticatedRequest,
+    @Body() input: ChangePasswordDto,
+  ) {
+    return this.identity.changePassword(
+      request.user!.id,
+      request.user!.sessionId,
+      input,
+    );
   }
 
   @Get("context")

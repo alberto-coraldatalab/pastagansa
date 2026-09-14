@@ -191,6 +191,58 @@ a {
   text-align: center;
   text-decoration: none;
 }
+.security-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.security-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+.security-card h2 {
+  margin: 0 0 0.5rem;
+}
+.security-card > p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 1.5rem;
+}
+.form-success {
+  background: var(--lime-soft);
+  border-radius: 10px;
+  color: var(--lime-dark);
+  margin: 0;
+  padding: 0.75rem;
+}
+.session-list {
+  display: grid;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.session-list li {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem 0;
+}
+.session-list li:first-child {
+  border-top: 0;
+}
+.session-list li div {
+  display: grid;
+  gap: 0.25rem;
+}
+.session-list span,
+.session-list small {
+  color: var(--muted);
+}
 .field {
   display: grid;
   gap: 0.45rem;
@@ -1644,6 +1696,9 @@ a {
     grid-template-columns: repeat(2, 1fr);
   }
   .reconciliation-layout {
+    grid-template-columns: 1fr;
+  }
+  .security-grid {
     grid-template-columns: 1fr;
   }
   .bank-import form {

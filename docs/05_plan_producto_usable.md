@@ -110,7 +110,9 @@ de una membresía, valida el nuevo tenant en servidor y recarga todos los datos 
 mezclar cachés. U1 queda completada.
 La recuperación de contraseña funciona sin SMTP mediante enlaces temporales generados
 por el operador: el token se persiste como hash, solo admite un uso y el cambio revoca
-todas las sesiones anteriores.
+todas las sesiones anteriores. La sección Seguridad permite además cambiar la
+contraseña validando la actual, conservar solo la sesión en uso y revisar o cerrar las
+demás sesiones; un E2E con dos navegadores protege el recorrido.
 
 Pendiente cuando exista SMTP: convertir el inicio de la recuperación en autoservicio
 desde la UI. `/recuperar` pedirá el correo y responderá siempre de forma genérica para
@@ -222,11 +224,12 @@ Gate:
 - cero bloqueadores de severidad crítica o alta en el recorrido usable;
 - incidencias de la prueba moderada clasificadas antes de cerrar el hito.
 
-Estado real: en curso. El host `ledger.coraldatalab.com` ya responde mediante HTTPS,
-pero la primera aceptación remota detectó que el rol runtime de un volumen existente no
-podía consultar las tablas. La migración 25 repara los grants actuales y futuros, y
-readiness consulta ahora `users` para impedir que ese estado vuelva a parecer sano; se
-debe redesplegar y repetir la aceptación. El inicio ya resume ventas emitidas, compras aprobadas y saldos
+Estado real: en curso. El host `ledger.coraldatalab.com` responde mediante HTTPS. La
+primera aceptación remota detectó permisos incompletos en el volumen; la migración 25
+los reparó y readiness consulta ahora `users` para impedir que ese estado vuelva a
+parecer sano. Tras el redespliegue, el 14/09/2026 pasaron 2/2 recorridos remotos de
+ventas y compras, incluidas conciliación y auditorías WCAG. El inicio ya resume ventas
+emitidas, compras aprobadas y saldos
 pendientes de cobro/pago con agregados exactos y aislados por tenant. La navegación
 incluye vistas read-only de diario y mayor por periodo y cuenta; el E2E de compra
 comprueba que resumen y libros reflejan los movimientos contabilizados. La vista de
@@ -234,9 +237,9 @@ tesorería ya permite configurar la cuenta bancaria, importar un movimiento norm
 revisar sugerencias y confirmar una conciliación uno-a-uno. El detalle de venta detecta
 si el correo está disponible, evita encolar entregas sin proveedor y ofrece la descarga
 PDF como recorrido soportado; si se configura SMTP conserva el historial observable.
-SMTP real queda aplazado por decisión de producto y deja de bloquear el hito. Faltan
-superar la aceptación remota tras el redespliegue y ejecutar la prueba moderada para
-cerrar U4. El
+SMTP real queda aplazado por decisión de producto y deja de bloquear el hito. Solo
+falta ejecutar la prueba moderada con una persona externa y clasificar sus incidencias
+para cerrar U4. El
 workflow manual de aceptación ya puede ejecutar los dos recorridos y auditorías WCAG
 contra una URL HTTPS externa, con confirmación explícita de escritura. El guion moderado
 define consignas, métricas, evidencias y severidades. El stack reproducible de

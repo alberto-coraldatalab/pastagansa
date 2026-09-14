@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PrismaClient } from "@prisma/client";
+import * as argon2 from "argon2";
 import { createHash } from "node:crypto";
 import request = require("supertest");
 import type { Test as SupertestTest } from "supertest";
@@ -106,6 +107,73 @@ describe("platform integrity", () => {
       .get("/v1/identity/context")
       .set("authorization", `Bearer ${original.accessToken}`)
       .expect(401);
+  });
+
+  it("changes the password and lets the user close another session", async () => {
+    const email = "security-settings@example.com";
+    const current = await register(
+      email,
+      "Security Org",
+      "Security Company",
+      "R5000001G",
+    );
+    const other = await request(app.getHttpServer())
+      .post("/v1/identity/login")
+      .send({ email, password: "correct horse battery staple" })
+      .expect(200);
+
+    const listed = await request(app.getHttpServer())
+      .get("/v1/identity/sessions")
+      .set("authorization", `Bearer ${current.accessToken}`)
+      .expect(200);
+    expect(listed.body).toHaveLength(2);
+    expect(
+      listed.body.filter(({ isCurrent }: { isCurrent: boolean }) => isCurrent),
+    ).toHaveLength(1);
+    const otherSession = listed.body.find(
+      ({ isCurrent }: { isCurrent: boolean }) => !isCurrent,
+    );
+    await request(app.getHttpServer())
+      .delete(`/v1/identity/sessions/${otherSession.id}`)
+      .set("authorization", `Bearer ${current.accessToken}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .get("/v1/identity/context")
+      .set("authorization", `Bearer ${other.body.accessToken}`)
+      .expect(401);
+
+    const additional = await request(app.getHttpServer())
+      .post("/v1/identity/login")
+      .send({ email, password: "correct horse battery staple" })
+      .expect(200);
+    await request(app.getHttpServer())
+      .put("/v1/identity/password")
+      .set("authorization", `Bearer ${current.accessToken}`)
+      .send({
+        currentPassword: "incorrect password",
+        newPassword: "new account password value",
+      })
+      .expect(401);
+    await request(app.getHttpServer())
+      .put("/v1/identity/password")
+      .set("authorization", `Bearer ${current.accessToken}`)
+      .send({
+        currentPassword: "correct horse battery staple",
+        newPassword: "new account password value",
+      })
+      .expect(204);
+    await request(app.getHttpServer())
+      .get("/v1/identity/context")
+      .set("authorization", `Bearer ${additional.body.accessToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get("/v1/identity/context")
+      .set("authorization", `Bearer ${current.accessToken}`)
+      .expect(200);
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    expect(
+      await argon2.verify(user.passwordHash!, "new account password value"),
+    ).toBe(true);
   });
 
   it("enforces tenant boundaries, quote integrity, refresh CAS, and revocation", async () => {
@@ -856,9 +924,7 @@ describe("platform integrity", () => {
       .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/attachments`)
       .attach(
         "file",
-        Buffer.from([
-          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01,
-        ]),
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]),
         { filename: "invoice-scan.png", contentType: "image/png" },
       )
       .expect(201);
@@ -879,7 +945,9 @@ describe("platform integrity", () => {
       )
       .expect(409);
     await authed(accountB.accessToken, tenantB)
-      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/${ocrJob.body.id}`)
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/${ocrJob.body.id}`,
+      )
       .expect(404);
     await authed(accountA.accessToken, tenantA)
       .post(`/v1/purchase-invoices/${purchaseDraft.body.id}/approve`)
@@ -908,7 +976,9 @@ describe("platform integrity", () => {
       },
     });
     const extractedOcr = await authed(accountA.accessToken, tenantA)
-      .get(`/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/${ocrJob.body.id}`)
+      .get(
+        `/v1/purchase-invoices/${purchaseDraft.body.id}/ocr/${ocrJob.body.id}`,
+      )
       .expect(200);
     expect(extractedOcr.body).toMatchObject({
       status: "REVIEW_REQUIRED",

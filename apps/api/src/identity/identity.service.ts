@@ -8,6 +8,7 @@ import {
 import { createHash } from "node:crypto";
 import { MembershipStatus, SessionStatus, UserStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
@@ -249,8 +250,8 @@ export class IdentityService {
     });
   }
 
-  async sessions(userId: string) {
-    return this.prisma.session.findMany({
+  async sessions(userId: string, currentSessionId: string) {
+    const sessions = await this.prisma.session.findMany({
       where: { userId },
       select: {
         id: true,
@@ -262,6 +263,63 @@ export class IdentityService {
       },
       orderBy: { createdAt: "desc" },
     });
+    return sessions.map((session) => ({
+      ...session,
+      status:
+        session.status === SessionStatus.ACTIVE &&
+        session.expiresAt <= new Date()
+          ? "EXPIRED"
+          : session.status,
+      isCurrent: session.id === currentSessionId,
+    }));
+  }
+
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: { id: sessionId, userId, status: SessionStatus.ACTIVE },
+      data: { status: SessionStatus.REVOKED, revokedAt: new Date() },
+    });
+  }
+
+  async changePassword(
+    userId: string,
+    currentSessionId: string,
+    input: ChangePasswordDto,
+  ): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true },
+    });
+    if (
+      !user?.passwordHash ||
+      !(await safeVerify(user.passwordHash, input.currentPassword))
+    )
+      throw new UnauthorizedException("Current password is incorrect");
+
+    const passwordHash = await argon2.hash(input.newPassword, {
+      type: argon2.argon2id,
+    });
+    const now = new Date();
+    const changed = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.updateMany({
+        where: { id: userId, passwordHash: user.passwordHash },
+        data: { passwordHash },
+      });
+      if (updated.count !== 1) return false;
+      await tx.session.updateMany({
+        where: {
+          userId,
+          id: { not: currentSessionId },
+          status: SessionStatus.ACTIVE,
+        },
+        data: { status: SessionStatus.REVOKED, revokedAt: now },
+      });
+      return true;
+    });
+    if (!changed)
+      throw new UnauthorizedException(
+        "Password changed concurrently; authenticate again",
+      );
   }
 
   async context(userId: string) {
