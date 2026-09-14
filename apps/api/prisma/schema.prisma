@@ -90,6 +90,15 @@ enum RectificationImpact {
   INCREASE
 }
 
+enum SifInvoiceType {
+  F1
+  R1
+  R2
+  R3
+  R4
+  R5
+}
+
 enum InvoiceEmailStatus {
   PENDING
   PROCESSING
@@ -369,6 +378,7 @@ model Invoice {
   sequenceId          String?                @map("sequence_id") @db.Uuid
   originalInvoiceId   String?                @map("original_invoice_id") @db.Uuid
   documentType        DocumentType           @default(INVOICE) @map("document_type")
+  sifInvoiceType      SifInvoiceType         @default(F1) @map("sif_invoice_type")
   rectificationKind   RectificationKind?     @map("rectification_kind")
   rectificationImpact RectificationImpact?   @map("rectification_impact")
   rectificationReason String?                @map("rectification_reason") @db.VarChar(1000)

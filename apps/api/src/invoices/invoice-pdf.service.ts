@@ -9,6 +9,7 @@ export interface InvoicePdfInput {
   fullNumber: string;
   status: string;
   documentType?: string;
+  sifInvoiceType?: string;
   rectificationKind?: string | null;
   rectificationImpact?: string | null;
   rectificationReason?: string | null;
@@ -183,7 +184,7 @@ export class InvoicePdfService {
         top + 10,
       )
       .text(
-        `${rectificationKind(invoice.rectificationKind)} · ${rectificationImpact(invoice.rectificationImpact)}`,
+        `${invoice.sifInvoiceType ?? "R4"} · ${rectificationKind(invoice.rectificationKind)} · ${rectificationImpact(invoice.rectificationImpact)}`,
         345,
         top + 10,
         { width: 188, align: "right" },

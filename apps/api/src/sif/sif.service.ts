@@ -52,6 +52,7 @@ export class SifService {
       select: {
         id: true,
         documentType: true,
+        sifInvoiceType: true,
         rectificationImpact: true,
         issuerTaxId: true,
         fullNumber: true,
@@ -85,8 +86,7 @@ export class SifService {
       issuerTaxId: invoice.issuerTaxId,
       invoiceNumber: invoice.fullNumber,
       issueDate: formatSifIssueDate(invoice.issueDate),
-      invoiceType:
-        invoice.documentType === DocumentType.CREDIT_NOTE ? "R4" : "F1",
+      invoiceType: invoice.sifInvoiceType,
       taxTotal: invoice.taxTotal.mul(sign).toFixed(2),
       total: invoice.total.mul(sign).toFixed(2),
       previousHash: previous?.recordHash ?? "",

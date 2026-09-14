@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { formatMoney } from "@/lib/catalog";
@@ -23,13 +24,17 @@ import {
   type Payment,
   type PaymentInput,
   type PaymentInstallment,
+  type RectificationInput,
+  sifInvoiceTypeLabel,
 } from "@/lib/invoices";
 import { InvoiceDialog } from "../invoices-view";
 
 export function InvoiceDetail({ id }: { id: string }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [issuing, setIssuing] = useState(false);
+  const [rectifying, setRectifying] = useState(false);
   const [notice, setNotice] = useState("");
   const invoice = useQuery({
     queryKey: ["invoice", id],
@@ -48,6 +53,18 @@ export function InvoiceDetail({ id }: { id: string }) {
       await queryClient.invalidateQueries({ queryKey: ["invoices"] });
       setEditing(false);
       setNotice("Los cambios del borrador se han guardado.");
+    },
+  });
+  const createRectification = useMutation({
+    mutationFn: (payload: RectificationInput) =>
+      requestJson<Invoice>(`/api/invoices/${id}/rectifications`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: async (created) => {
+      await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      router.push(`/facturas/${created.id}`);
     },
   });
 
@@ -89,21 +106,35 @@ export function InvoiceDetail({ id }: { id: string }) {
         <div className="detail-actions">
           {document.status === "DRAFT" ? (
             <>
-              <button
-                className="secondary-button"
-                onClick={() => setEditing(true)}
-              >
-                Editar borrador
-              </button>
+              {document.documentType === "INVOICE" && (
+                <button
+                  className="secondary-button"
+                  onClick={() => setEditing(true)}
+                >
+                  Editar borrador
+                </button>
+              )}
               <button
                 className="primary-button compact"
                 onClick={() => setIssuing(true)}
               >
-                Emitir factura
+                {document.documentType === "CREDIT_NOTE"
+                  ? "Emitir rectificativa"
+                  : "Emitir factura"}
               </button>
             </>
           ) : (
             <>
+              {document.documentType === "INVOICE" &&
+                document.status !== "RECTIFIED" &&
+                document.status !== "CANCELLED" && (
+                  <button
+                    className="secondary-button"
+                    onClick={() => setRectifying(true)}
+                  >
+                    Rectificar factura
+                  </button>
+                )}
               <a className="secondary-button trace-link" href="#trazabilidad">
                 Ver trazabilidad
               </a>
@@ -118,6 +149,22 @@ export function InvoiceDetail({ id }: { id: string }) {
           )}
         </div>
       </section>
+      {document.documentType === "CREDIT_NOTE" && (
+        <section className="invoice-summary-grid" aria-label="Rectificación">
+          <article className="summary-card">
+            <span>Clasificación AEAT</span>
+            <strong>{document.sifInvoiceType}</strong>
+          </article>
+          <article className="summary-card">
+            <span>Factura rectificada</span>
+            <strong>{document.originalInvoice?.fullNumber ?? "—"}</strong>
+          </article>
+          <article className="summary-card total-card">
+            <span>Motivo</span>
+            <strong>{sifInvoiceTypeLabel(document.sifInvoiceType)}</strong>
+          </article>
+        </section>
+      )}
       {notice && (
         <div className="notice" role="status">
           <span>✓</span>
@@ -243,7 +290,163 @@ export function InvoiceDetail({ id }: { id: string }) {
           }}
         />
       )}
+      {rectifying && (
+        <RectificationDialog
+          invoice={document}
+          pending={createRectification.isPending}
+          error={createRectification.error?.message}
+          onClose={() => {
+            setRectifying(false);
+            createRectification.reset();
+          }}
+          onSubmit={(payload) => createRectification.mutate(payload)}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function RectificationDialog({
+  invoice,
+  pending,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  invoice: Invoice;
+  pending: boolean;
+  error?: string;
+  onClose(): void;
+  onSubmit(input: RectificationInput): void;
+}) {
+  const originalIssueDate = invoice.issueDate.slice(0, 10);
+  const defaultIssueDate =
+    todayIso() < originalIssueDate ? originalIssueDate : todayIso();
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !pending) onClose();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose, pending]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    onSubmit({
+      sifInvoiceType: String(
+        values.get("sifInvoiceType"),
+      ) as RectificationInput["sifInvoiceType"],
+      reason: String(values.get("reason") ?? "").trim(),
+      issueDate: String(values.get("issueDate")),
+      dueDate: String(values.get("dueDate") ?? ""),
+      notes: String(values.get("notes") ?? "").trim() || undefined,
+    });
+  }
+
+  return (
+    <div
+      className="dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !pending) onClose();
+      }}
+    >
+      <section
+        className="dialog payment-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rectification-title"
+      >
+        <header>
+          <div>
+            <p className="eyebrow">Factura {invoice.fullNumber}</p>
+            <h2 id="rectification-title">Rectificar factura completa</h2>
+          </div>
+          <button
+            className="icon-button"
+            onClick={onClose}
+            disabled={pending}
+            aria-label="Cerrar"
+          >
+            ×
+          </button>
+        </header>
+        <form className="invoice-form" onSubmit={submit}>
+          <p className="dialog-helper">
+            Se creará un abono total en borrador, enlazado a la factura
+            original. Podrás revisarlo antes de emitirlo.
+          </p>
+          <div className="payment-fields">
+            <label className="field full">
+              <span>Motivo fiscal AEAT</span>
+              <select name="sifInvoiceType" defaultValue="R4" required>
+                {(["R1", "R2", "R3", "R4"] as const).map((type) => (
+                  <option key={type} value={type}>
+                    {type} · {sifInvoiceTypeLabel(type)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Fecha de rectificación</span>
+              <input
+                name="issueDate"
+                type="date"
+                min={originalIssueDate}
+                defaultValue={defaultIssueDate}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Nuevo vencimiento (opcional)</span>
+              <input name="dueDate" type="date" />
+            </label>
+            <label className="field full">
+              <span>Explicación de la rectificación</span>
+              <textarea
+                name="reason"
+                minLength={5}
+                maxLength={1000}
+                rows={3}
+                required
+              />
+            </label>
+            <label className="field full">
+              <span>Notas internas (opcional)</span>
+              <textarea name="notes" maxLength={5000} rows={2} />
+            </label>
+          </div>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="dialog-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onClose}
+              disabled={pending}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="primary-button compact"
+              disabled={pending}
+            >
+              {pending ? "Creando…" : "Crear rectificativa"}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
   );
 }
 
@@ -952,7 +1155,10 @@ function IssueDialog({
           {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ documentType: "INVOICE", series }),
+            body: JSON.stringify({
+              documentType: invoice.documentType,
+              series,
+            }),
           },
         );
         selectedId = created.id;
@@ -985,7 +1191,8 @@ function IssueDialog({
   }, []);
 
   const active = sequences.data?.filter(
-    (sequence) => sequence.active && sequence.documentType === "INVOICE",
+    (sequence) =>
+      sequence.active && sequence.documentType === invoice.documentType,
   );
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1007,7 +1214,12 @@ function IssueDialog({
         <header>
           <div>
             <p className="eyebrow">Acción irreversible</p>
-            <h2 id="issue-title">Emitir factura</h2>
+            <h2 id="issue-title">
+              Emitir{" "}
+              {invoice.documentType === "CREDIT_NOTE"
+                ? "rectificativa"
+                : "factura"}
+            </h2>
           </div>
           <button
             className="icon-button"
@@ -1050,7 +1262,7 @@ function IssueDialog({
                   required
                   maxLength={30}
                   pattern="[A-Za-z0-9][A-Za-z0-9._/-]*"
-                  defaultValue={`F${invoice.issueDate.slice(0, 4)}`}
+                  defaultValue={`${invoice.documentType === "CREDIT_NOTE" ? "R" : "F"}${invoice.issueDate.slice(0, 4)}`}
                 />
                 <small>
                   Se creará para esta empresa comenzando por el número 1.

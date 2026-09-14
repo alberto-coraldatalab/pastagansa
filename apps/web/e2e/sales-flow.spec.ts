@@ -130,6 +130,32 @@ test("completes the sales flow from registration to payment", async ({
   await expect(page.getByText("Registro SIF")).toBeVisible();
   await expect(page.getByText(/Alta · posición 1/)).toBeVisible();
   await expect(page.getByText(/AEAT-HASH-0\.1\.2/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Rectificar factura" }).click();
+  const rectificationDialog = page.getByRole("dialog", {
+    name: "Rectificar factura completa",
+  });
+  await rectificationDialog.getByLabel("Motivo fiscal AEAT").selectOption("R1");
+  await rectificationDialog
+    .getByLabel("Explicación de la rectificación")
+    .fill("Devolución completa del servicio facturado");
+  await rectificationDialog
+    .getByRole("button", { name: "Crear rectificativa" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Factura en borrador" }),
+  ).toBeVisible();
+  await expect(page.getByText("R1", { exact: true })).toBeVisible();
+  await expect(page.getByText("FE2E-0001", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Emitir rectificativa" }).click();
+  await page.getByLabel("Nueva serie").fill("RE2E");
+  await page.getByRole("button", { name: "Emitir definitivamente" }).click();
+  await expect(page.getByRole("heading", { name: "RE2E-0001" })).toBeVisible();
+  await page.getByRole("link", { name: "Ver trazabilidad" }).click();
+  await expect(page.getByText(/Alta · posición 2/)).toBeVisible();
+  await expect(page.getByText(/tipo R1/)).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, "issued rectification");
 });
 
 test("completes a purchase through payment and bank reconciliation", async ({

@@ -704,9 +704,20 @@ describe("platform integrity", () => {
     ).rejects.toThrow(
       /accounting rule requires an active account of the expected class/,
     );
+    await authed(accountA.accessToken, tenantA)
+      .post(`/v1/invoices/${invoiceDraft.body.id}/rectifications`)
+      .send({
+        sifInvoiceType: "R5",
+        kind: "TOTAL",
+        impact: "DECREASE",
+        reason: "Simplified invoice correction",
+        issueDate: "2026-09-09",
+      })
+      .expect(400);
     await authed(accountB.accessToken, tenantB)
       .post(`/v1/invoices/${invoiceDraft.body.id}/rectifications`)
       .send({
+        sifInvoiceType: "R1",
         kind: "TOTAL",
         impact: "DECREASE",
         reason: "Incorrect customer operation",
@@ -716,6 +727,7 @@ describe("platform integrity", () => {
     const rectification = await authed(accountA.accessToken, tenantA)
       .post(`/v1/invoices/${invoiceDraft.body.id}/rectifications`)
       .send({
+        sifInvoiceType: "R1",
         kind: "TOTAL",
         impact: "DECREASE",
         reason: "Incorrect customer operation",
@@ -724,6 +736,7 @@ describe("platform integrity", () => {
       .expect(201);
     expect(rectification.body).toMatchObject({
       documentType: "CREDIT_NOTE",
+      sifInvoiceType: "R1",
       rectificationKind: "TOTAL",
       rectificationImpact: "DECREASE",
       originalInvoiceId: invoiceDraft.body.id,
@@ -742,6 +755,15 @@ describe("platform integrity", () => {
       .send({ sequenceId: creditSequence.body.id })
       .expect(200);
     expect(issuedRectification.body.fullNumber).toBe("R2026-00001");
+    const rectificationSif = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/sif/records?invoiceId=${rectification.body.id}`)
+      .expect(200);
+    expect(rectificationSif.body).toHaveLength(1);
+    expect(rectificationSif.body[0]).toMatchObject({
+      invoiceType: "R1",
+      taxTotal: "-21",
+      total: "-121",
+    });
     const rectificationLedger = await authed(accountA.accessToken, tenantA)
       .get("/v1/tax-ledger")
       .expect(200);
@@ -781,6 +803,7 @@ describe("platform integrity", () => {
     await authed(accountA.accessToken, tenantA)
       .post(`/v1/invoices/${invoiceDraft.body.id}/rectifications`)
       .send({
+        sifInvoiceType: "R4",
         kind: "PARTIAL",
         impact: "DECREASE",
         reason: "Second correction is not allowed",

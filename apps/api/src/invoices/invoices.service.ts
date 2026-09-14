@@ -12,6 +12,7 @@ import {
   Prisma,
   RectificationImpact,
   RectificationKind,
+  SifInvoiceType,
   TaxRule,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
@@ -167,6 +168,14 @@ export class InvoicesService {
       );
     if (input.dueDate && input.dueDate < input.issueDate)
       throw new BadRequestException("dueDate cannot precede issueDate");
+    if (input.sifInvoiceType === SifInvoiceType.F1)
+      throw new BadRequestException(
+        "A rectification requires a SIF invoice type from R1 to R5",
+      );
+    if (input.sifInvoiceType === SifInvoiceType.R5)
+      throw new BadRequestException(
+        "R5 can only rectify a simplified invoice, which is not supported yet",
+      );
     if (
       input.kind === RectificationKind.TOTAL &&
       input.impact !== RectificationImpact.DECREASE
@@ -233,6 +242,7 @@ export class InvoicesService {
           contactId: original.contactId,
           originalInvoiceId: original.id,
           documentType: DocumentType.CREDIT_NOTE,
+          sifInvoiceType: input.sifInvoiceType,
           rectificationKind: input.kind,
           rectificationImpact: input.impact,
           rectificationReason: input.reason.trim(),
@@ -259,6 +269,7 @@ export class InvoicesService {
           originalInvoiceId: original.id,
           kind: input.kind,
           impact: input.impact,
+          sifInvoiceType: input.sifInvoiceType,
         },
       );
       return this.get(rectification.id);

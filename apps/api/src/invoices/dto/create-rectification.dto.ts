@@ -1,4 +1,8 @@
-import { RectificationImpact, RectificationKind } from "@prisma/client";
+import {
+  RectificationImpact,
+  RectificationKind,
+  SifInvoiceType,
+} from "@prisma/client";
 import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
@@ -15,6 +19,9 @@ import {
 import { InvoiceLineDto } from "./invoice.dto";
 
 export class CreateRectificationDto {
+  @IsEnum(SifInvoiceType)
+  sifInvoiceType!: SifInvoiceType;
+
   @IsEnum(RectificationKind)
   kind!: RectificationKind;
 

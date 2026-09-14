@@ -35,6 +35,12 @@ export interface Invoice {
     | "CANCELLED"
     | "RECTIFIED";
   documentType: "INVOICE" | "CREDIT_NOTE";
+  sifInvoiceType: "F1" | "R1" | "R2" | "R3" | "R4" | "R5";
+  rectificationKind: "TOTAL" | "PARTIAL" | "DIFFERENCE" | null;
+  rectificationImpact: "DECREASE" | "INCREASE" | null;
+  rectificationReason: string | null;
+  originalInvoiceId: string | null;
+  originalInvoice?: { id: string; fullNumber: string | null } | null;
   customerLegalName: string;
   customerTaxId: string | null;
   customerEmail: string | null;
@@ -61,6 +67,27 @@ export interface Invoice {
     taxAmount: string;
     totalAmount: string;
   }>;
+}
+
+export const rectificationInputSchema = z.object({
+  sifInvoiceType: z.enum(["R1", "R2", "R3", "R4"]),
+  reason: z.string().trim().min(5).max(1_000),
+  issueDate: z.iso.date(),
+  dueDate: z.union([z.iso.date(), z.literal("")]).optional(),
+  notes: z.string().trim().max(5_000).optional(),
+});
+
+export type RectificationInput = z.infer<typeof rectificationInputSchema>;
+
+export function sifInvoiceTypeLabel(type: Invoice["sifInvoiceType"]) {
+  return {
+    F1: "Factura completa",
+    R1: "Error jurídico, devolución, descuento o cambio de precio",
+    R2: "Concurso de acreedores",
+    R3: "Crédito incobrable",
+    R4: "Otra causa o dato no monetario",
+    R5: "Rectificación de factura simplificada",
+  }[type];
 }
 
 export const invoiceEmailInputSchema = z.object({

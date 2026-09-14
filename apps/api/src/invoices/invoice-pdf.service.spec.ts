@@ -45,6 +45,7 @@ describe("InvoicePdfService", () => {
       fullNumber: "R2026-00001",
       status: "ISSUED",
       documentType: "CREDIT_NOTE",
+      sifInvoiceType: "R1",
       rectificationKind: "PARTIAL",
       rectificationImpact: "DECREASE",
       rectificationReason: "Correction of the billed quantity",

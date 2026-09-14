@@ -4,7 +4,7 @@ import { normalizeApiError } from "@/lib/session";
 import { SessionError, tenantApiRequest } from "@/lib/server-session";
 
 const createSchema = z.object({
-  documentType: z.enum(["INVOICE", "PURCHASE_INVOICE"]),
+  documentType: z.enum(["INVOICE", "CREDIT_NOTE", "PURCHASE_INVOICE"]),
   series: z
     .string()
     .trim()

@@ -9,6 +9,8 @@ import {
   paymentInputSchema,
   paymentKey,
   paymentMethodLabel,
+  rectificationInputSchema,
+  sifInvoiceTypeLabel,
   todayIso,
 } from "./invoices";
 
@@ -85,5 +87,19 @@ describe("invoice presentation", () => {
     expect(paymentKey("invoice-1", "saved-payment-key")).toBe(
       "saved-payment-key",
     );
+  });
+
+  it("validates the supported AEAT rectification classes", () => {
+    const input = {
+      sifInvoiceType: "R1",
+      reason: "Devolución de mercancía",
+      issueDate: "2026-09-14",
+    };
+    expect(rectificationInputSchema.safeParse(input).success).toBe(true);
+    expect(
+      rectificationInputSchema.safeParse({ ...input, sifInvoiceType: "R5" })
+        .success,
+    ).toBe(false);
+    expect(sifInvoiceTypeLabel("R3")).toBe("Crédito incobrable");
   });
 });
