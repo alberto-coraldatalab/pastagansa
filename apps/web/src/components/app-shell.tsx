@@ -112,7 +112,7 @@ export function AppShell({
             Inicio
           </NavLink>
           <NavLink active={active === "clientes"} href="/clientes" number="02">
-            Clientes
+            Contactos
           </NavLink>
           <NavLink active={active === "catalogo"} href="/catalogo" number="03">
             Catálogo

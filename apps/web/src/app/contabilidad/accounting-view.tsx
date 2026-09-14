@@ -5,11 +5,13 @@ import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { formatMoney } from "@/lib/catalog";
 import { formatInvoiceDate, todayIso } from "@/lib/invoices";
-import type {
-  Account,
-  GeneralLedger,
-  JournalEntry,
-  JournalPage,
+import {
+  accountingDescription,
+  journalSourceLabel,
+  type Account,
+  type GeneralLedger,
+  type JournalEntry,
+  type JournalPage,
 } from "@/lib/accounting";
 
 export function AccountingView() {
@@ -174,7 +176,7 @@ export function AccountingView() {
                     <tr key={line.id}>
                       <td>#{line.entryNumber}</td>
                       <td>{formatInvoiceDate(line.entryDate)}</td>
-                      <td>{line.description}</td>
+                      <td>{accountingDescription(line.description)}</td>
                       <td className="money-cell">
                         {formatMoney(line.debit, "EUR")}
                       </td>
@@ -209,10 +211,10 @@ function JournalCard({ entry }: { entry: JournalEntry }) {
           <strong>Asiento #{entry.entryNumber}</strong>
           <small>
             {formatInvoiceDate(entry.entryDate)} ·{" "}
-            {sourceLabel(entry.sourceType)}
+            {journalSourceLabel(entry.sourceType)}
           </small>
         </div>
-        <span>{entry.description}</span>
+        <span>{accountingDescription(entry.description)}</span>
       </header>
       <div className="journal-totals">
         <span>
@@ -246,20 +248,6 @@ function ErrorState({ message }: { message: string }) {
       <strong>No se pudieron cargar los datos</strong>
       <p>{message}</p>
     </div>
-  );
-}
-
-function sourceLabel(source: string) {
-  return (
-    (
-      {
-        SALES_INVOICE: "Venta",
-        PURCHASE_INVOICE: "Compra",
-        CUSTOMER_PAYMENT: "Cobro",
-        SUPPLIER_PAYMENT: "Pago",
-        MANUAL: "Manual",
-      } as Record<string, string>
-    )[source] ?? source
   );
 }
 

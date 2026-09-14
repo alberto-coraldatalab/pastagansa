@@ -121,6 +121,14 @@ por email mediante outbox, sin incluirlo en respuestas ni logs. Debe conservar r
 limit, uso único, caducidad, revocación de sesiones y pruebas contra enumeración de
 cuentas. Hasta entonces se mantiene únicamente la generación administrativa documentada.
 
+La primera observación de uso externo detectó que un cliente no podía convertirse en
+proveedor desde la web y llevaba a crear un duplicado. Se resolvió unificando el maestro
+como Contactos, añadiendo filtros por rol, edición completa y una advertencia que deriva
+al registro existente cuando coinciden nombre o NIF, además de archivado seguro para
+retirar duplicados sin perder sus documentos históricos. La misma revisión detectó etiquetas
+contables técnicas en inglés; la presentación traduce ahora tipos y descripciones,
+incluidos los asientos históricos, sin modificar los datos contables persistidos.
+
 Entregables:
 
 - shell responsive, navegación principal y dirección visual lima;

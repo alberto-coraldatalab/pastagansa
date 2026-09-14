@@ -1,18 +1,22 @@
 import { z } from "zod";
 
-export const contactInputSchema = z.object({
-  legalName: z.string().trim().min(1).max(240),
-  tradeName: z.string().trim().max(240).optional(),
-  taxId: z.string().trim().max(40).optional(),
-  email: z.union([z.email(), z.literal("")]).optional(),
-  phone: z.string().trim().max(40).optional(),
-  paymentTermsDays: z.number().int().min(0).max(365).optional(),
-  paymentMethod: z
-    .enum(["BANK_TRANSFER", "DIRECT_DEBIT", "CASH", "CARD", "OTHER"])
-    .optional(),
-  isCustomer: z.boolean(),
-  isSupplier: z.boolean(),
-});
+export const contactInputSchema = z
+  .object({
+    legalName: z.string().trim().min(1).max(240),
+    tradeName: z.string().trim().max(240).optional(),
+    taxId: z.string().trim().max(40).optional(),
+    email: z.union([z.email(), z.literal("")]).optional(),
+    phone: z.string().trim().max(40).optional(),
+    paymentTermsDays: z.number().int().min(0).max(365).optional(),
+    paymentMethod: z
+      .enum(["BANK_TRANSFER", "DIRECT_DEBIT", "CASH", "CARD", "OTHER"])
+      .optional(),
+    isCustomer: z.boolean(),
+    isSupplier: z.boolean(),
+  })
+  .refine(({ isCustomer, isSupplier }) => isCustomer || isSupplier, {
+    message: "A contact must be a customer, a supplier, or both",
+  });
 
 export type ContactInput = z.infer<typeof contactInputSchema>;
 
@@ -47,7 +51,7 @@ export function contactPayload(values: Record<string, FormDataEntryValue>) {
     phone: optional("phone"),
     paymentTermsDays: Number(values.paymentTermsDays ?? 0),
     paymentMethod: String(values.paymentMethod ?? "BANK_TRANSFER"),
-    isCustomer: true,
+    isCustomer: values.isCustomer === "on",
     isSupplier: values.isSupplier === "on",
   };
 }

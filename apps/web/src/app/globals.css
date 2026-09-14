@@ -862,6 +862,24 @@ a {
   font-size: 0.7rem;
   margin: 0.25rem 0 0;
 }
+.kind-filter {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  margin-left: auto;
+}
+.kind-filter span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.kind-filter select {
+  background: #fafbf8;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  min-height: 40px;
+  padding: 0.5rem 2rem 0.5rem 0.7rem;
+}
 .search-form {
   display: flex;
   max-width: 390px;
@@ -934,6 +952,29 @@ a {
 .data-table td small {
   color: var(--muted);
   margin-top: 0.25rem;
+}
+.row-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.duplicate-warning {
+  background: #fff8e7;
+  border: 1px solid #ead49d;
+  border-radius: 10px;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem;
+}
+.duplicate-warning span {
+  color: #68552a;
+  font-size: 0.8rem;
+}
+.duplicate-warning .secondary-button {
+  justify-self: start;
+}
+.danger-action {
+  color: var(--danger);
+  margin-right: auto;
 }
 .tag {
   background: var(--lime-soft);
@@ -1713,6 +1754,9 @@ a {
   .data-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+  .kind-filter {
+    margin-left: 0;
   }
   .invoice-basics,
   .purchase-basics,

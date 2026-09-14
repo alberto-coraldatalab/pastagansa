@@ -23,16 +23,35 @@ test("completes the sales flow from registration to payment", async ({
   await expect(page).toHaveURL(/\/inicio$/);
   await expectNoSeriousAccessibilityViolations(page, "authenticated home");
 
-  await page.getByRole("link", { name: /Clientes/ }).click();
+  await page.getByRole("link", { name: /Contactos/ }).click();
   await page
     .locator(".page-heading")
-    .getByRole("button", { name: "Nuevo cliente" })
+    .getByRole("button", { name: "Nuevo contacto" })
     .click();
   await page.getByLabel("Razón social *").fill("Cliente E2E SL");
-  await page.getByRole("button", { name: "Guardar cliente" }).click();
+  await page.getByRole("button", { name: "Guardar contacto" }).click();
   await expect(page.getByRole("status")).toContainText(
     "Cliente E2E SL ya está en tu cartera",
   );
+  const customerRow = page.locator("tbody tr", { hasText: "Cliente E2E SL" });
+  await customerRow.getByRole("button", { name: "Editar" }).click();
+  await page.getByLabel("Es proveedor").check();
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page.getByRole("status")).toContainText("se ha actualizado");
+  await expect(customerRow.getByText("Cliente · Proveedor")).toBeVisible();
+
+  await page
+    .locator(".page-heading")
+    .getByRole("button", { name: "Nuevo contacto" })
+    .click();
+  await page.getByLabel("Razón social *").fill("Cliente E2E SL");
+  await page.getByRole("button", { name: "Guardar contacto" }).click();
+  await expect(page.getByText("Este contacto parece existir")).toBeVisible();
+  await page.getByRole("button", { name: "Editar el existente" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Editar contacto" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar", exact: true }).click();
 
   await page.getByRole("link", { name: /Catálogo/ }).click();
   await page
@@ -130,14 +149,15 @@ test("completes a purchase through payment and bank reconciliation", async ({
     .click();
   await expect(page).toHaveURL(/\/inicio$/);
 
-  await page.getByRole("link", { name: /Clientes/ }).click();
+  await page.getByRole("link", { name: /Contactos/ }).click();
   await page
     .locator(".page-heading")
-    .getByRole("button", { name: "Nuevo cliente" })
+    .getByRole("button", { name: "Nuevo contacto" })
     .click();
   await page.getByLabel("Razón social *").fill("Proveedor E2E SL");
-  await page.getByLabel("También es proveedor").check();
-  await page.getByRole("button", { name: "Guardar cliente" }).click();
+  await page.getByLabel("Es cliente").uncheck();
+  await page.getByLabel("Es proveedor").check();
+  await page.getByRole("button", { name: "Guardar contacto" }).click();
   await expect(page.getByRole("status")).toContainText(
     "Proveedor E2E SL ya está en tu cartera",
   );
