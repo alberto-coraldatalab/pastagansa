@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Post, Req } from "@nestjs/common";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshDto } from "./dto/refresh.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { IdentityService } from "./identity.service";
 import { Authenticated } from "./authenticated.decorator";
 import { AuthenticatedRequest } from "../tenancy/tenant.types";
@@ -22,6 +23,13 @@ export class IdentityController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   login(@Body() input: LoginDto) {
     return this.identity.login(input);
+  }
+
+  @HttpCode(204)
+  @Post("password-reset")
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  resetPassword(@Body() input: ResetPasswordDto) {
+    return this.identity.resetPassword(input);
   }
 
   @HttpCode(200)

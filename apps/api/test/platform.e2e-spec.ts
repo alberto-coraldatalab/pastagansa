@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PrismaClient } from "@prisma/client";
+import { createHash } from "node:crypto";
 import request = require("supertest");
 import type { Test as SupertestTest } from "supertest";
 import { AppModule } from "../src/app.module";
@@ -47,6 +48,64 @@ describe("platform integrity", () => {
     if (app) await app.close();
     await prisma.$disconnect();
     await admin.$disconnect();
+  });
+
+  it("resets a password once and revokes every existing session", async () => {
+    const email = "password-recovery@example.com";
+    const original = await register(
+      email,
+      "Recovery Org",
+      "Recovery Company",
+      "Q5000001G",
+    );
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const expiredToken = "expired-password-recovery-token-000000000000";
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashRecoveryToken(expiredToken),
+        expiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+    await request(app.getHttpServer())
+      .post("/v1/identity/password-reset")
+      .send({ token: expiredToken, password: "new secure password value" })
+      .expect(400);
+
+    const token = "valid-password-recovery-token-00000000000000";
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashRecoveryToken(token),
+        expiresAt: new Date(Date.now() + 30 * 60_000),
+      },
+    });
+    const attempts = await Promise.all([
+      request(app.getHttpServer())
+        .post("/v1/identity/password-reset")
+        .send({ token, password: "new secure password value" }),
+      request(app.getHttpServer())
+        .post("/v1/identity/password-reset")
+        .send({ token, password: "different secure password" }),
+    ]);
+    expect(attempts.map(({ status }) => status).sort()).toEqual([204, 400]);
+
+    await request(app.getHttpServer())
+      .post("/v1/identity/login")
+      .send({ email, password: "correct horse battery staple" })
+      .expect(401);
+    const acceptedPassword =
+      attempts[0].status === 204
+        ? "new secure password value"
+        : "different secure password";
+    await request(app.getHttpServer())
+      .post("/v1/identity/login")
+      .send({ email, password: acceptedPassword })
+      .expect(200);
+    await request(app.getHttpServer())
+      .get("/v1/identity/context")
+      .set("authorization", `Bearer ${original.accessToken}`)
+      .expect(401);
   });
 
   it("enforces tenant boundaries, quote integrity, refresh CAS, and revocation", async () => {
@@ -1780,6 +1839,9 @@ describe("platform integrity", () => {
       delete: (path: string) =>
         apply(request(app.getHttpServer()).delete(path)),
     };
+  }
+  function hashRecoveryToken(token: string) {
+    return createHash("sha256").update(token).digest("hex");
   }
   function quote(contactId: string, catalogItemId?: string) {
     return {

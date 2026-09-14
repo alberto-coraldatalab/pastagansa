@@ -1,13 +1,16 @@
 import * as argon2 from "argon2";
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { createHash } from "node:crypto";
 import { MembershipStatus, SessionStatus, UserStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { TokenPair, TokenService } from "./token.service";
 
 @Injectable()
@@ -162,6 +165,46 @@ export class IdentityService {
       throw new UnauthorizedException("Invalid email or password");
     }
     return this.createSession(user.id);
+  }
+
+  async resetPassword(input: ResetPasswordDto): Promise<void> {
+    const tokenHash = createHash("sha256").update(input.token).digest("hex");
+    const reset = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      select: { id: true, userId: true, usedAt: true, expiresAt: true },
+    });
+    if (!reset || reset.usedAt || reset.expiresAt <= new Date())
+      throw new BadRequestException("Recovery link is invalid or has expired");
+
+    const passwordHash = await argon2.hash(input.password, {
+      type: argon2.argon2id,
+    });
+    const now = new Date();
+
+    const changed = await this.prisma.$transaction(async (tx) => {
+      const consumed = await tx.passwordResetToken.updateMany({
+        where: { id: reset.id, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now },
+      });
+      if (consumed.count !== 1) return false;
+
+      await tx.user.update({
+        where: { id: reset.userId },
+        data: { passwordHash },
+      });
+      await tx.session.updateMany({
+        where: { userId: reset.userId, status: SessionStatus.ACTIVE },
+        data: { status: SessionStatus.REVOKED, revokedAt: now },
+      });
+      await tx.passwordResetToken.updateMany({
+        where: { userId: reset.userId, usedAt: null },
+        data: { usedAt: now },
+      });
+      return true;
+    });
+
+    if (!changed)
+      throw new BadRequestException("Recovery link is invalid or has expired");
   }
 
   async rotate(refreshToken: string): Promise<TokenPair> {

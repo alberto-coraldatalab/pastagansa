@@ -129,6 +129,11 @@ export function AuthPanel() {
               : "Crear cuenta"}
         </button>
       </form>
+      {mode === "login" && (
+        <Link className="auth-secondary-link" href="/recuperar">
+          He olvidado mi contraseña
+        </Link>
+      )}
       <p className="trust-copy">
         Tus credenciales se mantienen fuera del JavaScript del navegador.
       </p>

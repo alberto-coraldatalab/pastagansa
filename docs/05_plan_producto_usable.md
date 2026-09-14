@@ -108,6 +108,9 @@ el acceso, la persistencia de sesión y auditorías WCAG automatizadas con axe e
 inicio y estados clave de venta y compra. El selector multiempresa solo aparece con más
 de una membresía, valida el nuevo tenant en servidor y recarga todos los datos para no
 mezclar cachés. U1 queda completada.
+La recuperación de contraseña funciona sin SMTP mediante enlaces temporales generados
+por el operador: el token se persiste como hash, solo admite un uso y el cambio revoca
+todas las sesiones anteriores.
 
 Entregables:
 
@@ -230,7 +233,7 @@ cerrar U4. El
 workflow manual de aceptación ya puede ejecutar los dos recorridos y auditorías WCAG
 contra una URL HTTPS externa, con confirmación explícita de escritura. El guion moderado
 define consignas, métricas, evidencias y severidades. El stack reproducible de
-PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 25 migraciones,
+PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 26 migraciones,
 espera readiness real y supera el smoke test. El 10/09/2026 se ensayó localmente un dump
 custom y su restauración aislada, verificando migraciones, tablas críticas y recuentos
 de datos; CI repite ese ensayo en cada cambio.

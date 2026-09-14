@@ -19,7 +19,8 @@
     "db:generate": "npm run db:generate --workspace=@pastagansa/api",
     "db:migrate": "npm run db:migrate --workspace=@pastagansa/api",
     "db:deploy": "npm run db:deploy --workspace=@pastagansa/api",
-    "demo:seed": "node scripts/seed-demo.mjs"
+    "demo:seed": "node scripts/seed-demo.mjs",
+    "password:recovery-link": "node apps/api/scripts/create-password-reset.mjs"
   },
   "dependencies": {
     "@nestjs/platform-express": "11.2.3",

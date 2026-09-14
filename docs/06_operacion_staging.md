@@ -28,6 +28,22 @@ codificarse. Generar `JWT_SECRET` con al menos 32 caracteres aleatorios.
 SMTP es opcional y no forma parte del gate actual. Sin proveedor, la web desactiva el
 envío y ofrece la descarga PDF. No se deben inventar valores SMTP para staging.
 
+## Recuperación de una contraseña sin SMTP
+
+Generar el enlace temporal desde el host, sustituyendo el correo y la URL pública:
+
+```bash
+docker compose --env-file .env.staging -f docker-compose.staging.yml exec api \
+  node apps/api/scripts/create-password-reset.mjs usuario@empresa.es https://ledger.example.com
+```
+
+El comando imprime un enlace válido durante 30 minutos. Solo debe compartirse con el
+propietario de la cuenta mediante un canal privado. Generar otro enlace invalida el
+anterior; al elegir la contraseña nueva se consume el token y se revocan todas las
+sesiones que tuviera abiertas. El token se almacena únicamente como SHA-256 y nunca se
+debe copiar a logs, tickets o canales compartidos. La duración puede configurarse entre
+5 y 1440 minutos mediante `PASSWORD_RESET_TTL_MINUTES` al ejecutar el comando.
+
 ## Despliegue y actualización
 
 Desde el commit que se quiere desplegar:
