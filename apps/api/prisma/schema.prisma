@@ -292,6 +292,12 @@ model Company {
   timezone              String                       @default("Europe/Madrid") @db.VarChar(64)
   sifMode               SifMode                      @default(DISABLED) @map("sif_mode")
   aeatEnvironment       AeatEnvironment              @default(PRODUCTION) @map("aeat_environment")
+  sifSoftwareProducerName String?                    @map("sif_software_producer_name") @db.VarChar(240)
+  sifSoftwareProducerTaxId String?                   @map("sif_software_producer_tax_id") @db.VarChar(40)
+  sifSoftwareName       String?                      @map("sif_software_name") @db.VarChar(120)
+  sifSoftwareId         String?                      @map("sif_software_id") @db.VarChar(120)
+  sifSoftwareVersion    String?                      @map("sif_software_version") @db.VarChar(60)
+  sifInstallationNumber String?                      @map("sif_installation_number") @db.VarChar(120)
   createdAt             DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
   organization          Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   memberships           Membership[]
@@ -562,6 +568,7 @@ model SifRecord {
   hashAlgorithm        String        @default("SHA-256") @map("hash_algorithm") @db.VarChar(20)
   specificationVersion String        @default("AEAT-HASH-0.1.2") @map("specification_version") @db.VarChar(40)
   payload              Json
+  softwareSnapshot     Json          @default("{}") @map("software_snapshot")
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   organization         Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company              Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)

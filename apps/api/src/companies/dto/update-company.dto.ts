@@ -58,6 +58,24 @@ export class UpdateCompanyDto {
   @IsEnum(AeatEnvironment)
   aeatEnvironment?: AeatEnvironment;
 
+  @IsOptional() @IsString() @MaxLength(240)
+  sifSoftwareProducerName?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(40)
+  sifSoftwareProducerTaxId?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(120)
+  sifSoftwareName?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(120)
+  sifSoftwareId?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(60)
+  sifSoftwareVersion?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(120)
+  sifInstallationNumber?: string | null;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => UpdateCompanyDocumentProfileDto)

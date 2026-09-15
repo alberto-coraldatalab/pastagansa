@@ -29,6 +29,12 @@ export type CompanySettings = {
   timezone: string;
   sifMode: "DISABLED" | "NO_VERIFACTU" | "VERIFACTU";
   aeatEnvironment: "TEST" | "PRODUCTION";
+  sifSoftwareProducerName: string | null;
+  sifSoftwareProducerTaxId: string | null;
+  sifSoftwareName: string | null;
+  sifSoftwareId: string | null;
+  sifSoftwareVersion: string | null;
+  sifInstallationNumber: string | null;
   documentProfile: CompanyDocumentProfile | null;
   documentLogo: {
     id: string;
@@ -44,6 +50,8 @@ export type CompanySettings = {
 export type CompanySettingsInput = Pick<
   CompanySettings,
   "legalName" | "baseCurrency" | "timezone" | "sifMode" | "aeatEnvironment"
+  | "sifSoftwareProducerName" | "sifSoftwareProducerTaxId" | "sifSoftwareName"
+  | "sifSoftwareId" | "sifSoftwareVersion" | "sifInstallationNumber"
 > & { documentProfile: CompanyDocumentProfile };
 
 export const emptyDocumentProfile: CompanyDocumentProfile = {
@@ -79,6 +87,12 @@ export function companySettingsInput(company: CompanySettings): CompanySettingsI
     timezone: company.timezone,
     sifMode: company.sifMode,
     aeatEnvironment: company.aeatEnvironment,
+    sifSoftwareProducerName: company.sifSoftwareProducerName,
+    sifSoftwareProducerTaxId: company.sifSoftwareProducerTaxId,
+    sifSoftwareName: company.sifSoftwareName,
+    sifSoftwareId: company.sifSoftwareId,
+    sifSoftwareVersion: company.sifSoftwareVersion,
+    sifInstallationNumber: company.sifInstallationNumber,
     documentProfile: editableDocumentProfile(company.documentProfile),
   };
 }
@@ -90,6 +104,12 @@ export function normalizeCompanySettings(input: CompanySettingsInput) {
     timezone: input.timezone.trim(),
     sifMode: input.sifMode,
     aeatEnvironment: input.aeatEnvironment,
+    sifSoftwareProducerName: optionalText(input.sifSoftwareProducerName),
+    sifSoftwareProducerTaxId: optionalText(input.sifSoftwareProducerTaxId)?.toUpperCase() ?? null,
+    sifSoftwareName: optionalText(input.sifSoftwareName),
+    sifSoftwareId: optionalText(input.sifSoftwareId),
+    sifSoftwareVersion: optionalText(input.sifSoftwareVersion),
+    sifInstallationNumber: optionalText(input.sifInstallationNumber),
     documentProfile: Object.fromEntries(
       documentProfileFields.map((key) => {
         const value = input.documentProfile[key];
@@ -100,6 +120,10 @@ export function normalizeCompanySettings(input: CompanySettingsInput) {
       }),
     ),
   };
+}
+
+function optionalText(value: string | null) {
+  return value?.trim() || null;
 }
 
 function editableDocumentProfile(

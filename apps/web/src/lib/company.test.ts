@@ -14,6 +14,12 @@ const company: CompanySettings = {
   timezone: "Europe/Madrid",
   sifMode: "DISABLED",
   aeatEnvironment: "PRODUCTION",
+  sifSoftwareProducerName: null,
+  sifSoftwareProducerTaxId: null,
+  sifSoftwareName: null,
+  sifSoftwareId: null,
+  sifSoftwareVersion: null,
+  sifInstallationNumber: null,
   documentProfile: null,
   documentLogo: null,
 };

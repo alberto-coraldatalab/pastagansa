@@ -17,6 +17,7 @@ import {
   SIF_HASH_SPECIFICATION_VERSION,
 } from "./sif-hash-v1";
 import { verifySifChain } from "./sif-chain";
+import { captureSifSoftwareSnapshot } from "./sif-software-profile";
 
 @Injectable()
 export class SifService {
@@ -69,7 +70,17 @@ export class SifService {
         taxTotal: true,
         total: true,
         status: true,
-        company: { select: { timezone: true } },
+        company: {
+          select: {
+            timezone: true,
+            sifSoftwareProducerName: true,
+            sifSoftwareProducerTaxId: true,
+            sifSoftwareName: true,
+            sifSoftwareId: true,
+            sifSoftwareVersion: true,
+            sifInstallationNumber: true,
+          },
+        },
       },
     });
     if (
@@ -132,6 +143,7 @@ export class SifService {
         recordHash,
         specificationVersion: SIF_HASH_SPECIFICATION_VERSION,
         payload,
+        softwareSnapshot: captureSifSoftwareSnapshot(invoice.company),
       },
     });
     await this.audit.record("sif_record.registered", "sif_record", record.id, {
