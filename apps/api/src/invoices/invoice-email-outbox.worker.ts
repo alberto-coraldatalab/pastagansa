@@ -117,6 +117,7 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async succeed(organizationId: string, deliveryId: string, result: { provider: string; messageId?: string }, document: { invoiceId?: string; quoteId?: string; purpose: string }) {
+    const { purpose, ...documentReference } = document;
     await this.prisma.$transaction(async (db) => {
       await db.$queryRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
       await db.documentDelivery.update({ where: { id: deliveryId }, data: { status: InvoiceEmailStatus.SENT, sentAt: new Date(), lockedAt: null, lastError: null, provider: result.provider, providerMessageId: result.messageId ?? null } });
@@ -126,12 +127,12 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
           companyId: document.invoiceId
             ? (await db.invoice.findUniqueOrThrow({ where: { id: document.invoiceId }, select: { companyId: true } })).companyId
             : (await db.quote.findUniqueOrThrow({ where: { id: document.quoteId! }, select: { companyId: true } })).companyId,
-          ...document,
+          ...documentReference,
           type: CommercialDocumentEventType.SENT,
           source: CommercialEventSource.EMAIL,
           externalId: `delivery:${deliveryId}:sent`,
           effectiveAt: new Date(),
-          payload: { schemaVersion: 1, deliveryId, purpose: document.purpose, provider: result.provider, providerMessageId: result.messageId ?? null },
+          payload: { schemaVersion: 1, deliveryId, purpose, provider: result.provider, providerMessageId: result.messageId ?? null },
         },
       });
       if (document.invoiceId) await db.invoice.updateMany({ where: { id: document.invoiceId, status: InvoiceStatus.ISSUED }, data: { status: InvoiceStatus.SENT } });
