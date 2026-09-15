@@ -25,6 +25,8 @@ Future business controllers must use `@TenantProtected()`; the authentication an
 
 `POST /v1/contacts/import` accepts an object with a `csv` string. Required headers are `legal_name,trade_name,tax_id,email,phone,is_customer,is_supplier`; the import validates every row, rejects duplicate tax IDs, and executes atomically.
 
+`/v1/quotes` creates commercial quotations with a required active `QUOTE` document sequence. Number allocation is atomic and tenant-scoped; the resulting commercial code is preserved through PDF generation, status changes, and idempotent conversion to an invoice draft.
+
 `/v1/catalog-items` manages products and services, including commercial defaults used when document lines are created. Tax codes are suggestions only; they will be resolved by the versioned fiscal engine, not trusted as tax calculations.
 
 `POST /v1/catalog-items/import` accepts a `csv` string with the catalog fields in its documented header. It validates all rows and executes an all-or-nothing import.

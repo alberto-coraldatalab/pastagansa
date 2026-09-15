@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { logoutSession } from "@/lib/server-session";
 
-export async function POST(request: Request) {
+export async function POST() {
   await logoutSession();
-  return NextResponse.redirect(new URL("/acceso", request.url), 303);
+  return new NextResponse(null, {
+    status: 303,
+    headers: { location: "/acceso" },
+  });
 }

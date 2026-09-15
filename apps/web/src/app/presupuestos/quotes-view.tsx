@@ -6,7 +6,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { formatMoney, type CatalogPage } from "@/lib/catalog";
 import { type ContactPage } from "@/lib/contacts";
-import { formatInvoiceDate, todayIso } from "@/lib/invoices";
+import {
+  formatInvoiceDate,
+  todayIso,
+  type DocumentSequence,
+} from "@/lib/invoices";
 import {
   defaultQuoteExpiry,
   quoteCode,
@@ -36,14 +40,34 @@ export function QuotesView() {
     },
   });
   const createQuote = useMutation({
-    mutationFn: (payload: QuoteInput) =>
-      requestJson<Quote>("/api/quotes", {
+    mutationFn: async (payload: QuoteInput) => {
+      let sequenceId = payload.sequenceId;
+      if (!sequenceId && payload.newSeries) {
+        const sequence = await requestJson<DocumentSequence>(
+          "/api/document-sequences",
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              documentType: "QUOTE",
+              series: payload.newSeries,
+              padding: 4,
+            }),
+          },
+        );
+        sequenceId = sequence.id;
+      }
+      return requestJson<Quote>("/api/quotes", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      }),
+        body: JSON.stringify({ ...payload, sequenceId, newSeries: undefined }),
+      });
+    },
     onSuccess: async (quote) => {
-      await queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["quotes"] }),
+        queryClient.invalidateQueries({ queryKey: ["document-sequences"] }),
+      ]);
       setCreating(false);
       setNotice(
         `${quoteCode(quote.code)} guardado por ${formatMoney(quote.total, quote.currency)}.`,
@@ -243,6 +267,7 @@ export function QuoteDialog({
     initial?.validUntil?.slice(0, 10) ??
       defaultQuoteExpiry(initial?.issueDate.slice(0, 10) ?? todayIso()),
   );
+  const [useNewSeries, setUseNewSeries] = useState(false);
   const [lines, setLines] = useState<EditableLine[]>(() =>
     initial?.lines?.length
       ? initial.lines.map((line) => ({
@@ -263,6 +288,11 @@ export function QuoteDialog({
   const catalog = useQuery({
     queryKey: ["quote-catalog"],
     queryFn: () => loadOptions<CatalogPage>("/api/catalog?limit=100"),
+  });
+  const sequences = useQuery({
+    queryKey: ["document-sequences"],
+    queryFn: () => requestJson<DocumentSequence[]>("/api/document-sequences"),
+    enabled: !initial,
   });
 
   useEffect(() => {
@@ -299,7 +329,17 @@ export function QuoteDialog({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
+    const selectedSequenceId = String(values.get("sequenceId") ?? "");
     onSubmit({
+      ...(!initial
+        ? {
+            sequenceId:
+              selectedSequenceId && selectedSequenceId !== "__new__"
+                ? selectedSequenceId
+                : undefined,
+            newSeries: String(values.get("newSeries") ?? "").trim() || undefined,
+          }
+        : {}),
       contactId: String(values.get("contactId")),
       issueDate: String(values.get("issueDate")),
       validUntil: String(values.get("validUntil")),
@@ -316,8 +356,16 @@ export function QuoteDialog({
     });
   }
 
-  const loading = customers.isPending || catalog.isPending;
-  const loadError = customers.error?.message ?? catalog.error?.message;
+  const activeSequences =
+    sequences.data?.filter(
+      (sequence) => sequence.active && sequence.documentType === "QUOTE",
+    ) ?? [];
+  const loading =
+    customers.isPending || catalog.isPending || (!initial && sequences.isPending);
+  const loadError =
+    customers.error?.message ??
+    catalog.error?.message ??
+    (!initial ? sequences.error?.message : undefined);
   return (
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !pending) onClose();
@@ -342,6 +390,39 @@ export function QuoteDialog({
         {!loading && !loadError && !!customers.data?.data.length && catalog.data && (
           <form className="invoice-form" onSubmit={submit}>
             <div className="invoice-basics">
+              {!initial && activeSequences.length > 0 && (
+                <label className="field">
+                  <span>Serie del presupuesto</span>
+                  <select
+                    name="sequenceId"
+                    required={!useNewSeries}
+                    defaultValue={activeSequences[0].id}
+                    onChange={(event) =>
+                      setUseNewSeries(event.target.value === "__new__")
+                    }
+                  >
+                    {activeSequences.map((sequence) => (
+                      <option key={sequence.id} value={sequence.id}>
+                        {sequence.series} · próximo {sequence.nextNumber.padStart(sequence.padding, "0")}
+                      </option>
+                    ))}
+                    <option value="__new__">Crear otra serie…</option>
+                  </select>
+                </label>
+              )}
+              {!initial && (activeSequences.length === 0 || useNewSeries) && (
+                <label className="field">
+                  <span>Nueva serie del presupuesto</span>
+                  <input
+                    name="newSeries"
+                    required
+                    maxLength={30}
+                    pattern="[A-Za-z0-9][A-Za-z0-9._/-]*"
+                    defaultValue={`P${issueDate.slice(0, 4)}`}
+                  />
+                  <small>Se creará al guardar el primer presupuesto.</small>
+                </label>
+              )}
               <label className="field invoice-customer">
                 <span>Cliente</span>
                 <select name="contactId" required defaultValue={initial?.contactId ?? ""}>

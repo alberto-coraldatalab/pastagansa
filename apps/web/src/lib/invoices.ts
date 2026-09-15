@@ -116,7 +116,7 @@ export interface InvoiceEmailCapability {
 
 export interface DocumentSequence {
   id: string;
-  documentType: "INVOICE" | "CREDIT_NOTE" | "PURCHASE_INVOICE";
+  documentType: "INVOICE" | "CREDIT_NOTE" | "PURCHASE_INVOICE" | "QUOTE";
   series: string;
   nextNumber: string;
   padding: number;

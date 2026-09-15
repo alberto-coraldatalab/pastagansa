@@ -67,6 +67,7 @@ enum DocumentType {
   INVOICE
   CREDIT_NOTE
   PURCHASE_INVOICE
+  QUOTE
 }
 
 enum InvoiceStatus {
@@ -364,6 +365,7 @@ model DocumentSequence {
   invoices                Invoice[]
   purchaseInvoices        PurchaseInvoice[] @relation("PurchaseReceptionSequence")
   pendingPurchaseInvoices PurchaseInvoice[] @relation("PurchaseRequestedSequence")
+  quotes                  Quote[]
 
   @@unique([companyId, documentType, series])
   @@unique([id, organizationId, companyId])
@@ -1210,11 +1212,14 @@ model Quote {
   organizationId    String       @map("organization_id") @db.Uuid
   companyId         String       @map("company_id") @db.Uuid
   contactId         String       @map("contact_id") @db.Uuid
+  sequenceId        String?      @map("sequence_id") @db.Uuid
   convertedInvoiceId String?     @map("converted_invoice_id") @db.Uuid
   customerLegalName String       @map("customer_legal_name") @db.VarChar(240)
   customerTaxId     String?      @map("customer_tax_id") @db.VarChar(40)
   billingAddress    Json?        @map("billing_address")
   code              String       @default(cuid()) @db.VarChar(40)
+  series            String?      @db.VarChar(30)
+  number            BigInt?
   status            QuoteStatus  @default(DRAFT)
   issueDate         DateTime     @map("issue_date") @db.Date
   validUntil        DateTime?    @map("valid_until") @db.Date
@@ -1229,10 +1234,12 @@ model Quote {
   organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company           Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
   contact           Contact      @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  sequence          DocumentSequence? @relation(fields: [sequenceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   convertedInvoice  Invoice?     @relation(fields: [convertedInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   lines             QuoteLine[]
 
   @@unique([companyId, code])
+  @@unique([companyId, series, number])
   @@unique([convertedInvoiceId, organizationId, companyId])
   @@index([companyId, status, issueDate])
   @@map("quotes")

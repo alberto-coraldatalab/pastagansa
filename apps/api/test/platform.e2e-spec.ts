@@ -288,16 +288,26 @@ describe("platform integrity", () => {
         currency: "EUR",
       })
       .expect(201);
+    const quoteSequence = await authed(accountA.accessToken, tenantA)
+      .post("/v1/document-sequences")
+      .send({ documentType: "QUOTE", series: "P2026", padding: 5 })
+      .expect(201);
 
     await authed(accountA.accessToken, tenantB).get("/v1/contacts").expect(403);
     await authed(accountA.accessToken, tenantA)
       .post("/v1/quotes")
-      .send(quote(contactA.body.id, itemB.body.id))
+      .send(quote(contactA.body.id, quoteSequence.body.id, itemB.body.id))
       .expect(400);
     const createdQuote = await authed(accountA.accessToken, tenantA)
       .post("/v1/quotes")
-      .send(quote(contactA.body.id))
+      .send(quote(contactA.body.id, quoteSequence.body.id))
       .expect(201);
+    expect(createdQuote.body).toMatchObject({
+      code: "P2026-00001",
+      series: "P2026",
+      number: "1",
+      sequenceId: quoteSequence.body.id,
+    });
     expect(createdQuote.body.customerLegalName).toBe("Customer A");
     expect(createdQuote.body.lines[0].totalAmount).toBe("121");
     const quotePdf = await authed(accountA.accessToken, tenantA)
@@ -311,9 +321,22 @@ describe("platform integrity", () => {
     expect(Buffer.isBuffer(quotePdf.body)).toBe(true);
     expect(quotePdf.body.subarray(0, 5).toString()).toBe("%PDF-");
 
+    const concurrentQuotes = await Promise.all(
+      Array.from({ length: 2 }, () =>
+        authed(accountA.accessToken, tenantA)
+          .post("/v1/quotes")
+          .send(quote(contactA.body.id, quoteSequence.body.id)),
+      ),
+    );
+    expect(concurrentQuotes.map(({ status }) => status)).toEqual([201, 201]);
+    expect(new Set(concurrentQuotes.map(({ body }) => body.code)).size).toBe(2);
+    expect(
+      concurrentQuotes.every(({ body }) => body.series === "P2026"),
+    ).toBe(true);
+
     const acceptedQuote = await authed(accountA.accessToken, tenantA)
       .post("/v1/quotes")
-      .send(quote(contactA.body.id))
+      .send(quote(contactA.body.id, quoteSequence.body.id))
       .expect(201);
     await authed(accountA.accessToken, tenantA)
       .post(`/v1/quotes/${acceptedQuote.body.id}/status`)
@@ -1974,9 +1997,14 @@ describe("platform integrity", () => {
   function hashRecoveryToken(token: string) {
     return createHash("sha256").update(token).digest("hex");
   }
-  function quote(contactId: string, catalogItemId?: string) {
+  function quote(
+    contactId: string,
+    sequenceId: string,
+    catalogItemId?: string,
+  ) {
     return {
       contactId,
+      sequenceId,
       issueDate: "2026-09-08",
       validUntil: "2026-10-08",
       currency: "EUR",

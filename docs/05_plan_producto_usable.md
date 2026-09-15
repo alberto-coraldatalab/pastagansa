@@ -77,8 +77,8 @@ demo coherente con un procedimiento documentado.
 
 Estado real: completada. Los comandos raíz levantan API y web; el stack reproducible
 aplica migraciones y comprueba readiness; y el seed público crea una empresa, usuario,
-cliente, proveedor, servicio, dos series y una cuenta bancaria. CI lo ejecuta dos veces
-y exige que la segunda pasada reutilice los seis recursos. Las credenciales, recorridos
+cliente, proveedor, servicio, tres series y una cuenta bancaria. CI lo ejecuta dos veces
+y exige que la segunda pasada reutilice los siete recursos. Las credenciales, recorridos
 y reinicio destructivo limitado al volumen local están documentados.
 
 Entregables:
@@ -269,11 +269,12 @@ descarga PDF y los estados enviado, aceptado, rechazado, caducado y cancelado. U
 presupuesto aceptado se convierte de forma atómica e idempotente en factura borrador,
 copiando cliente, conceptos, condiciones e impuestos y manteniendo navegación entre
 ambos documentos. El E2E de venta cubre creación, PDF, aceptación y conversión,
-incluida una auditoría WCAG del borrador.
+incluida una auditoría WCAG del borrador. Los presupuestos usan ya una serie
+comercial configurable con asignación atómica y conservan ese número en listado,
+detalle y PDF.
 
 Pendiente para cerrar U5:
 
-- sustituir el identificador técnico por una serie/numeración comercial configurable;
 - validar el recorrido actualizado en staging.
 
 Gate:

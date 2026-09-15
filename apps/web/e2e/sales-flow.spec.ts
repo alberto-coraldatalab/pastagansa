@@ -77,7 +77,7 @@ test("completes the sales flow from registration to payment", async ({
     .fill("Oferta válida durante 30 días");
   await page.getByRole("button", { name: "Guardar borrador" }).click();
   await expect(page.getByRole("status")).toContainText("guardado por 121,00");
-  await page.getByRole("link", { name: /^PRE-/ }).click();
+  await page.getByRole("link", { name: /^P\d{4}-\d{4}$/ }).click();
   await expect(page.getByText("Oferta válida durante 30 días")).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, "quote draft");
 
@@ -99,7 +99,10 @@ test("completes the sales flow from registration to payment", async ({
     page.getByRole("heading", { name: "Factura en borrador" }),
   ).toBeVisible();
   await expect(page.getByText("Creada desde el presupuesto")).toBeVisible();
-  await page.locator(".notice").getByRole("link", { name: /^PRE-/ }).click();
+  await page
+    .locator(".notice")
+    .getByRole("link", { name: /^P\d{4}-\d{4}$/ })
+    .click();
   await expect(page.getByText("Convertido", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText("Convertido", { exact: true })).toBeVisible();

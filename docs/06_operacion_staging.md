@@ -28,6 +28,10 @@ codificarse. Generar `JWT_SECRET` con al menos 32 caracteres aleatorios.
 SMTP es opcional y no forma parte del gate actual. Sin proveedor, la web desactiva el
 envío y ofrece la descarga PDF. No se deben inventar valores SMTP para staging.
 
+El staging aislado usa `THROTTLE_LIMIT=1000` para que los recorridos de aceptación
+completos no compartan y agoten la ventana por IP. Producción conserva el límite normal
+de 120 salvo una decisión operativa explícita.
+
 ## Recuperación de una contraseña sin SMTP
 
 Generar el enlace temporal desde el host, sustituyendo el correo y la URL pública:

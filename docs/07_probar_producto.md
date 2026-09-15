@@ -21,9 +21,9 @@ El seed utiliza por defecto estas credenciales, exclusivas para desarrollo y dem
 - contraseña: `DemoPastagansa2026!`.
 
 Crea la empresa `PastaGansa Demo SL`, un cliente, un proveedor, un servicio a 75 €/h,
-series de venta y compra y una cuenta bancaria ligada a la cuenta contable 572000. Una
-segunda ejecución reutiliza los seis recursos y debe informar `created: 0` y
-`existing: 6`.
+series de venta, compra y presupuestos y una cuenta bancaria ligada a la cuenta contable 572000. Una
+segunda ejecución reutiliza los siete recursos y debe informar `created: 0` y
+`existing: 7`.
 
 Para personalizar credenciales se pueden definir `DEMO_EMAIL` y `DEMO_PASSWORD`. El
 script rechaza hosts que no sean loopback; sembrar un entorno demo remoto exige además

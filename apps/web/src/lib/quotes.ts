@@ -10,6 +10,14 @@ export const quoteLineInputSchema = z.object({
 });
 
 export const quoteInputSchema = z.object({
+  sequenceId: z.uuid().optional(),
+  newSeries: z
+    .string()
+    .trim()
+    .min(1)
+    .max(30)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/)
+    .optional(),
   contactId: z.uuid(),
   issueDate: z.iso.date(),
   validUntil: z.union([z.iso.date(), z.literal("")]).optional(),
@@ -36,6 +44,9 @@ export interface Quote {
   id: string;
   contactId: string;
   code: string;
+  sequenceId: string | null;
+  series: string | null;
+  number: string | null;
   status: QuoteStatus;
   customerLegalName: string;
   customerTaxId: string | null;
@@ -84,6 +95,9 @@ export function quoteStatusLabel(status: QuoteStatus) {
 }
 
 export function quoteCode(code: string) {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(code);
+  const isCuid = /^c[a-z0-9]{20,}$/i.test(code);
+  if (!isUuid && !isCuid) return code;
   return `PRE-${code.slice(-8).toUpperCase()}`;
 }
 

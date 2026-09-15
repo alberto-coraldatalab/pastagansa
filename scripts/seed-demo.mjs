@@ -206,6 +206,12 @@ const purchaseSequence = await ensureSequence(auth, sequences, {
   startingNumber: 1,
   padding: 4,
 });
+const quoteSequence = await ensureSequence(auth, sequences, {
+  documentType: "QUOTE",
+  series: "DEMO-P",
+  startingNumber: 1,
+  padding: 4,
+});
 const bankAccount = await ensureBankAccount(auth);
 
 const resources = {
@@ -214,6 +220,7 @@ const resources = {
   service,
   invoiceSequence,
   purchaseSequence,
+  quoteSequence,
   bankAccount,
 };
 const created = Object.values(resources).filter(

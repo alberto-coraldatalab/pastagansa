@@ -7,6 +7,7 @@ import {
 import {
   CatalogItemStatus,
   ContactStatus,
+  DocumentType,
   Prisma,
   QuoteStatus,
 } from "@prisma/client";
@@ -17,7 +18,10 @@ import { CreateQuoteDto, QuoteLineDto, UpdateQuoteDto } from "./dto/quote.dto";
 import { ListQuotesDto } from "./dto/list-quotes.dto";
 import { decodeCursor, encodeCursor } from "../common/cursor";
 import { QuotePdfService } from "./quote-pdf.service";
-import { InvoicesService } from "../invoices/invoices.service";
+import {
+  formatInvoiceNumber,
+  InvoicesService,
+} from "../invoices/invoices.service";
 import { ConvertQuoteDto } from "./dto/convert-quote.dto";
 
 @Injectable()
@@ -62,7 +66,7 @@ export class QuotesService {
     const data = hasMore ? quotes.slice(0, -1) : quotes;
     const last = data.at(-1);
     return {
-      data,
+      data: data.map(presentQuote),
       nextCursor:
         hasMore && last
           ? encodeCursor(last.id, last.createdAt.toISOString(), filter)
@@ -79,7 +83,7 @@ export class QuotesService {
       },
     });
     if (!quote) throw new NotFoundException("Quote not found");
-    return quote;
+    return presentQuote(quote);
   }
 
   async downloadPdf(id: string) {
@@ -99,18 +103,59 @@ export class QuotesService {
   async create(input: CreateQuoteDto) {
     const scope = this.scope();
     const data = await this.build(input);
+    const sequence = await this.tenant.db.documentSequence.findFirst({
+      where: {
+        id: input.sequenceId,
+        ...scope,
+        documentType: DocumentType.QUOTE,
+        active: true,
+      },
+    });
+    if (!sequence)
+      throw new BadRequestException(
+        "An active QUOTE sequence from this company is required",
+      );
+    const [allocated] = await this.tenant.db.$queryRaw<
+      Array<{ number: bigint }>
+    >`
+      UPDATE "document_sequences"
+      SET "next_number" = "next_number" + 1,
+          "updated_at" = CURRENT_TIMESTAMP
+      WHERE "id" = CAST(${sequence.id} AS uuid)
+        AND "organization_id" = CAST(${scope.organizationId} AS uuid)
+        AND "company_id" = CAST(${scope.companyId} AS uuid)
+        AND "document_type" = 'QUOTE'
+        AND "active" = true
+      RETURNING "next_number" - 1 AS "number"
+    `;
+    if (!allocated)
+      throw new ConflictException("Document sequence is no longer active");
+    const code = formatInvoiceNumber(
+      sequence.series,
+      allocated.number,
+      sequence.padding,
+    );
     const quote = await this.tenant.db.quote.create({
       data: {
         ...scope,
         ...data.document,
+        sequenceId: sequence.id,
+        series: sequence.series,
+        number: allocated.number,
+        code,
         lines: {
           create: data.lines.map((item) => ({ ...item.persisted, ...scope })),
         },
       },
       include: { lines: true },
     });
-    await this.audit.record("quote.created", "quote", quote.id);
-    return quote;
+    await this.audit.record("quote.created", "quote", quote.id, {
+      sequenceId: sequence.id,
+      series: sequence.series,
+      number: allocated.number.toString(),
+      code,
+    });
+    return presentQuote(quote);
   }
 
   async update(id: string, input: UpdateQuoteDto) {
@@ -212,7 +257,7 @@ export class QuotesService {
     return invoice;
   }
 
-  private async build(input: CreateQuoteDto) {
+  private async build(input: CreateQuoteDto | UpdateQuoteDto) {
     if (input.validUntil && input.validUntil < input.issueDate)
       throw new BadRequestException("validUntil cannot precede issueDate");
     const scope = this.scope();
@@ -331,6 +376,13 @@ export function calculateQuoteLine(input: QuoteLineDto, position: number) {
       taxAmount,
       totalAmount: netAmount.plus(taxAmount),
     },
+  };
+}
+
+function presentQuote<T extends { number: bigint | null }>(quote: T) {
+  return {
+    ...quote,
+    number: quote.number?.toString() ?? null,
   };
 }
 

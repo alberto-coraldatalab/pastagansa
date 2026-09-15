@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const input = quoteInputSchema.safeParse(
     await request.json().catch(() => undefined),
   );
-  if (!input.success)
+  if (!input.success || !input.data.sequenceId)
     return NextResponse.json(
       { error: "Revisa el cliente, las fechas y las líneas del presupuesto." },
       { status: 400 },
@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       ...input.data,
+      newSeries: undefined,
       validUntil: input.data.validUntil || undefined,
       notes: input.data.notes || undefined,
     }),

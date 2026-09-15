@@ -41,7 +41,7 @@ export class QuoteLineDto {
   @Max(100)
   taxRate?: number;
 }
-export class CreateQuoteDto {
+class QuoteDocumentDto {
   @IsUUID() contactId!: string;
   @IsDateString() issueDate!: string;
   @IsOptional() @IsDateString() validUntil?: string;
@@ -54,7 +54,10 @@ export class CreateQuoteDto {
   @Type(() => QuoteLineDto)
   lines!: QuoteLineDto[];
 }
-export class UpdateQuoteDto extends CreateQuoteDto {}
+export class CreateQuoteDto extends QuoteDocumentDto {
+  @IsUUID() sequenceId!: string;
+}
+export class UpdateQuoteDto extends QuoteDocumentDto {}
 export class ChangeQuoteStatusDto {
   @IsEnum(QuoteStatus) expectedStatus!: QuoteStatus;
   @IsEnum(QuoteStatus) status!: QuoteStatus;
