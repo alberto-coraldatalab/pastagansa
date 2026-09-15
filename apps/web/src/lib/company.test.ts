@@ -35,4 +35,24 @@ describe("company settings helpers", () => {
       documentProfile: { phone: null },
     });
   });
+
+  it("does not send API-only document profile metadata back to the server", () => {
+    const input = companySettingsInput({
+      ...company,
+      documentProfile: {
+        ...companySettingsInput(company).documentProfile,
+        id: "profile-1",
+        organizationId: "organization-1",
+        companyId: "company-1",
+        createdAt: "2026-09-15T00:00:00.000Z",
+        updatedAt: "2026-09-15T00:00:00.000Z",
+      } as CompanySettings["documentProfile"],
+    });
+    const profile = normalizeCompanySettings(input).documentProfile;
+    expect(profile).not.toHaveProperty("id");
+    expect(profile).not.toHaveProperty("organizationId");
+    expect(profile).not.toHaveProperty("companyId");
+    expect(profile).not.toHaveProperty("createdAt");
+    expect(profile).not.toHaveProperty("updatedAt");
+  });
 });

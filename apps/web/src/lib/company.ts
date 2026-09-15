@@ -68,6 +68,10 @@ export const emptyDocumentProfile: CompanyDocumentProfile = {
   emailBodyTemplate: "{{company_name}} adjunta {{document_type}} {{document_number}}.",
 };
 
+const documentProfileFields = Object.keys(emptyDocumentProfile) as Array<
+  keyof CompanyDocumentProfile
+>;
+
 export function companySettingsInput(company: CompanySettings): CompanySettingsInput {
   return {
     legalName: company.legalName,
@@ -75,7 +79,7 @@ export function companySettingsInput(company: CompanySettings): CompanySettingsI
     timezone: company.timezone,
     sifMode: company.sifMode,
     aeatEnvironment: company.aeatEnvironment,
-    documentProfile: { ...emptyDocumentProfile, ...company.documentProfile },
+    documentProfile: editableDocumentProfile(company.documentProfile),
   };
 }
 
@@ -87,10 +91,24 @@ export function normalizeCompanySettings(input: CompanySettingsInput) {
     sifMode: input.sifMode,
     aeatEnvironment: input.aeatEnvironment,
     documentProfile: Object.fromEntries(
-      Object.entries(input.documentProfile).map(([key, value]) => [
-        key,
+      documentProfileFields.map((key) => {
+        const value = input.documentProfile[key];
+        return [
+          key,
         typeof value === "string" && value.trim() === "" ? null : value?.trim() ?? null,
-      ]),
+        ];
+      }),
     ),
   };
+}
+
+function editableDocumentProfile(
+  profile: CompanyDocumentProfile | null,
+): CompanyDocumentProfile {
+  return Object.fromEntries(
+    documentProfileFields.map((field) => [
+      field,
+      profile?.[field] ?? emptyDocumentProfile[field],
+    ]),
+  ) as CompanyDocumentProfile;
 }
