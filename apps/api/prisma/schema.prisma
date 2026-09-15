@@ -113,6 +113,25 @@ enum DeliveryDocumentType {
   QUOTE
 }
 
+enum CommercialDocumentEventType {
+  SENT
+  DELIVERY_FAILED
+  ACCEPTED
+  REJECTED
+  DISPUTED
+  PARTIALLY_PAID
+  PAID
+  PAYMENT_PROMISED
+}
+
+enum CommercialEventSource {
+  USER
+  EMAIL
+  BANK
+  SYSTEM
+  EINVOICE
+}
+
 enum InstallmentStatus {
   PENDING
   PARTIALLY_PAID
@@ -213,6 +232,7 @@ model Organization {
   documentSequences     DocumentSequence[]
   invoices              Invoice[]
   documentDeliveries    DocumentDelivery[]
+  commercialEvents      CommercialDocumentEvent[]
   invoiceInstallments   InvoiceInstallment[]
   payments              Payment[]
   paymentAllocations    PaymentAllocation[]
@@ -264,6 +284,7 @@ model Company {
   documentSequences     DocumentSequence[]
   invoices              Invoice[]
   documentDeliveries    DocumentDelivery[]
+  commercialEvents      CommercialDocumentEvent[]
   invoiceInstallments   InvoiceInstallment[]
   payments              Payment[]
   paymentAllocations    PaymentAllocation[]
@@ -483,6 +504,7 @@ model Invoice {
   rectifications      Invoice[]              @relation("InvoiceRectifications")
   lines               InvoiceLine[]
   emailDeliveries     DocumentDelivery[]
+  commercialEvents    CommercialDocumentEvent[]
   installments        InvoiceInstallment[]
   paymentAllocations  PaymentAllocation[]
   taxLines            InvoiceTaxLine[]
@@ -1195,6 +1217,7 @@ model Payment {
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company        Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
   allocations    PaymentAllocation[]
+  commercialEvents CommercialDocumentEvent[]
 
   @@unique([companyId, idempotencyKey])
   @@unique([id, organizationId, companyId])
@@ -1255,6 +1278,36 @@ model DocumentDelivery {
   @@index([invoiceId, createdAt])
   @@index([quoteId, createdAt])
   @@map("document_deliveries")
+}
+
+model CommercialDocumentEvent {
+  id             String                      @id @default(uuid()) @db.Uuid
+  organizationId String                      @map("organization_id") @db.Uuid
+  companyId      String                      @map("company_id") @db.Uuid
+  invoiceId      String?                     @map("invoice_id") @db.Uuid
+  quoteId        String?                     @map("quote_id") @db.Uuid
+  paymentId      String?                     @map("payment_id") @db.Uuid
+  correctionOfId String?                     @map("correction_of_id") @db.Uuid
+  actorUserId    String?                     @map("actor_user_id") @db.Uuid
+  type           CommercialDocumentEventType
+  source         CommercialEventSource
+  externalId     String?                     @map("external_id") @db.VarChar(240)
+  effectiveAt    DateTime                    @map("effective_at") @db.Timestamptz(6)
+  receivedAt     DateTime                    @default(now()) @map("received_at") @db.Timestamptz(6)
+  comment        String?                     @db.VarChar(1000)
+  payload        Json                        @default("{}")
+  createdAt      DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company                     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invoice        Invoice?                    @relation(fields: [invoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  quote          Quote?                      @relation(fields: [quoteId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  payment        Payment?                    @relation(fields: [paymentId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+
+  @@unique([companyId, source, externalId])
+  @@index([invoiceId, effectiveAt, id])
+  @@index([quoteId, effectiveAt, id])
+  @@index([companyId, type, effectiveAt])
+  @@map("commercial_document_events")
 }
 
 model InvoiceLine {
@@ -1318,6 +1371,7 @@ model Quote {
   convertedInvoice  Invoice?     @relation(fields: [convertedInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   lines             QuoteLine[]
   emailDeliveries   DocumentDelivery[]
+  commercialEvents  CommercialDocumentEvent[]
 
   @@unique([companyId, code])
   @@unique([companyId, series, number])

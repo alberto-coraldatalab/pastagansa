@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { CommercialTimeline } from "@/components/commercial-timeline";
 import { formatMoney } from "@/lib/catalog";
 import {
   formatInvoiceDate,
@@ -211,6 +212,7 @@ export function InvoiceDetail({ id }: { id: string }) {
         </article>
       </section>
       {document.status !== "DRAFT" && <EmailPanel invoice={document} />}
+      {document.status !== "DRAFT" && <CommercialTimeline endpoint={`/api/invoices/${document.id}/commercial-events`} canManage />}
       {document.status !== "DRAFT" && <PaymentsPanel invoice={document} />}
       <section className="invoice-detail-panel">
         <header>

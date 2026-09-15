@@ -12,9 +12,10 @@ import { TaxModule } from "../tax/tax.module";
 import { AccountingModule } from "../accounting/accounting.module";
 import { SifModule } from "../sif/sif.module";
 import { QuotePdfService } from "../quotes/quote-pdf.service";
+import { CommercialEventsModule } from "../commercial-events/commercial-events.module";
 
 @Module({
-  imports: [AuditModule, TaxModule, AccountingModule, SifModule],
+  imports: [AuditModule, TaxModule, AccountingModule, SifModule, CommercialEventsModule],
   controllers: [DocumentSequencesController, InvoicesController],
   providers: [
     DocumentSequencesService,

@@ -24,12 +24,16 @@ import { ListQuotesDto } from "./dto/list-quotes.dto";
 import { ConvertQuoteDto } from "./dto/convert-quote.dto";
 import { SendDocumentEmailDto } from "../invoices/dto/send-invoice-email.dto";
 import { InvoiceEmailService } from "../invoices/invoice-email.service";
+import { CommercialEventsService } from "../commercial-events/commercial-events.service";
+import { CreateCommercialEventDto } from "../commercial-events/dto/create-commercial-event.dto";
+import { ListCommercialEventsDto } from "../commercial-events/dto/list-commercial-events.dto";
 @Controller("quotes")
 @TenantProtected()
 export class QuotesController {
   constructor(
     private readonly quotes: QuotesService,
     private readonly emails: InvoiceEmailService,
+    private readonly commercialEvents: CommercialEventsService,
   ) {}
   @Get() @RequirePermissions("quote.read") list(@Query() query: ListQuotesDto) {
     return this.quotes.list(query);
@@ -57,6 +61,12 @@ export class QuotesController {
   ) {
     return this.emails.listQuote(id);
   }
+  @Get(":id/commercial-events") @RequirePermissions("quote.read", "collections.read") commercialEventsList(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: ListCommercialEventsDto,
+  ) {
+    return this.commercialEvents.listQuote(id, query);
+  }
   @Post() @RequirePermissions("quote.create") create(
     @Body() input: CreateQuoteDto,
   ) {
@@ -71,6 +81,15 @@ export class QuotesController {
     @Body() input: SendDocumentEmailDto,
   ) {
     return this.emails.enqueueQuote(id, input, requireIdempotencyKey(idempotencyKey));
+  }
+  @Post(":id/commercial-events")
+  @HttpCode(201)
+  @RequirePermissions("quote.read", "quotes.manage")
+  commercialEvent(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: CreateCommercialEventDto,
+  ) {
+    return this.commercialEvents.recordQuote(id, input);
   }
   @Patch(":id") @RequirePermissions("quote.update") update(
     @Param("id", ParseUUIDPipe) id: string,

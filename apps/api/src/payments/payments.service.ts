@@ -16,6 +16,7 @@ import { AuditService } from "../audit/audit.service";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 import { RecordPaymentDto } from "./dto/record-payment.dto";
 import { SetPaymentScheduleDto } from "./dto/set-payment-schedule.dto";
+import { CommercialEventsService } from "../commercial-events/commercial-events.service";
 
 @Injectable()
 export class PaymentsService {
@@ -23,6 +24,7 @@ export class PaymentsService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     private readonly accounting: AccountingService,
+    private readonly commercialEvents: CommercialEventsService,
   ) {}
 
   async getSchedule(invoiceId: string) {
@@ -203,6 +205,14 @@ export class PaymentsService {
         },
       });
       await this.accounting.postPayment(payment.id);
+      await this.commercialEvents.recordPayment({
+        invoiceId,
+        paymentId: payment.id,
+        paidAt: payment.paidAt,
+        amount: amount.toFixed(2),
+        currency: invoice.currency,
+        fullyPaid: amountDue.isZero(),
+      });
       await this.audit.record("payment.created", "payment", payment.id, {
         invoiceId,
         amount: amount.toFixed(2),

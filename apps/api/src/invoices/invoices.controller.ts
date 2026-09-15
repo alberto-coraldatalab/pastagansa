@@ -22,6 +22,9 @@ import { IssueInvoiceDto } from "./dto/issue-invoice.dto";
 import { SendInvoiceEmailDto } from "./dto/send-invoice-email.dto";
 import { InvoiceEmailService } from "./invoice-email.service";
 import { InvoicesService } from "./invoices.service";
+import { CommercialEventsService } from "../commercial-events/commercial-events.service";
+import { CreateCommercialEventDto } from "../commercial-events/dto/create-commercial-event.dto";
+import { ListCommercialEventsDto } from "../commercial-events/dto/list-commercial-events.dto";
 
 @Controller("invoices")
 @TenantProtected()
@@ -29,6 +32,7 @@ export class InvoicesController {
   constructor(
     private readonly invoices: InvoicesService,
     private readonly emails: InvoiceEmailService,
+    private readonly commercialEvents: CommercialEventsService,
   ) {}
 
   @Get()
@@ -64,6 +68,15 @@ export class InvoicesController {
   @RequirePermissions("invoice.read")
   deliveries(@Param("id", ParseUUIDPipe) id: string) {
     return this.emails.list(id);
+  }
+
+  @Get(":id/commercial-events")
+  @RequirePermissions("invoice.read", "collections.read")
+  commercialEventsList(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: ListCommercialEventsDto,
+  ) {
+    return this.commercialEvents.listInvoice(id, query);
   }
 
   @Post()
@@ -118,6 +131,16 @@ export class InvoicesController {
       input,
       requireIdempotencyKey(idempotencyKey),
     );
+  }
+
+  @Post(":id/commercial-events")
+  @HttpCode(201)
+  @RequirePermissions("invoice.read", "collections.manage")
+  commercialEvent(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: CreateCommercialEventDto,
+  ) {
+    return this.commercialEvents.recordInvoice(id, input);
   }
 
   @Delete(":id")

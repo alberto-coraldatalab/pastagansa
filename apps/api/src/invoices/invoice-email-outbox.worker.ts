@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { DeliveryDocumentType, InvoiceEmailStatus, InvoiceStatus, Prisma, PrismaClient, QuoteStatus } from "@prisma/client";
+import { CommercialDocumentEventType, CommercialEventSource, DeliveryDocumentType, InvoiceEmailStatus, InvoiceStatus, Prisma, PrismaClient, QuoteStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { QuotePdfService } from "../quotes/quote-pdf.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
@@ -120,6 +120,20 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
     await this.prisma.$transaction(async (db) => {
       await db.$queryRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
       await db.documentDelivery.update({ where: { id: deliveryId }, data: { status: InvoiceEmailStatus.SENT, sentAt: new Date(), lockedAt: null, lastError: null, provider: result.provider, providerMessageId: result.messageId ?? null } });
+      await db.commercialDocumentEvent.create({
+        data: {
+          organizationId,
+          companyId: document.invoiceId
+            ? (await db.invoice.findUniqueOrThrow({ where: { id: document.invoiceId }, select: { companyId: true } })).companyId
+            : (await db.quote.findUniqueOrThrow({ where: { id: document.quoteId! }, select: { companyId: true } })).companyId,
+          ...document,
+          type: CommercialDocumentEventType.SENT,
+          source: CommercialEventSource.EMAIL,
+          externalId: `delivery:${deliveryId}:sent`,
+          effectiveAt: new Date(),
+          payload: { schemaVersion: 1, deliveryId, provider: result.provider, providerMessageId: result.messageId ?? null },
+        },
+      });
       if (document.invoiceId) await db.invoice.updateMany({ where: { id: document.invoiceId, status: InvoiceStatus.ISSUED }, data: { status: InvoiceStatus.SENT } });
       if (document.quoteId) await db.quote.updateMany({ where: { id: document.quoteId, status: QuoteStatus.DRAFT }, data: { status: QuoteStatus.SENT } });
     });
@@ -128,9 +142,17 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
   private async fail(organizationId: string, deliveryId: string, error: unknown) {
     await this.prisma.$transaction(async (db) => {
       await db.$queryRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
-      const delivery = await db.documentDelivery.findUnique({ where: { id: deliveryId }, select: { attempts: true } });
+      const delivery = await db.documentDelivery.findUnique({ where: { id: deliveryId }, select: { attempts: true, companyId: true, invoiceId: true, quoteId: true } });
       if (!delivery) return;
       await db.documentDelivery.update({ where: { id: deliveryId }, data: { status: delivery.attempts >= 5 ? InvoiceEmailStatus.FAILED : InvoiceEmailStatus.PENDING, availableAt: new Date(Date.now() + retryDelay(delivery.attempts)), lockedAt: null, lastError: errorMessage(error) } });
+      if (delivery.attempts >= 5) await db.commercialDocumentEvent.create({
+        data: {
+          organizationId, companyId: delivery.companyId, invoiceId: delivery.invoiceId, quoteId: delivery.quoteId,
+          type: CommercialDocumentEventType.DELIVERY_FAILED, source: CommercialEventSource.EMAIL,
+          externalId: `delivery:${deliveryId}:failed`, effectiveAt: new Date(),
+          payload: { schemaVersion: 1, deliveryId, reason: errorMessage(error) },
+        },
+      });
     });
   }
 }

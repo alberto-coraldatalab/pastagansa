@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect } from "react";
 import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { CommercialTimeline } from "@/components/commercial-timeline";
 import { formatMoney } from "@/lib/catalog";
 import { formatInvoiceDate } from "@/lib/invoices";
 import {
@@ -193,6 +194,7 @@ export function QuoteDetail({ id }: { id: string }) {
         {document.notes && <p className="invoice-notes"><strong>Condiciones y notas:</strong> {document.notes}</p>}
       </section>
       {(document.status === "DRAFT" || document.status === "SENT") && <QuoteEmailPanel quote={document} />}
+      <CommercialTimeline endpoint={`/api/quotes/${document.id}/commercial-events`} canManage />
       {editing && (
         <QuoteDialog
           initial={document}
