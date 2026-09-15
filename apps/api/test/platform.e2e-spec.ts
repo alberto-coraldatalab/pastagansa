@@ -51,6 +51,62 @@ describe("platform integrity", () => {
     await admin.$disconnect();
   });
 
+  it("stores an isolated company document profile and validated logo", async () => {
+    const email = "company-profile@example.com";
+    const account = await register(
+      email,
+      "Company Profile Org",
+      "Company Profile SL",
+      "B12345674",
+    );
+    const tenant = await tenantFor(email);
+    const updated = await authed(account.accessToken, tenant)
+      .patch("/v1/companies/current")
+      .send({
+        documentProfile: {
+          tradeName: "Company Profile",
+          addressLine1: "Calle Ejemplo 123",
+          city: "Madrid",
+          addressCountry: "es",
+          email: "Facturacion@Example.com",
+          bankIban: "ES91 2100 0418 4502 0005 1332",
+          primaryColor: "#f71950",
+        },
+      })
+      .expect(200);
+    expect(updated.body.documentProfile).toMatchObject({
+      tradeName: "Company Profile",
+      addressCountry: "ES",
+      email: "facturacion@example.com",
+      bankIban: "ES9121000418450200051332",
+      primaryColor: "#F71950",
+    });
+
+    const logo = pngLogo(80, 40);
+    await authed(account.accessToken, tenant)
+      .put("/v1/companies/current/logo")
+      .attach("file", logo, { filename: "logo.png", contentType: "image/png" })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          mediaType: "image/png",
+          sizeBytes: logo.length,
+          width: 80,
+          height: 40,
+        });
+      });
+    await authed(account.accessToken, tenant)
+      .get("/v1/companies/current/logo")
+      .expect("content-type", /image\/png/)
+      .expect(200);
+    await authed(account.accessToken, tenant)
+      .delete("/v1/companies/current/logo")
+      .expect(204);
+    await authed(account.accessToken, tenant)
+      .get("/v1/companies/current/logo")
+      .expect(404);
+  });
+
   it("resets a password once and revokes every existing session", async () => {
     const email = "password-recovery@example.com";
     const original = await register(
@@ -1996,6 +2052,15 @@ describe("platform integrity", () => {
   }
   function hashRecoveryToken(token: string) {
     return createHash("sha256").update(token).digest("hex");
+  }
+  function pngLogo(width: number, height: number) {
+    const content = Buffer.alloc(24);
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(content, 0);
+    content.writeUInt32BE(13, 8);
+    content.write("IHDR", 12, "ascii");
+    content.writeUInt32BE(width, 16);
+    content.writeUInt32BE(height, 20);
+    return content;
   }
   function quote(
     contactId: string,

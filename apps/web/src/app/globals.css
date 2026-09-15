@@ -210,6 +210,97 @@ a {
   line-height: 1.5;
   margin: 0 0 1.5rem;
 }
+.company-settings {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 980px;
+  padding-bottom: 3rem;
+}
+.company-settings-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+.company-settings-card h2 {
+  margin: 0 0 1.25rem;
+}
+.company-settings-card > p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: -0.5rem 0 1.25rem;
+}
+.logo-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+.company-logo-preview,
+.company-logo-placeholder {
+  align-items: center;
+  background: #f7f8f5;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  height: 96px;
+  justify-content: center;
+  max-width: 240px;
+  object-fit: contain;
+  padding: 0.75rem;
+  width: 180px;
+}
+.company-logo-placeholder {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.logo-controls > div:last-child {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.file-button {
+  cursor: pointer;
+  display: inline-flex;
+}
+.file-button input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+.company-document-preview {
+  background: #fbfcf9;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  border-top: 5px solid var(--lime);
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: 1fr auto;
+  padding: 1.25rem;
+}
+.company-document-preview > div {
+  display: grid;
+  gap: 0.3rem;
+}
+.company-document-preview strong,
+.company-document-preview b {
+  font-size: 1.05rem;
+}
+.company-document-preview span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.company-document-preview .preview-total {
+  border-top: 1px solid var(--line);
+  font-size: 1.15rem;
+  font-weight: 800;
+  grid-column: 1 / -1;
+  padding-top: 0.85rem;
+}
 .form-success {
   background: var(--lime-soft);
   border-radius: 10px;
@@ -1849,6 +1940,9 @@ a {
   .contact-form .full,
   .dialog-actions {
     grid-column: auto;
+  }
+  .company-document-preview {
+    grid-template-columns: 1fr;
   }
   .mode-switch {
     margin-bottom: 2rem;

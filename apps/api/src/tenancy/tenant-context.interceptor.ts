@@ -23,6 +23,8 @@ export class TenantContextInterceptor implements NestInterceptor {
       this.prisma.$transaction(
         async (db) => {
           await db.$queryRaw`SELECT set_config('app.organization_id', ${request.tenant!.organizationId}, true)`;
+          if (request.tenant!.companyId)
+            await db.$queryRaw`SELECT set_config('app.company_id', ${request.tenant!.companyId}, true)`;
           return this.tenantContext.run({ ...request.tenant!, db }, () =>
             lastValueFrom(next.handle()),
           );

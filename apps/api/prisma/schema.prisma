@@ -234,6 +234,8 @@ model Organization {
   bankAccounts          BankAccount[]
   bankTransactions      BankTransaction[]
   bankReconciliations   BankReconciliation[]
+  companyDocumentProfiles CompanyDocumentProfile[]
+  companyDocumentLogos    CompanyDocumentLogo[]
 
   @@map("organizations")
 }
@@ -283,10 +285,60 @@ model Company {
   bankAccounts          BankAccount[]
   bankTransactions      BankTransaction[]
   bankReconciliations   BankReconciliation[]
+  documentProfile       CompanyDocumentProfile?
+  documentLogo          CompanyDocumentLogo?
 
   @@unique([organizationId, taxId])
   @@index([organizationId])
   @@map("companies")
+}
+
+model CompanyDocumentProfile {
+  id                  String       @id @default(uuid()) @db.Uuid
+  organizationId      String       @map("organization_id") @db.Uuid
+  companyId           String       @unique @map("company_id") @db.Uuid
+  tradeName           String?      @map("trade_name") @db.VarChar(240)
+  addressLine1        String?      @map("address_line_1") @db.VarChar(240)
+  addressLine2        String?      @map("address_line_2") @db.VarChar(240)
+  postalCode          String?      @map("postal_code") @db.VarChar(20)
+  city                String?      @db.VarChar(120)
+  province            String?      @db.VarChar(120)
+  addressCountry      String?      @map("address_country") @db.Char(2)
+  email               String?      @db.VarChar(320)
+  phone               String?      @db.VarChar(40)
+  website             String?      @db.VarChar(500)
+  bankIban            String?      @map("bank_iban") @db.VarChar(34)
+  paymentInstructions String?      @map("payment_instructions") @db.VarChar(2000)
+  paymentTerms        String?      @map("payment_terms") @db.VarChar(1000)
+  defaultNotes        String?      @map("default_notes") @db.VarChar(5000)
+  documentFooter      String?      @map("document_footer") @db.VarChar(1000)
+  primaryColor        String?      @map("primary_color") @db.Char(7)
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company             Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@map("company_document_profiles")
+}
+
+model CompanyDocumentLogo {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  companyId      String       @unique @map("company_id") @db.Uuid
+  mediaType      String       @map("media_type") @db.VarChar(100)
+  sizeBytes      Int          @map("size_bytes")
+  width          Int
+  height         Int
+  sha256         String       @db.Char(64)
+  content        Bytes
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@map("company_document_logos")
 }
 
 model CatalogItem {

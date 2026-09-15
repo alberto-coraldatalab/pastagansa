@@ -13,6 +13,7 @@ import {
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditService } from "../audit/audit.service";
 import { decodeCursor, encodeCursor } from "../common/cursor";
+import { isValidIban, normalizeIban } from "../common/iban";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 import {
   CreateBankAccountDto,
@@ -318,23 +319,6 @@ export class BankingService {
     if (!companyId) throw new BadRequestException("x-company-id is required");
     return { organizationId, companyId };
   }
-}
-
-function normalizeIban(value: string | undefined) {
-  return value?.replaceAll(" ", "").toUpperCase() || null;
-}
-
-function isValidIban(iban: string) {
-  const rearranged = `${iban.slice(4)}${iban.slice(0, 4)}`;
-  let remainder = 0;
-  for (const character of rearranged) {
-    const digits = /[A-Z]/.test(character)
-      ? String(character.charCodeAt(0) - 55)
-      : character;
-    for (const digit of digits)
-      remainder = (remainder * 10 + Number(digit)) % 97;
-  }
-  return remainder === 1;
 }
 
 function shiftDays(date: Date, days: number) {

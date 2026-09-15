@@ -54,6 +54,14 @@ cobro desde una bandeja única.
 **Dependencias:** ninguna  
 **Entrega:** U6A
 
+**Estado real (15/09/2026):** implementado localmente y validado con builds, lint,
+pruebas unitarias e integración PostgreSQL. El perfil uno-a-uno y el logo dedicado son
+tenant-scoped, están protegidos por RLS de empresa, validan IBAN, color y contenido
+binario PNG/JPEG, y quedan accesibles desde `Configuración > Empresa y documentos`.
+La pantalla permite guardar, sustituir/eliminar logo y revisar una previsualización no
+fiscal. Quedan para el gate U6A el E2E de navegador, la validación de restore drill en
+staging y el consumo de snapshots por U6-02.
+
 ### Historia
 
 Como propietario de una empresa quiero configurar una vez los datos que aparecen en

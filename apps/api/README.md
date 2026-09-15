@@ -19,7 +19,7 @@ Authenticated clients use `GET /v1/identity/context` to discover the active user
 
 Future business controllers must use `@TenantProtected()`; the authentication and tenant guards then require a verified bearer token, check the requested organization/company against active memberships, and write the approved context to `request.tenant`.
 
-`GET` and `PATCH /v1/companies/current` are the first company-scoped endpoints. They require tenant headers, a bearer token, and the `company.read` or `company.update` permission respectively. Company updates are recorded in `audit_events`.
+`GET` and `PATCH /v1/companies/current` are company-scoped endpoints. They require tenant headers, a bearer token, and the `company.read` or `company.update` permission respectively. The optional document profile keeps commercial contact, payment and presentation defaults separately from legal identity; its IBAN is checksum-validated. `PUT`, `GET`, and `DELETE /v1/companies/current/logo` manage one validated PNG/JPEG logo (maximum 512 KiB) per company. Company and logo updates are recorded in `audit_events` without storing file bytes or sensitive field values there.
 
 `/v1/contacts` provides company-scoped customer/supplier master data. Contact deletion is an archive operation; all writes carry tenant, permission, and audit enforcement.
 

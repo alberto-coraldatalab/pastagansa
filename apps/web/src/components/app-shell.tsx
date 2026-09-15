@@ -35,7 +35,8 @@ export function AppShell({
     | "compras"
     | "tesoreria"
     | "contabilidad"
-    | "seguridad";
+    | "seguridad"
+    | "configuracion";
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -154,6 +155,13 @@ export function AppShell({
           >
             Seguridad
           </NavLink>
+          <NavLink
+            active={active === "configuracion"}
+            href="/configuracion"
+            number="10"
+          >
+            Configuración
+          </NavLink>
         </nav>
         <div className="sidebar-company">
           <span>{organization.name}</span>
@@ -227,7 +235,8 @@ function NavLink({
     | "/compras"
     | "/tesoreria"
     | "/contabilidad"
-    | "/seguridad";
+    | "/seguridad"
+    | "/configuracion";
   number: string;
   children: React.ReactNode;
 }) {
