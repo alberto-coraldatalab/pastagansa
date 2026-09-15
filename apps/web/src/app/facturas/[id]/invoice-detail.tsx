@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { CommercialTimeline } from "@/components/commercial-timeline";
+import { PaymentReminderDialog } from "@/components/payment-reminder-dialog";
 import { formatMoney } from "@/lib/catalog";
 import {
   formatInvoiceDate,
@@ -465,6 +466,7 @@ function RectificationDialog({
 function EmailPanel({ invoice }: { invoice: Invoice }) {
   const queryClient = useQueryClient();
   const [composing, setComposing] = useState(false);
+  const [reminding, setReminding] = useState(false);
   const [notice, setNotice] = useState("");
   const capability = useQuery({
     queryKey: ["invoice-email-capability"],
@@ -520,18 +522,28 @@ function EmailPanel({ invoice }: { invoice: Invoice }) {
           <h2 id="email-title">Envío por correo</h2>
           <p>El PDF se genera al enviar y cada intento queda registrado.</p>
         </div>
-        <button
-          className="primary-button compact"
-          onClick={() => setComposing(true)}
-          disabled={!capability.data?.enabled}
-          title={
-            capability.data?.enabled
-              ? undefined
-              : "El envío por correo no está configurado"
-          }
-        >
-          Enviar por email
-        </button>
+        <div className="email-panel-actions">
+          <button
+            className="secondary-button compact"
+            onClick={() => setReminding(true)}
+            disabled={!capability.data?.enabled || Number(invoice.amountDue) <= 0}
+            title={capability.data?.enabled ? undefined : "El envío por correo no está configurado"}
+          >
+            Recordatorio de pago
+          </button>
+          <button
+            className="primary-button compact"
+            onClick={() => setComposing(true)}
+            disabled={!capability.data?.enabled}
+            title={
+              capability.data?.enabled
+                ? undefined
+                : "El envío por correo no está configurado"
+            }
+          >
+            Enviar por email
+          </button>
+        </div>
       </header>
       {capability.data && !capability.data.enabled && (
         <div className="email-unavailable" role="note">
@@ -582,7 +594,10 @@ function EmailPanel({ invoice }: { invoice: Invoice }) {
               {deliveries.data.map((delivery) => (
                 <tr key={delivery.id}>
                   <td>{delivery.recipient}</td>
-                  <td>{delivery.subject}</td>
+                  <td>
+                    {delivery.subject}
+                    {delivery.purpose === "PAYMENT_REMINDER" && <small>Recordatorio de pago</small>}
+                  </td>
                   <td>
                     <span
                       className={`delivery-status ${delivery.status.toLowerCase()}`}
@@ -611,6 +626,18 @@ function EmailPanel({ invoice }: { invoice: Invoice }) {
             send.reset();
           }}
           onSubmit={(payload) => send.mutate(payload)}
+        />
+      )}
+      {reminding && (
+        <PaymentReminderDialog
+          targets={[{ id: invoice.id, number: invoice.fullNumber ?? invoice.draftCode }]}
+          mode="single"
+          onClose={() => setReminding(false)}
+          onQueued={async () => {
+            await queryClient.invalidateQueries({ queryKey: ["invoice-email-deliveries", invoice.id] });
+            setReminding(false);
+            setNotice("Recordatorio de pago preparado para su envío.");
+          }}
         />
       )}
     </section>

@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Route } from "next";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { PaymentReminderDialog, type ReminderTarget } from "@/components/payment-reminder-dialog";
 import {
   bucketLabels,
   collectionAmount,
@@ -64,6 +65,8 @@ export function CollectionsView() {
     new URLSearchParams(searchParams.toString()),
   );
   const [selected, setSelected] = useState<CollectionInvoice>();
+  const [selectedReminderIds, setSelectedReminderIds] = useState<string[]>([]);
+  const [reminderTargets, setReminderTargets] = useState<ReminderTarget[] | null>(null);
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [notice, setNotice] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -165,6 +168,7 @@ export function CollectionsView() {
       { scroll: false },
     );
     setSelected(undefined);
+    setSelectedReminderIds([]);
   }
   function openDetails(invoice: CollectionInvoice, trigger: HTMLButtonElement) {
     triggerRef.current = trigger;
@@ -281,6 +285,14 @@ export function CollectionsView() {
                 : "Cargando cartera…"}
             </p>
           </div>
+          {!!selectedReminderIds.length && (
+            <button
+              className="primary-button compact"
+              onClick={() => setReminderTargets((invoices.data?.data ?? []).filter((invoice) => selectedReminderIds.includes(invoice.id)).map((invoice) => ({ id: invoice.id, number: invoice.fullNumber ?? invoice.draftCode })))}
+            >
+              Preparar recordatorio ({selectedReminderIds.length})
+            </button>
+          )}
         </div>
         {invoices.isPending && <LoadingState />}
         {invoices.error && (
@@ -299,7 +311,12 @@ export function CollectionsView() {
           </div>
         )}
         {!!invoices.data?.data.length && (
-          <CollectionsTable items={invoices.data.data} onOpen={openDetails} />
+          <CollectionsTable
+            items={invoices.data.data}
+            onOpen={openDetails}
+            selectedIds={selectedReminderIds}
+            onToggleReminder={(invoiceId, checked) => setSelectedReminderIds((ids) => checked ? [...new Set([...ids, invoiceId])] : ids.filter((id) => id !== invoiceId))}
+          />
         )}
       </section>
       {selected && (
@@ -315,6 +332,7 @@ export function CollectionsView() {
             recordEvent.mutate({ type, comment })
           }
           onRecordPayment={() => setRecordingPayment(true)}
+          onPrepareReminder={() => setReminderTargets([{ id: selected.id, number: selected.fullNumber ?? selected.draftCode }])}
         />
       )}
       {recordingPayment && selected && (
@@ -327,6 +345,22 @@ export function CollectionsView() {
             recordPayment.reset();
           }}
           onSubmit={(input) => recordPayment.mutate(input)}
+        />
+      )}
+      {reminderTargets && (
+        <PaymentReminderDialog
+          targets={reminderTargets}
+          mode={reminderTargets.length === 1 ? "single" : "batch"}
+          onClose={() => setReminderTargets(null)}
+          onQueued={async (result) => {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ["collections"] }),
+              queryClient.invalidateQueries({ queryKey: ["commercial-events", selected?.id] }),
+            ]);
+            setReminderTargets(null);
+            setSelectedReminderIds([]);
+            setNotice(`${result.queued} recordatorio${result.queued === 1 ? "" : "s"} preparado${result.queued === 1 ? "" : "s"}${result.skipped ? `; ${result.skipped} excluido${result.skipped === 1 ? "" : "s"}.` : "."}`);
+          }}
         />
       )}
     </AppShell>
@@ -377,15 +411,20 @@ function CollectionsSummaryCards({
 function CollectionsTable({
   items,
   onOpen,
+  selectedIds,
+  onToggleReminder,
 }: {
   items: CollectionInvoice[];
   onOpen(invoice: CollectionInvoice, trigger: HTMLButtonElement): void;
+  selectedIds: string[];
+  onToggleReminder(invoiceId: string, checked: boolean): void;
 }) {
   return (
     <div className="table-scroll">
       <table className="data-table collections-table">
         <thead>
           <tr>
+            <th><span className="sr-only">Seleccionar recordatorio</span></th>
             <th>Cliente</th>
             <th>Factura</th>
             <th>Vencimiento</th>
@@ -401,6 +440,14 @@ function CollectionsTable({
         <tbody>
           {items.map((invoice) => (
             <tr key={invoice.id}>
+              <td>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(invoice.id)}
+                  onChange={(event) => onToggleReminder(invoice.id, event.target.checked)}
+                  aria-label={`Preparar recordatorio para ${invoice.fullNumber ?? invoice.draftCode}`}
+                />
+              </td>
               <td>
                 <strong>{invoice.customerLegalName}</strong>
                 <small>
@@ -463,6 +510,7 @@ function CollectionDrawer({
   onClose,
   onRecordEvent,
   onRecordPayment,
+  onPrepareReminder,
 }: {
   invoice: CollectionInvoice;
   events: ReturnType<typeof useQuery<TimelinePage>>;
@@ -476,6 +524,7 @@ function CollectionDrawer({
     comment?: string,
   ): void;
   onRecordPayment(): void;
+  onPrepareReminder(): void;
 }) {
   const [action, setAction] = useState<
     "PAYMENT_PROMISED" | "DISPUTED" | "NOTE"
@@ -541,6 +590,9 @@ function CollectionDrawer({
           disabled={paymentPending}
         >
           Registrar cobro
+        </button>
+        <button className="secondary-button" onClick={onPrepareReminder}>
+          Preparar recordatorio
         </button>
         <Link className="secondary-button" href={`/facturas/${invoice.id}`}>
           Abrir factura

@@ -1770,6 +1770,12 @@ a {
   justify-content: space-between;
   padding: 1.3rem 1.5rem;
 }
+.email-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
 .payments-panel h2,
 .email-panel h2 {
   font-size: 1rem;
@@ -1830,6 +1836,44 @@ a {
 }
 .email-dialog {
   max-width: 580px;
+}
+.reminder-dialog {
+  max-width: 760px;
+}
+.reminder-preview-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.reminder-preview-list article {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+}
+.reminder-preview-list article > header {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 0.55rem;
+}
+.reminder-preview-list article > header span,
+.reminder-preview-list article > p {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.reminder-preview-list pre {
+  background: #f8faf5;
+  border-radius: 8px;
+  color: var(--ink);
+  font: 0.75rem/1.55 var(--font-geist-mono, monospace);
+  margin: 0.7rem 0 0;
+  overflow-wrap: anywhere;
+  padding: 0.75rem;
+  white-space: pre-wrap;
+}
+.reminder-preview-list .reminder-skipped {
+  background: #fff8e6;
+  border-color: #f1dfae;
 }
 .payments-empty {
   border-top: 1px solid var(--line);

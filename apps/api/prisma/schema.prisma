@@ -113,6 +113,11 @@ enum DeliveryDocumentType {
   QUOTE
 }
 
+enum DeliveryPurpose {
+  DOCUMENT_DELIVERY
+  PAYMENT_REMINDER
+}
+
 enum CommercialDocumentEventType {
   SENT
   DELIVERY_FAILED
@@ -1251,6 +1256,7 @@ model DocumentDelivery {
   organizationId String             @map("organization_id") @db.Uuid
   companyId      String             @map("company_id") @db.Uuid
   documentType   DeliveryDocumentType @map("document_type")
+  purpose        DeliveryPurpose      @default(DOCUMENT_DELIVERY)
   invoiceId      String?            @map("invoice_id") @db.Uuid
   quoteId        String?            @map("quote_id") @db.Uuid
   idempotencyKey String             @map("idempotency_key") @db.VarChar(128)

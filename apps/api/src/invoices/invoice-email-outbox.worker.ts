@@ -105,18 +105,18 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
         if (!invoice?.fullNumber) throw new Error("Queued invoice does not have an issued number");
         const pdf = await this.invoicePdf.render({ ...invoice, fullNumber: invoice.fullNumber });
         const result = await this.mailer.send({ recipient: delivery.recipient, subject: delivery.subject, text, documentNumber: invoice.fullNumber, documentLabel: "la factura", issuerLegalName: invoice.issuerLegalName, filename: `factura-${safeFilename(invoice.fullNumber)}.pdf`, pdf });
-        await this.succeed(organizationId, deliveryId, result, { invoiceId: invoice.id });
+        await this.succeed(organizationId, deliveryId, result, { invoiceId: invoice.id, purpose: delivery.purpose });
       } else {
         const quote = delivery.quote;
         if (!quote) throw new Error("Queued quote no longer exists");
         const pdf = await this.quotePdf.render({ quote, issuerLogoMediaType: quote.issuerLogoMediaType, issuerLogoContent: quote.issuerLogoContent });
         const result = await this.mailer.send({ recipient: delivery.recipient, subject: delivery.subject, text, documentNumber: quote.code, documentLabel: "el presupuesto", issuerLegalName: parameters.company_name ?? "", filename: `presupuesto-${safeFilename(quote.code)}.pdf`, pdf });
-        await this.succeed(organizationId, deliveryId, result, { quoteId: quote.id });
+        await this.succeed(organizationId, deliveryId, result, { quoteId: quote.id, purpose: delivery.purpose });
       }
     } catch (error) { await this.fail(organizationId, deliveryId, error); }
   }
 
-  private async succeed(organizationId: string, deliveryId: string, result: { provider: string; messageId?: string }, document: { invoiceId?: string; quoteId?: string }) {
+  private async succeed(organizationId: string, deliveryId: string, result: { provider: string; messageId?: string }, document: { invoiceId?: string; quoteId?: string; purpose: string }) {
     await this.prisma.$transaction(async (db) => {
       await db.$queryRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
       await db.documentDelivery.update({ where: { id: deliveryId }, data: { status: InvoiceEmailStatus.SENT, sentAt: new Date(), lockedAt: null, lastError: null, provider: result.provider, providerMessageId: result.messageId ?? null } });
@@ -131,7 +131,7 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
           source: CommercialEventSource.EMAIL,
           externalId: `delivery:${deliveryId}:sent`,
           effectiveAt: new Date(),
-          payload: { schemaVersion: 1, deliveryId, provider: result.provider, providerMessageId: result.messageId ?? null },
+          payload: { schemaVersion: 1, deliveryId, purpose: document.purpose, provider: result.provider, providerMessageId: result.messageId ?? null },
         },
       });
       if (document.invoiceId) await db.invoice.updateMany({ where: { id: document.invoiceId, status: InvoiceStatus.ISSUED }, data: { status: InvoiceStatus.SENT } });
@@ -142,7 +142,7 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
   private async fail(organizationId: string, deliveryId: string, error: unknown) {
     await this.prisma.$transaction(async (db) => {
       await db.$queryRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
-      const delivery = await db.documentDelivery.findUnique({ where: { id: deliveryId }, select: { attempts: true, companyId: true, invoiceId: true, quoteId: true } });
+      const delivery = await db.documentDelivery.findUnique({ where: { id: deliveryId }, select: { attempts: true, companyId: true, invoiceId: true, quoteId: true, purpose: true } });
       if (!delivery) return;
       await db.documentDelivery.update({ where: { id: deliveryId }, data: { status: delivery.attempts >= 5 ? InvoiceEmailStatus.FAILED : InvoiceEmailStatus.PENDING, availableAt: new Date(Date.now() + retryDelay(delivery.attempts)), lockedAt: null, lastError: errorMessage(error) } });
       if (delivery.attempts >= 5) await db.commercialDocumentEvent.create({
@@ -150,7 +150,7 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
           organizationId, companyId: delivery.companyId, invoiceId: delivery.invoiceId, quoteId: delivery.quoteId,
           type: CommercialDocumentEventType.DELIVERY_FAILED, source: CommercialEventSource.EMAIL,
           externalId: `delivery:${deliveryId}:failed`, effectiveAt: new Date(),
-          payload: { schemaVersion: 1, deliveryId, reason: errorMessage(error) },
+          payload: { schemaVersion: 1, deliveryId, purpose: delivery.purpose, reason: errorMessage(error) },
         },
       });
     });

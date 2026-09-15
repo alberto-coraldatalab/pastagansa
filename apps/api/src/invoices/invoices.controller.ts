@@ -20,6 +20,7 @@ import { CreateInvoiceDto, UpdateInvoiceDto } from "./dto/invoice.dto";
 import { ListInvoicesDto } from "./dto/list-invoices.dto";
 import { IssueInvoiceDto } from "./dto/issue-invoice.dto";
 import { SendInvoiceEmailDto } from "./dto/send-invoice-email.dto";
+import { PaymentReminderPreviewDto } from "./dto/payment-reminder.dto";
 import { InvoiceEmailService } from "./invoice-email.service";
 import { InvoicesService } from "./invoices.service";
 import { CommercialEventsService } from "../commercial-events/commercial-events.service";
@@ -130,6 +131,31 @@ export class InvoicesController {
       id,
       input,
       requireIdempotencyKey(idempotencyKey),
+    );
+  }
+
+  @Post(":id/payment-reminder/preview")
+  @RequirePermissions("invoice.read", "collections.manage")
+  previewPaymentReminder(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: PaymentReminderPreviewDto,
+  ) {
+    return this.emails.previewPaymentReminder(id, input.template, input.recipient);
+  }
+
+  @Post(":id/payment-reminder")
+  @HttpCode(202)
+  @RequirePermissions("invoice.read", "collections.manage")
+  paymentReminder(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() input: PaymentReminderPreviewDto,
+  ) {
+    return this.emails.enqueuePaymentReminder(
+      id,
+      input.template,
+      requireIdempotencyKey(idempotencyKey),
+      input.recipient,
     );
   }
 
