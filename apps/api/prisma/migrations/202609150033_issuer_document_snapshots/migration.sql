@@ -23,6 +23,7 @@ ALTER TABLE "quotes"
   );
 
 ALTER TABLE "invoices" DISABLE TRIGGER "issued_invoice_immutability";
+ALTER TABLE "invoices" DISABLE TRIGGER "rectification_original_integrity";
 
 UPDATE "invoices"
 SET "issuer_snapshot" = jsonb_build_object(
@@ -33,6 +34,7 @@ SET "issuer_snapshot" = jsonb_build_object(
 );
 
 ALTER TABLE "invoices" ENABLE TRIGGER "issued_invoice_immutability";
+ALTER TABLE "invoices" ENABLE TRIGGER "rectification_original_integrity";
 
 UPDATE "quotes"
 SET "issuer_snapshot" = jsonb_build_object(
