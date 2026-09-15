@@ -166,6 +166,15 @@ export function CompanySettingsView() {
               <TextArea className="full" disabled={!canUpdate} label="Pie de documento" onChange={(value) => updateProfile("documentFooter", value)} value={form.documentProfile.documentFooter ?? ""} />
             </div>
           </section>
+          <section className="company-settings-card" aria-labelledby="sif-title">
+            <h2 id="sif-title">SIF y QR fiscal</h2>
+            <p>El QR se fija al emitir cada factura. VERI*FACTU se habilitará cuando esté disponible el envío XML firmado a la AEAT.</p>
+            <div className="contact-form">
+              <label className="field"><span>Modo fiscal</span><select disabled={!canUpdate} onChange={(event) => updateCompany("sifMode", event.target.value)} value={form.sifMode}><option value="DISABLED">No incluir QR fiscal</option><option value="NO_VERIFACTU">SIF no VERI*FACTU (QR fiscal)</option></select></label>
+              <label className="field"><span>Entorno AEAT</span><select disabled={!canUpdate || form.sifMode === "DISABLED"} onChange={(event) => updateCompany("aeatEnvironment", event.target.value)} value={form.aeatEnvironment}><option value="PRODUCTION">Producción</option><option value="TEST">Pruebas AEAT</option></select></label>
+            </div>
+            {form.sifMode === "NO_VERIFACTU" && <p className="notice" role="status">Las facturas nuevas incluirán un QR fiscal de 34 mm. Las ya emitidas no se modifican.</p>}
+          </section>
           <section className="company-settings-card" aria-labelledby="logo-title">
             <h2 id="logo-title">Logo</h2>
             <p>PNG o JPEG, hasta 512 KiB. No aceptamos SVG por seguridad.</p>

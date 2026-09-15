@@ -12,6 +12,8 @@ const company: CompanySettings = {
   country: "ES",
   baseCurrency: "EUR",
   timezone: "Europe/Madrid",
+  sifMode: "DISABLED",
+  aeatEnvironment: "PRODUCTION",
   documentProfile: null,
   documentLogo: null,
 };

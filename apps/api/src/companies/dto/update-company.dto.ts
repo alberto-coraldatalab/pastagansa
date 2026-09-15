@@ -1,6 +1,8 @@
 import { Type } from "class-transformer";
+import { AeatEnvironment, SifMode } from "@prisma/client";
 import {
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   IsUrl,
@@ -47,6 +49,14 @@ export class UpdateCompanyDto {
   @IsString()
   @MaxLength(64)
   timezone?: string;
+
+  @IsOptional()
+  @IsEnum(SifMode)
+  sifMode?: SifMode;
+
+  @IsOptional()
+  @IsEnum(AeatEnvironment)
+  aeatEnvironment?: AeatEnvironment;
 
   @IsOptional()
   @ValidateNested()

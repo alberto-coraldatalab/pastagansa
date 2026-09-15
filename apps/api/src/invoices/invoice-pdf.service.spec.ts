@@ -71,6 +71,7 @@ describe("InvoicePdfService", () => {
       },
       issuerLogoMediaType: null,
       issuerLogoContent: null,
+      sifQr: { mode: "NO_VERIFACTU", environment: "TEST" },
       customerLegalName: "Example Customer",
       customerTaxId: null,
       billingAddress: null,

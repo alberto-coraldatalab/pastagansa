@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { CommercialDocumentEventType, CommercialEventSource, DeliveryDocumentType, InvoiceEmailStatus, InvoiceStatus, Prisma, PrismaClient, QuoteStatus } from "@prisma/client";
+import { CommercialDocumentEventType, CommercialEventSource, DeliveryDocumentType, InvoiceEmailStatus, InvoiceStatus, Prisma, PrismaClient, QuoteStatus, SifMode } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { QuotePdfService } from "../quotes/quote-pdf.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
@@ -103,7 +103,14 @@ export class InvoiceEmailOutboxWorker implements OnModuleInit, OnModuleDestroy {
       if (delivery.documentType === DeliveryDocumentType.INVOICE) {
         const invoice = delivery.invoice;
         if (!invoice?.fullNumber) throw new Error("Queued invoice does not have an issued number");
-        const pdf = await this.invoicePdf.render({ ...invoice, fullNumber: invoice.fullNumber });
+        const pdf = await this.invoicePdf.render({
+          ...invoice,
+          fullNumber: invoice.fullNumber,
+          sifQr:
+            invoice.sifMode === SifMode.NO_VERIFACTU
+              ? { mode: "NO_VERIFACTU", environment: invoice.aeatEnvironment }
+              : undefined,
+        });
         const result = await this.mailer.send({ recipient: delivery.recipient, subject: delivery.subject, text, documentNumber: invoice.fullNumber, documentLabel: "la factura", issuerLegalName: invoice.issuerLegalName, filename: `factura-${safeFilename(invoice.fullNumber)}.pdf`, pdf });
         await this.succeed(organizationId, deliveryId, result, { invoiceId: invoice.id, purpose: delivery.purpose });
       } else {

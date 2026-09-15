@@ -27,6 +27,8 @@ export type CompanySettings = {
   country: string;
   baseCurrency: string;
   timezone: string;
+  sifMode: "DISABLED" | "NO_VERIFACTU" | "VERIFACTU";
+  aeatEnvironment: "TEST" | "PRODUCTION";
   documentProfile: CompanyDocumentProfile | null;
   documentLogo: {
     id: string;
@@ -41,7 +43,7 @@ export type CompanySettings = {
 
 export type CompanySettingsInput = Pick<
   CompanySettings,
-  "legalName" | "baseCurrency" | "timezone"
+  "legalName" | "baseCurrency" | "timezone" | "sifMode" | "aeatEnvironment"
 > & { documentProfile: CompanyDocumentProfile };
 
 export const emptyDocumentProfile: CompanyDocumentProfile = {
@@ -71,6 +73,8 @@ export function companySettingsInput(company: CompanySettings): CompanySettingsI
     legalName: company.legalName,
     baseCurrency: company.baseCurrency,
     timezone: company.timezone,
+    sifMode: company.sifMode,
+    aeatEnvironment: company.aeatEnvironment,
     documentProfile: { ...emptyDocumentProfile, ...company.documentProfile },
   };
 }
@@ -80,6 +84,8 @@ export function normalizeCompanySettings(input: CompanySettingsInput) {
     legalName: input.legalName.trim(),
     baseCurrency: input.baseCurrency.trim().toUpperCase(),
     timezone: input.timezone.trim(),
+    sifMode: input.sifMode,
+    aeatEnvironment: input.aeatEnvironment,
     documentProfile: Object.fromEntries(
       Object.entries(input.documentProfile).map(([key, value]) => [
         key,

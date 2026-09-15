@@ -12,6 +12,7 @@ import {
   Prisma,
   RectificationImpact,
   RectificationKind,
+  SifMode,
   SifInvoiceType,
   TaxRule,
 } from "@prisma/client";
@@ -122,6 +123,10 @@ export class InvoicesService {
         fullNumber: invoice.fullNumber,
         issuerLogoMediaType: asset?.issuerLogoMediaType ?? null,
         issuerLogoContent: asset?.issuerLogoContent ?? null,
+        sifQr:
+          invoice.sifMode === SifMode.NO_VERIFACTU
+            ? { mode: "NO_VERIFACTU", environment: invoice.aeatEnvironment }
+            : undefined,
       }),
     };
   }
@@ -450,6 +455,8 @@ export class InvoicesService {
           status: InvoiceStatus.ISSUED,
           issuerLegalName: issuer.legalName,
           issuerTaxId: issuer.taxId,
+          sifMode: issuer.sifMode,
+          aeatEnvironment: issuer.aeatEnvironment,
           ...issuer.snapshot,
         },
       });
@@ -680,6 +687,8 @@ export class InvoicesService {
     return {
       legalName: company.legalName,
       taxId: company.taxId,
+      sifMode: company.sifMode,
+      aeatEnvironment: company.aeatEnvironment,
       snapshot,
     };
   }

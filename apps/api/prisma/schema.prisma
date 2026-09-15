@@ -163,6 +163,17 @@ enum SifRecordType {
   CANCELLATION
 }
 
+enum SifMode {
+  DISABLED
+  NO_VERIFACTU
+  VERIFACTU
+}
+
+enum AeatEnvironment {
+  TEST
+  PRODUCTION
+}
+
 enum PurchaseInvoiceStatus {
   DRAFT
   PENDING_APPROVAL
@@ -279,6 +290,8 @@ model Company {
   country               String                       @default("ES") @db.Char(2)
   baseCurrency          String                       @default("EUR") @map("base_currency") @db.Char(3)
   timezone              String                       @default("Europe/Madrid") @db.VarChar(64)
+  sifMode               SifMode                      @default(DISABLED) @map("sif_mode")
+  aeatEnvironment       AeatEnvironment              @default(PRODUCTION) @map("aeat_environment")
   createdAt             DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
   organization          Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   memberships           Membership[]
@@ -485,6 +498,8 @@ model Invoice {
   issuerLogoMediaType String?                @map("issuer_logo_media_type") @db.VarChar(100)
   issuerLogoSha256    String?                @map("issuer_logo_sha256") @db.Char(64)
   issuerLogoContent   Bytes?                 @map("issuer_logo_content")
+  sifMode             SifMode                @default(DISABLED) @map("sif_mode")
+  aeatEnvironment     AeatEnvironment        @default(PRODUCTION) @map("aeat_environment")
   customerLegalName   String                 @map("customer_legal_name") @db.VarChar(240)
   customerTaxId       String?                @map("customer_tax_id") @db.VarChar(40)
   customerEmail       String?                @map("customer_email") @db.VarChar(320)

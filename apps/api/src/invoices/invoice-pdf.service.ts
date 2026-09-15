@@ -1,6 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import PDFDocument = require("pdfkit");
 import {
+  aeatQrPng,
+  aeatQrUrl,
+  type AeatQrEnvironment,
+  type AeatQrMode,
+} from "../sif/aeat-qr";
+import {
   issuerAddressLines,
   issuerContactLines,
   issuerDisplayName,
@@ -29,6 +35,10 @@ export interface InvoicePdfInput {
   issuerSnapshot: unknown;
   issuerLogoMediaType: string | null;
   issuerLogoContent: Uint8Array | null;
+  sifQr?: {
+    mode: AeatQrMode;
+    environment: AeatQrEnvironment;
+  };
   customerLegalName: string;
   customerTaxId: string | null;
   billingAddress: unknown;
@@ -87,7 +97,18 @@ export class InvoicePdfService {
       document.on("error", reject);
     });
 
-    this.header(document, invoice, issuer);
+    const qr = invoice.sifQr
+      ? await aeatQrPng(
+          aeatQrUrl({
+            issuerTaxId: invoice.issuerTaxId,
+            invoiceNumber: invoice.fullNumber,
+            issueDate: invoice.issueDate,
+            total: invoice.total.toString(),
+            ...invoice.sifQr,
+          }),
+        )
+      : undefined;
+    this.header(document, invoice, issuer, qr);
     this.parties(document, invoice, issuer);
     if (isRectification) this.rectification(document, invoice);
     let y = this.tableHeader(document, document.y + 22);
@@ -117,6 +138,7 @@ export class InvoicePdfService {
     document: PDFKit.PDFDocument,
     invoice: InvoicePdfInput,
     issuer: IssuerSnapshot,
+    qr?: Buffer,
   ) {
     const title =
       invoice.documentType === "CREDIT_NOTE"
@@ -148,6 +170,14 @@ export class InvoicePdfService {
       .fontSize(title.length > 12 ? 10 : 15)
       .fillColor(primary)
       .text(title, 421, PAGE.top + 8, { width: 126, align: "center" });
+    if (qr) {
+      document
+        .font("Helvetica-Bold")
+        .fontSize(7)
+        .fillColor(COLOR.ink)
+        .text("QR tributario:", 451, 154, { width: 96, align: "center" });
+      document.image(qr, 451, 166, { fit: [96, 96] });
+    }
     document.y = 106;
   }
 
@@ -277,14 +307,16 @@ export class InvoicePdfService {
           lineGap: 2,
         },
       );
-    document.y =
+    document.y = Math.max(
       customerTop +
-      36 +
-      document.heightOfString(
-        details.join("\n") || "Sin dirección de facturación",
-        { width: 330, lineGap: 2 },
-      ) +
-      12;
+        36 +
+        document.heightOfString(
+          details.join("\n") || "Sin dirección de facturación",
+          { width: 330, lineGap: 2 },
+        ) +
+        12,
+      invoice.sifQr ? 274 : 0,
+    );
   }
 
   private continuation(document: PDFKit.PDFDocument, number: string) {

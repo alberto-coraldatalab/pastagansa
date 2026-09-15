@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { SifMode } from "@prisma/client";
 import { createHash } from "crypto";
 import { AuditService } from "../audit/audit.service";
 import { isValidIban, normalizeIban } from "../common/iban";
@@ -54,7 +56,11 @@ export class CompaniesService {
   }
 
   async update(input: UpdateCompanyDto) {
+    if (input.sifMode === SifMode.VERIFACTU)
+      throw new ConflictException("VERI*FACTU cannot be enabled until AEAT transmission is configured");
     const company = await this.current();
+    if (input.sifMode === SifMode.NO_VERIFACTU && company.country !== "ES")
+      throw new ConflictException("El QR fiscal AEAT solo está disponible para empresas españolas");
     const { documentProfile, ...companyInput } = input;
     const companyData = Object.fromEntries(
       Object.entries(companyInput).filter(([, value]) => value !== undefined),
