@@ -10,7 +10,11 @@ import { formatMoney } from "@/lib/catalog";
 import { formatInvoiceDate } from "@/lib/invoices";
 import {
   quoteCode,
+  quoteEmailKey,
   quoteStatusLabel,
+  type QuoteEmailCapability,
+  type QuoteEmailDelivery,
+  type QuoteEmailInput,
   type Quote,
   type QuoteInput,
   type QuoteStatus,
@@ -188,6 +192,7 @@ export function QuoteDetail({ id }: { id: string }) {
         </div>
         {document.notes && <p className="invoice-notes"><strong>Condiciones y notas:</strong> {document.notes}</p>}
       </section>
+      {(document.status === "DRAFT" || document.status === "SENT") && <QuoteEmailPanel quote={document} />}
       {editing && (
         <QuoteDialog
           initial={document}
@@ -207,6 +212,46 @@ export function QuoteDetail({ id }: { id: string }) {
       )}
     </AppShell>
   );
+}
+
+function QuoteEmailPanel({ quote }: { quote: Quote }) {
+  const queryClient = useQueryClient();
+  const [recipient, setRecipient] = useState(quote.customerEmail ?? "");
+  const [subject, setSubject] = useState(`Presupuesto ${quoteCode(quote.code)}`);
+  const capability = useQuery({
+    queryKey: ["quote-email-capability"],
+    queryFn: () => requestJson<QuoteEmailCapability>("/api/quotes/email-capability"),
+  });
+  const deliveries = useQuery({
+    queryKey: ["quote-email-deliveries", quote.id],
+    queryFn: () => requestJson<QuoteEmailDelivery[]>(`/api/quotes/${quote.id}/email-deliveries`),
+    refetchInterval: (query) => query.state.data?.some((delivery) => delivery.status === "PENDING" || delivery.status === "PROCESSING") ? 5_000 : false,
+  });
+  const send = useMutation({
+    mutationFn: (input: QuoteEmailInput) => requestJson<QuoteEmailDelivery>(`/api/quotes/${quote.id}/email`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...input, idempotencyKey: quoteEmailKey(quote.id) }),
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["quote-email-deliveries", quote.id] });
+      await queryClient.invalidateQueries({ queryKey: ["quote", quote.id] });
+      await queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    },
+  });
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    send.mutate({ recipient, subject: subject || undefined });
+  }
+  return <section className="invoice-detail-panel">
+    <header><div><h2>Enviar por email</h2><p>Adjunta el PDF guardado del presupuesto. El estado cambia a enviado solo cuando SMTP lo acepta.</p></div></header>
+    {capability.data?.enabled === false ? <p className="notice">Correo no configurado. Puedes descargar el PDF y enviarlo desde tu cliente habitual.</p> : <form className="contact-form" onSubmit={submit}>
+      <label className="field"><span>Destinatario</span><input type="email" required maxLength={320} value={recipient} onChange={(event) => setRecipient(event.target.value)} /></label>
+      <label className="field"><span>Asunto</span><input maxLength={300} value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
+      <div className="full"><button className="primary-button compact" disabled={send.isPending || capability.isPending} type="submit">{send.isPending ? "Encolando…" : "Enviar presupuesto"}</button></div>
+    </form>}
+    {send.error && <p className="form-error" role="alert">{send.error.message}</p>}
+    {deliveries.data?.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th>Destinatario</th><th>Asunto</th><th>Estado</th><th>Intentos</th></tr></thead><tbody>{deliveries.data.map((delivery) => <tr key={delivery.id}><td>{delivery.recipient}</td><td>{delivery.subject}</td><td>{delivery.status}</td><td>{delivery.attempts}</td></tr>)}</tbody></table></div> : null}
+  </section>;
 }
 
 function ConversionDialog({

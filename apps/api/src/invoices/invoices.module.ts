@@ -11,6 +11,7 @@ import { SmtpInvoiceMailer } from "./smtp-invoice-mailer.service";
 import { TaxModule } from "../tax/tax.module";
 import { AccountingModule } from "../accounting/accounting.module";
 import { SifModule } from "../sif/sif.module";
+import { QuotePdfService } from "../quotes/quote-pdf.service";
 
 @Module({
   imports: [AuditModule, TaxModule, AccountingModule, SifModule],
@@ -22,7 +23,8 @@ import { SifModule } from "../sif/sif.module";
     InvoiceEmailService,
     SmtpInvoiceMailer,
     InvoiceEmailOutboxWorker,
+    QuotePdfService,
   ],
-  exports: [InvoicesService],
+  exports: [InvoicesService, InvoiceEmailService],
 })
 export class InvoicesModule {}

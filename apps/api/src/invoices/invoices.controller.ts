@@ -107,7 +107,7 @@ export class InvoicesController {
 
   @Post(":id/email")
   @HttpCode(202)
-  @RequirePermissions("invoice.send")
+  @RequirePermissions("document.send")
   email(
     @Param("id", ParseUUIDPipe) id: string,
     @Headers("idempotency-key") idempotencyKey: string | undefined,

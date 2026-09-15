@@ -1,7 +1,9 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
+  Headers,
   HttpCode,
   Param,
   Patch,
@@ -20,12 +22,20 @@ import {
 import { QuotesService } from "./quotes.service";
 import { ListQuotesDto } from "./dto/list-quotes.dto";
 import { ConvertQuoteDto } from "./dto/convert-quote.dto";
+import { SendDocumentEmailDto } from "../invoices/dto/send-invoice-email.dto";
+import { InvoiceEmailService } from "../invoices/invoice-email.service";
 @Controller("quotes")
 @TenantProtected()
 export class QuotesController {
-  constructor(private readonly quotes: QuotesService) {}
+  constructor(
+    private readonly quotes: QuotesService,
+    private readonly emails: InvoiceEmailService,
+  ) {}
   @Get() @RequirePermissions("quote.read") list(@Query() query: ListQuotesDto) {
     return this.quotes.list(query);
+  }
+  @Get("email-capability") @RequirePermissions("quote.read") emailCapability() {
+    return this.emails.capability();
   }
   @Get(":id") @RequirePermissions("quote.read") get(
     @Param("id", ParseUUIDPipe) id: string,
@@ -42,10 +52,25 @@ export class QuotesController {
       length: file.content.length,
     });
   }
+  @Get(":id/email-deliveries") @RequirePermissions("quote.read") deliveries(
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.emails.listQuote(id);
+  }
   @Post() @RequirePermissions("quote.create") create(
     @Body() input: CreateQuoteDto,
   ) {
     return this.quotes.create(input);
+  }
+  @Post(":id/email")
+  @HttpCode(202)
+  @RequirePermissions("document.send")
+  email(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() input: SendDocumentEmailDto,
+  ) {
+    return this.emails.enqueueQuote(id, input, requireIdempotencyKey(idempotencyKey));
   }
   @Patch(":id") @RequirePermissions("quote.update") update(
     @Param("id", ParseUUIDPipe) id: string,
@@ -71,4 +96,11 @@ export class QuotesController {
   ) {
     return this.quotes.convertToInvoice(id, input);
   }
+}
+
+function requireIdempotencyKey(value: string | undefined) {
+  const key = value?.trim();
+  if (!key || key.length > 128 || /[\u0000-\u001f\u007f]/.test(key))
+    throw new BadRequestException("Idempotency-Key must contain between 1 and 128 printable characters");
+  return key;
 }

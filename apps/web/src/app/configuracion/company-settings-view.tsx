@@ -174,6 +174,15 @@ export function CompanySettingsView() {
               {canUpdate && <div><label className="secondary-button file-button">Subir logo<input accept="image/png,image/jpeg" disabled={uploadLogo.isPending} onChange={(event) => void selectLogo(event.target.files?.[0])} type="file" /></label>{company.data.documentLogo && <button className="text-button" disabled={deleteLogo.isPending} onClick={() => void removeLogo()} type="button">Eliminar</button>}</div>}
             </div>
           </section>
+          <section className="company-settings-card" aria-labelledby="email-template-title">
+            <h2 id="email-template-title">Correo de documentos</h2>
+            <p>Variables disponibles: <code>{"{{document_number}}"}</code>, <code>{"{{customer_name}}"}</code>, <code>{"{{company_name}}"}</code> y <code>{"{{document_type}}"}</code>.</p>
+            <div className="contact-form">
+              <TextField className="full" disabled={!canUpdate} label="Asunto de factura" maxLength={300} onChange={(value) => updateProfile("invoiceEmailSubjectTemplate", value)} value={form.documentProfile.invoiceEmailSubjectTemplate ?? ""} />
+              <TextField className="full" disabled={!canUpdate} label="Asunto de presupuesto" maxLength={300} onChange={(value) => updateProfile("quoteEmailSubjectTemplate", value)} value={form.documentProfile.quoteEmailSubjectTemplate ?? ""} />
+              <TextArea className="full" disabled={!canUpdate} label="Texto del correo" onChange={(value) => updateProfile("emailBodyTemplate", value)} value={form.documentProfile.emailBodyTemplate ?? ""} />
+            </div>
+          </section>
           <section className="company-settings-card" aria-labelledby="preview-title">
             <h2 id="preview-title">Vista previa</h2>
             <p>Así se organizarán estos datos en los próximos documentos. Los documentos ya emitidos no cambian.</p>

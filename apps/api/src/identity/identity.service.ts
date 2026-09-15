@@ -64,6 +64,7 @@ export class IdentityService {
           ["invoice.delete", "Delete invoice drafts"],
           ["invoice.issue", "Issue invoices"],
           ["invoice.send", "Send invoices"],
+          ["document.send", "Send documents by email"],
           ["payment.read", "Read invoice payments"],
           ["payment.create", "Record invoice payments"],
           ["tax_rule.read", "Read versioned tax rules"],

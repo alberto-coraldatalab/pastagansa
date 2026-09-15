@@ -2,11 +2,13 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import nodemailer = require("nodemailer");
 
-export interface InvoiceMail {
+export interface DocumentMail {
   recipient: string;
   subject: string;
-  invoiceNumber: string;
+  documentNumber: string;
+  documentLabel: string;
   issuerLegalName: string;
+  text?: string;
   filename: string;
   pdf: Buffer;
 }
@@ -37,15 +39,15 @@ export class SmtpInvoiceMailer {
     return Boolean(this.transport && this.from);
   }
 
-  async send(mail: InvoiceMail) {
+  async send(mail: DocumentMail) {
     if (!this.transport || !this.from)
       throw new Error("SMTP transport is not configured");
-    await this.transport.sendMail({
+    const result = await this.transport.sendMail({
       from: this.from,
       to: mail.recipient,
       subject: mail.subject,
-      text: `${mail.issuerLegalName} adjunta la factura ${mail.invoiceNumber}.`,
-      html: `<p>${escapeHtml(mail.issuerLegalName)} adjunta la factura <strong>${escapeHtml(mail.invoiceNumber)}</strong>.</p>`,
+      text: mail.text ?? `${mail.issuerLegalName} adjunta ${mail.documentLabel} ${mail.documentNumber}.`,
+      html: `<p>${escapeHtml(mail.text ?? `${mail.issuerLegalName} adjunta ${mail.documentLabel} ${mail.documentNumber}.`)}</p>`,
       attachments: [
         {
           filename: mail.filename,
@@ -54,6 +56,7 @@ export class SmtpInvoiceMailer {
         },
       ],
     });
+    return { provider: "smtp", messageId: result.messageId || undefined };
   }
 }
 

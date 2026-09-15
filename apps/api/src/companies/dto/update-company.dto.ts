@@ -27,6 +27,9 @@ export class UpdateCompanyDocumentProfileDto {
   @IsOptional() @IsString() @MaxLength(5000) defaultNotes?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) documentFooter?: string | null;
   @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/) primaryColor?: string | null;
+  @IsOptional() @IsString() @MaxLength(300) invoiceEmailSubjectTemplate?: string | null;
+  @IsOptional() @IsString() @MaxLength(300) quoteEmailSubjectTemplate?: string | null;
+  @IsOptional() @IsString() @MaxLength(2000) emailBodyTemplate?: string | null;
 }
 
 export class UpdateCompanyDto {

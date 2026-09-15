@@ -28,6 +28,27 @@ export const quoteInputSchema = z.object({
 
 export type QuoteInput = z.infer<typeof quoteInputSchema>;
 
+export const quoteEmailInputSchema = z.object({
+  recipient: z.string().trim().email().max(320),
+  subject: z.string().trim().min(1).max(300).optional(),
+});
+export type QuoteEmailInput = z.infer<typeof quoteEmailInputSchema>;
+export interface QuoteEmailDelivery {
+  id: string;
+  recipient: string;
+  subject: string;
+  status: "PENDING" | "PROCESSING" | "SENT" | "FAILED";
+  attempts: number;
+  sentAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface QuoteEmailCapability { enabled: boolean }
+export function quoteEmailKey(quoteId: string, existing?: string | null) {
+  return existing ?? `quote-email:${quoteId}:${crypto.randomUUID()}`;
+}
+
 export const quoteStatuses = [
   "DRAFT",
   "SENT",
@@ -50,6 +71,7 @@ export interface Quote {
   status: QuoteStatus;
   customerLegalName: string;
   customerTaxId: string | null;
+  customerEmail: string | null;
   issueDate: string;
   validUntil: string | null;
   currency: string;

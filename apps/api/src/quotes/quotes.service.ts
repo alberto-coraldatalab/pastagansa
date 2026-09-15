@@ -339,6 +339,7 @@ export class QuotesService {
         contactId: input.contactId,
         customerLegalName: contact.legalName,
         customerTaxId: contact.taxId,
+        customerEmail: contact.email,
         billingAddress,
         ...issuer.snapshot,
         issueDate: new Date(input.issueDate),

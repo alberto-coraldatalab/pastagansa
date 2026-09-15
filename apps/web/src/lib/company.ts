@@ -15,6 +15,9 @@ export type CompanyDocumentProfile = {
   defaultNotes: string | null;
   documentFooter: string | null;
   primaryColor: string | null;
+  invoiceEmailSubjectTemplate: string | null;
+  quoteEmailSubjectTemplate: string | null;
+  emailBodyTemplate: string | null;
 };
 
 export type CompanySettings = {
@@ -58,6 +61,9 @@ export const emptyDocumentProfile: CompanyDocumentProfile = {
   defaultNotes: null,
   documentFooter: null,
   primaryColor: "#F71950",
+  invoiceEmailSubjectTemplate: "Factura {{document_number}}",
+  quoteEmailSubjectTemplate: "Presupuesto {{document_number}}",
+  emailBodyTemplate: "{{company_name}} adjunta {{document_type}} {{document_number}}.",
 };
 
 export function companySettingsInput(company: CompanySettings): CompanySettingsInput {

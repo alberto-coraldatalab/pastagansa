@@ -108,6 +108,11 @@ enum InvoiceEmailStatus {
   FAILED
 }
 
+enum DeliveryDocumentType {
+  INVOICE
+  QUOTE
+}
+
 enum InstallmentStatus {
   PENDING
   PARTIALLY_PAID
@@ -207,7 +212,7 @@ model Organization {
   catalogItems          CatalogItem[]
   documentSequences     DocumentSequence[]
   invoices              Invoice[]
-  invoiceDeliveries     InvoiceEmailDelivery[]
+  documentDeliveries    DocumentDelivery[]
   invoiceInstallments   InvoiceInstallment[]
   payments              Payment[]
   paymentAllocations    PaymentAllocation[]
@@ -258,7 +263,7 @@ model Company {
   catalogItems          CatalogItem[]
   documentSequences     DocumentSequence[]
   invoices              Invoice[]
-  invoiceDeliveries     InvoiceEmailDelivery[]
+  documentDeliveries    DocumentDelivery[]
   invoiceInstallments   InvoiceInstallment[]
   payments              Payment[]
   paymentAllocations    PaymentAllocation[]
@@ -313,6 +318,9 @@ model CompanyDocumentProfile {
   defaultNotes        String?      @map("default_notes") @db.VarChar(5000)
   documentFooter      String?      @map("document_footer") @db.VarChar(1000)
   primaryColor        String?      @map("primary_color") @db.Char(7)
+  invoiceEmailSubjectTemplate String? @map("invoice_email_subject_template") @db.VarChar(300)
+  quoteEmailSubjectTemplate   String? @map("quote_email_subject_template") @db.VarChar(300)
+  emailBodyTemplate           String? @map("email_body_template") @db.VarChar(2000)
   createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
   organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -474,7 +482,7 @@ model Invoice {
   originalInvoice     Invoice?               @relation("InvoiceRectifications", fields: [originalInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   rectifications      Invoice[]              @relation("InvoiceRectifications")
   lines               InvoiceLine[]
-  emailDeliveries     InvoiceEmailDelivery[]
+  emailDeliveries     DocumentDelivery[]
   installments        InvoiceInstallment[]
   paymentAllocations  PaymentAllocation[]
   taxLines            InvoiceTaxLine[]
@@ -1214,14 +1222,21 @@ model PaymentAllocation {
   @@map("payment_allocations")
 }
 
-model InvoiceEmailDelivery {
+model DocumentDelivery {
   id             String             @id @default(uuid()) @db.Uuid
   organizationId String             @map("organization_id") @db.Uuid
   companyId      String             @map("company_id") @db.Uuid
-  invoiceId      String             @map("invoice_id") @db.Uuid
+  documentType   DeliveryDocumentType @map("document_type")
+  invoiceId      String?            @map("invoice_id") @db.Uuid
+  quoteId        String?            @map("quote_id") @db.Uuid
   idempotencyKey String             @map("idempotency_key") @db.VarChar(128)
   recipient      String             @db.VarChar(320)
   subject        String             @db.VarChar(300)
+  bodyTemplate   String?            @map("body_template") @db.VarChar(2000)
+  templateParameters Json           @default("{}") @map("template_parameters")
+  templateVersion String             @default("v1") @map("template_version") @db.VarChar(40)
+  provider       String?            @db.VarChar(100)
+  providerMessageId String?         @map("provider_message_id") @db.VarChar(500)
   status         InvoiceEmailStatus @default(PENDING)
   attempts       Int                @default(0)
   availableAt    DateTime           @default(now()) @map("available_at") @db.Timestamptz(6)
@@ -1232,12 +1247,14 @@ model InvoiceEmailDelivery {
   updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   company        Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  invoice        Invoice            @relation(fields: [invoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  invoice        Invoice?           @relation(fields: [invoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  quote          Quote?             @relation(fields: [quoteId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
 
   @@unique([companyId, idempotencyKey])
   @@index([status, availableAt])
   @@index([invoiceId, createdAt])
-  @@map("invoice_email_deliveries")
+  @@index([quoteId, createdAt])
+  @@map("document_deliveries")
 }
 
 model InvoiceLine {
@@ -1273,6 +1290,7 @@ model Quote {
   convertedInvoiceId String?     @map("converted_invoice_id") @db.Uuid
   customerLegalName String       @map("customer_legal_name") @db.VarChar(240)
   customerTaxId     String?      @map("customer_tax_id") @db.VarChar(40)
+  customerEmail     String?      @map("customer_email") @db.VarChar(320)
   billingAddress    Json?        @map("billing_address")
   issuerSnapshot    Json         @default("{}") @map("issuer_snapshot")
   issuerSnapshotVersion Int       @default(1) @map("issuer_snapshot_version")
@@ -1299,9 +1317,11 @@ model Quote {
   sequence          DocumentSequence? @relation(fields: [sequenceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   convertedInvoice  Invoice?     @relation(fields: [convertedInvoiceId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
   lines             QuoteLine[]
+  emailDeliveries   DocumentDelivery[]
 
   @@unique([companyId, code])
   @@unique([companyId, series, number])
+  @@unique([id, organizationId, companyId])
   @@unique([convertedInvoiceId, organizationId, companyId])
   @@index([companyId, status, issueDate])
   @@map("quotes")
