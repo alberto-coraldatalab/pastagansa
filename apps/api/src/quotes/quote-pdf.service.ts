@@ -44,11 +44,11 @@ const PAGE = {
   footerY: 774,
 };
 const COLOR = {
-  ink: "#172033",
-  muted: "#667085",
-  primary: "#175CD3",
-  primarySoft: "#EFF4FF",
-  line: "#D0D5DD",
+  ink: "#10233F",
+  muted: "#52627A",
+  primary: "#F71950",
+  primarySoft: "#FDECF1",
+  line: "#D9DEE7",
   paper: "#FFFFFF",
 };
 
@@ -93,30 +93,8 @@ export class QuotePdfService {
     document.y = rowY + 20;
     this.ensureSpace(document, 150, quote.code);
     this.drawTotals(document, input);
-    if (quote.notes) {
-      const notesHeight =
-        document.heightOfString(quote.notes, {
-          width: PAGE.right - PAGE.left,
-          lineGap: 2,
-        }) + 38;
-      this.ensureSpace(document, notesHeight, quote.code);
-      const notesY = document.y + 14;
-      document
-        .font("Helvetica-Bold")
-        .fontSize(9)
-        .fillColor(COLOR.ink)
-        .text("Notas", PAGE.left, notesY, { width: PAGE.right - PAGE.left });
-      document
-        .font("Helvetica")
-        .fontSize(9)
-        .fillColor(COLOR.muted)
-        .text(quote.notes, PAGE.left, notesY + 18, {
-          width: PAGE.right - PAGE.left,
-          lineGap: 2,
-        });
-    }
-
-    this.drawFooters(document, quote.code);
+    this.drawNotesAndTerms(document, input);
+    this.drawFooters(document, input);
     document.end();
     return completed;
   }
@@ -126,58 +104,74 @@ export class QuotePdfService {
     input: QuotePdfInput,
   ) {
     const { company, quote } = input;
-    document.roundedRect(PAGE.left, PAGE.top, 42, 42, 8).fill(COLOR.primary);
+    document.circle(PAGE.left + 13, PAGE.top + 16, 11).fill(COLOR.primary);
+    document.circle(PAGE.left + 15, PAGE.top + 13, 3).fill(COLOR.paper);
     document
       .font("Helvetica-Bold")
-      .fontSize(15)
-      .fillColor(COLOR.paper)
-      .text("PG", PAGE.left, PAGE.top + 12, { width: 42, align: "center" });
+      .fontSize(19)
+      .fillColor(COLOR.ink)
+      .text(company.legalName.toUpperCase(), PAGE.left + 34, PAGE.top + 5, {
+        width: 300,
+      });
+    document
+      .roundedRect(407, PAGE.top, 140, 30, 5)
+      .fill(COLOR.primarySoft);
     document
       .font("Helvetica-Bold")
       .fontSize(13)
+      .fillColor(COLOR.primary)
+      .text("PRESUPUESTO", 407, PAGE.top + 9, {
+        width: 140,
+        align: "center",
+      });
+    document.y = 106;
+  }
+
+  private drawCustomer(document: PDFKit.PDFDocument, input: QuotePdfInput) {
+    const { company, quote } = input;
+    const top = document.y;
+    document
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor(COLOR.primary)
+      .text("Datos del emisor", PAGE.left, top);
+    document
+      .font("Helvetica-Bold")
+      .fontSize(10)
       .fillColor(COLOR.ink)
-      .text(company.legalName, 104, PAGE.top + 3, { width: 245 });
+      .text(company.legalName, PAGE.left, top + 19, { width: 275 });
     document
       .font("Helvetica")
       .fontSize(9)
       .fillColor(COLOR.muted)
-      .text(`NIF: ${company.taxId}`, 104, PAGE.top + 25, { width: 245 });
+      .text(`NIF: ${company.taxId}`, PAGE.left, top + 35);
+    const rows = [
+      ["Nº de presupuesto", quote.code],
+      ["Fecha de emisión", formatDate(quote.issueDate)],
+      ["Válido hasta", quote.validUntil ? formatDate(quote.validUntil) : "-"],
+    ];
+    rows.forEach(([label, value], index) => {
+      const y = top + index * 20;
+      document
+        .font("Helvetica")
+        .fontSize(9)
+        .fillColor(COLOR.ink)
+        .text(label, 364, y, { width: 105 });
+      document.text(value, 469, y, { width: 78, align: "right" });
+    });
+    const customerTop = top + 91;
     document
       .font("Helvetica-Bold")
-      .fontSize(20)
+      .fontSize(12)
       .fillColor(COLOR.primary)
-      .text("PRESUPUESTO", 360, PAGE.top, { width: 187, align: "right" });
+      .text("Datos del cliente", PAGE.left, customerTop);
     document
-      .font("Helvetica")
+      .font("Helvetica-Bold")
       .fontSize(10)
       .fillColor(COLOR.ink)
-      .text(quote.code, 360, PAGE.top + 28, { width: 187, align: "right" });
-    document
-      .fontSize(8)
-      .fillColor(COLOR.muted)
-      .text(`Estado: ${quote.status}`, 360, PAGE.top + 45, {
-        width: 187,
-        align: "right",
+      .text(quote.customerLegalName, PAGE.left, customerTop + 19, {
+        width: 300,
       });
-    document.y = 116;
-  }
-
-  private drawCustomer(document: PDFKit.PDFDocument, input: QuotePdfInput) {
-    const { quote } = input;
-    const top = document.y;
-    document
-      .roundedRect(PAGE.left, top, PAGE.right - PAGE.left, 105, 8)
-      .fill(COLOR.primarySoft);
-    document
-      .font("Helvetica-Bold")
-      .fontSize(8)
-      .fillColor(COLOR.primary)
-      .text("CLIENTE", PAGE.left + 14, top + 13);
-    document
-      .font("Helvetica-Bold")
-      .fontSize(11)
-      .fillColor(COLOR.ink)
-      .text(quote.customerLegalName, PAGE.left + 14, top + 29, { width: 270 });
     const customerDetails = [
       quote.customerTaxId ? `NIF: ${quote.customerTaxId}` : null,
       ...billingAddressLines(quote.billingAddress),
@@ -188,55 +182,14 @@ export class QuotePdfService {
       .fillColor(COLOR.muted)
       .text(
         customerDetails.join("\n") || "Sin dirección de facturación",
-        PAGE.left + 14,
-        top + 49,
+        PAGE.left,
+        customerTop + 36,
         {
-          width: 280,
+          width: 330,
           lineGap: 2,
         },
       );
-    document
-      .font("Helvetica-Bold")
-      .fontSize(8)
-      .fillColor(COLOR.muted)
-      .text("FECHA", 382, top + 18, { width: 68 });
-    document
-      .font("Helvetica")
-      .fontSize(9)
-      .fillColor(COLOR.ink)
-      .text(formatDate(quote.issueDate), 455, top + 18, {
-        width: 78,
-        align: "right",
-      });
-    document
-      .font("Helvetica-Bold")
-      .fontSize(8)
-      .fillColor(COLOR.muted)
-      .text("VÁLIDO HASTA", 382, top + 43, { width: 78 });
-    document
-      .font("Helvetica")
-      .fontSize(9)
-      .fillColor(COLOR.ink)
-      .text(
-        quote.validUntil ? formatDate(quote.validUntil) : "-",
-        455,
-        top + 43,
-        {
-          width: 78,
-          align: "right",
-        },
-      );
-    document
-      .font("Helvetica-Bold")
-      .fontSize(8)
-      .fillColor(COLOR.muted)
-      .text("MONEDA", 382, top + 68, { width: 68 });
-    document
-      .font("Helvetica")
-      .fontSize(9)
-      .fillColor(COLOR.ink)
-      .text(quote.currency, 455, top + 68, { width: 78, align: "right" });
-    document.y = top + 105;
+    document.y = top + 174;
   }
 
   private drawContinuationHeader(document: PDFKit.PDFDocument, code: string) {
@@ -251,7 +204,9 @@ export class QuotePdfService {
   }
 
   private drawTableHeader(document: PDFKit.PDFDocument, y: number) {
-    document.rect(PAGE.left, y, PAGE.right - PAGE.left, 24).fill(COLOR.ink);
+    document
+      .roundedRect(PAGE.left, y, PAGE.right - PAGE.left, 28, 5)
+      .fill(COLOR.primarySoft);
     const headings = [
       ["Descripción", 58, 190, "left"],
       ["Cant.", 258, 45, "right"],
@@ -260,10 +215,10 @@ export class QuotePdfService {
       ["IVA", 438, 35, "right"],
       ["Total", 483, 54, "right"],
     ] as const;
-    document.font("Helvetica-Bold").fontSize(7.5).fillColor(COLOR.paper);
+    document.font("Helvetica-Bold").fontSize(7.5).fillColor(COLOR.ink);
     for (const [label, x, width, align] of headings)
-      document.text(label, x, y + 8, { width, align });
-    return y + 24;
+      document.text(label.toUpperCase(), x, y + 10, { width, align });
+    return y + 28;
   }
 
   private drawLine(
@@ -273,10 +228,6 @@ export class QuotePdfService {
     y: number,
     height: number,
   ) {
-    if (line.position % 2 === 0)
-      document
-        .rect(PAGE.left, y, PAGE.right - PAGE.left, height)
-        .fill("#F9FAFB");
     document
       .moveTo(PAGE.left, y + height)
       .lineTo(PAGE.right, y + height)
@@ -302,13 +253,13 @@ export class QuotePdfService {
     const width = PAGE.right - x;
     const rows = [
       ["Base", formatMoney(quote.subtotal, quote.currency)],
-      ["Descuentos", `-${formatMoney(quote.discountTotal, quote.currency)}`],
+      ["Descuentos", formatDiscountMoney(quote.discountTotal, quote.currency)],
       ["Impuestos", formatMoney(quote.taxTotal, quote.currency)],
     ];
     let y = document.y;
     document.fontSize(9);
     for (const [label, value] of rows) {
-      document.font("Helvetica").fillColor(COLOR.muted).text(label, x, y, {
+      document.font("Helvetica").fillColor(COLOR.ink).text(label, x, y, {
         width: 85,
       });
       document
@@ -321,25 +272,66 @@ export class QuotePdfService {
       y += 20;
     }
     document
-      .moveTo(x, y)
-      .lineTo(PAGE.right, y)
-      .strokeColor(COLOR.primary)
-      .lineWidth(1.5)
-      .stroke();
-    document
-      .font("Helvetica-Bold")
-      .fontSize(12)
-      .fillColor(COLOR.ink)
-      .text("TOTAL", x, y + 12, { width: 85 });
+      .roundedRect(x - 10, y + 3, PAGE.right - x + 10, 34, 5)
+      .fill(COLOR.primarySoft);
     document
       .font("Helvetica-Bold")
       .fontSize(12)
       .fillColor(COLOR.primary)
-      .text(formatMoney(quote.total, quote.currency), x + 85, y + 12, {
+      .text("Total", x, y + 14, { width: 85 });
+    document
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor(COLOR.primary)
+      .text(formatMoney(quote.total, quote.currency), x + 85, y + 14, {
         width: width - 85,
         align: "right",
       });
-    document.y = y + 38;
+    document.y = y + 48;
+  }
+
+  private drawNotesAndTerms(
+    document: PDFKit.PDFDocument,
+    input: QuotePdfInput,
+  ) {
+    const { quote } = input;
+    this.ensureSpace(document, 105, quote.code);
+    const top = document.y + 18;
+    document
+      .moveTo(PAGE.left, top)
+      .lineTo(PAGE.right, top)
+      .strokeColor(COLOR.primary)
+      .lineWidth(1)
+      .stroke();
+    document
+      .moveTo(300, top + 20)
+      .lineTo(300, top + 90)
+      .strokeColor("#F68AA5")
+      .lineWidth(0.7)
+      .stroke();
+    document
+      .font("Helvetica-Bold")
+      .fontSize(10)
+      .fillColor(COLOR.primary)
+      .text("NOTAS", PAGE.left, top + 22)
+      .text("CONDICIONES DE PAGO", 318, top + 22);
+    document
+      .font("Helvetica")
+      .fontSize(8.5)
+      .fillColor(COLOR.muted)
+      .text(quote.notes || "Sin notas adicionales.", PAGE.left, top + 42, {
+        width: 230,
+        lineGap: 2,
+      })
+      .text(
+        quote.validUntil
+          ? `Oferta válida hasta el ${formatDate(quote.validUntil)}.\nMoneda: ${quote.currency}`
+          : `Validez no especificada.\nMoneda: ${quote.currency}`,
+        318,
+        top + 42,
+        { width: 229, lineGap: 2 },
+      );
+    document.y = top + 96;
   }
 
   private ensureSpace(
@@ -352,7 +344,8 @@ export class QuotePdfService {
     this.drawContinuationHeader(document, code);
   }
 
-  private drawFooters(document: PDFKit.PDFDocument, code: string) {
+  private drawFooters(document: PDFKit.PDFDocument, input: QuotePdfInput) {
+    const { company, quote } = input;
     const range = document.bufferedPageRange();
     for (
       let index = range.start;
@@ -370,16 +363,16 @@ export class QuotePdfService {
         .font("Helvetica")
         .fontSize(7.5)
         .fillColor(COLOR.muted)
-        .text(`Generado por Pastagansa · ${code}`, PAGE.left, PAGE.footerY, {
+        .text(`${company.legalName} | NIF: ${company.taxId}`, PAGE.left, PAGE.footerY, {
           width: 300,
           lineBreak: false,
         });
       document.text(
-        `Página ${index + 1} de ${range.count}`,
-        397,
+        `Pastagansa · ${quote.code} · Página ${index + 1} de ${range.count}`,
+        307,
         PAGE.footerY,
         {
-          width: 150,
+          width: 240,
           align: "right",
           lineBreak: false,
         },
@@ -409,6 +402,11 @@ function formatMoney(value: DecimalValue, currency: string) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(value.toString()))} ${currency}`;
+}
+
+function formatDiscountMoney(value: DecimalValue, currency: string) {
+  const formatted = formatMoney(value, currency);
+  return Number(value.toString()) === 0 ? formatted : `-${formatted}`;
 }
 
 function billingAddressLines(value: unknown): string[] {
