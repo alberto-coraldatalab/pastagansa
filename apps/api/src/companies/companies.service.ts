@@ -17,6 +17,7 @@ import {
   inspectCompanyLogo,
   normalizedLogoMediaType,
 } from "./company-logo";
+import { SifDeclarationPdfService } from "../sif/sif-declaration-pdf.service";
 
 export type UploadedCompanyLogo = {
   buffer: Buffer;
@@ -29,6 +30,7 @@ export class CompaniesService {
   constructor(
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
+    private readonly sifDeclaration: SifDeclarationPdfService,
   ) {}
 
   async current() {
@@ -88,6 +90,14 @@ export class CompaniesService {
       ],
     });
     return this.current();
+  }
+
+  async downloadSifDeclaration() {
+    const company = await this.current();
+    return {
+      filename: `borrador-declaracion-responsable-sif-${safeFilename(company.sifSoftwareId ?? company.id)}.pdf`,
+      content: await this.sifDeclaration.render({ company }),
+    };
   }
 
   async uploadLogo(file: UploadedCompanyLogo | undefined) {
@@ -158,6 +168,10 @@ export class CompaniesService {
     if (!companyId) throw new NotFoundException("x-company-id is required");
     return { organizationId, companyId };
   }
+}
+
+function safeFilename(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, "-");
 }
 
 function normalizeProfile(input: UpdateCompanyDocumentProfileDto) {

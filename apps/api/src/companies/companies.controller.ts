@@ -48,6 +48,17 @@ export class CompaniesController {
     });
   }
 
+  @Get("sif-declaration")
+  @RequirePermissions("company.read")
+  async sifDeclaration() {
+    const file = await this.companies.downloadSifDeclaration();
+    return new StreamableFile(file.content, {
+      type: "application/pdf",
+      disposition: `attachment; filename="${file.filename}"`,
+      length: file.content.length,
+    });
+  }
+
   @Put("logo")
   @RequirePermissions("company.update")
   @UseInterceptors(

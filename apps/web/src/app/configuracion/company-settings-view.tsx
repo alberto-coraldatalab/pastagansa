@@ -187,6 +187,7 @@ export function CompanySettingsView() {
               <TextField disabled={!canUpdate} label="Nº de instalación" maxLength={120} onChange={(value) => updateCompany("sifInstallationNumber", value)} value={form.sifInstallationNumber ?? ""} />
             </div>
             {form.sifMode === "NO_VERIFACTU" && <p className="notice" role="status">Las facturas nuevas incluirán un QR fiscal de 34 mm. Las ya emitidas no se modifican. Completa los datos del productor antes de activar la remisión VERI*FACTU.</p>}
+            <a className="secondary-button" href="/api/company/sif-declaration">Descargar borrador de declaración responsable</a>
           </section>
           <section className="company-settings-card" aria-labelledby="logo-title">
             <h2 id="logo-title">Logo</h2>
