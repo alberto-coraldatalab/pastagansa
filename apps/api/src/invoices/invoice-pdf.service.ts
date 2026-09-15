@@ -175,8 +175,8 @@ export class InvoicePdfService {
         .font("Helvetica-Bold")
         .fontSize(7)
         .fillColor(COLOR.ink)
-        .text("QR tributario:", 451, 154, { width: 96, align: "center" });
-      document.image(qr, 451, 166, { fit: [96, 96] });
+        .text("QR tributario:", 451, 172, { width: 96, align: "center" });
+      document.image(qr, 451, 184, { fit: [96, 96] });
     }
     document.y = 106;
   }
@@ -315,7 +315,7 @@ export class InvoicePdfService {
           { width: 330, lineGap: 2 },
         ) +
         12,
-      invoice.sifQr ? 274 : 0,
+      invoice.sifQr ? 292 : 0,
     );
   }
 
