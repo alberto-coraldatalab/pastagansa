@@ -286,9 +286,9 @@ Gate:
 
 ## Orden inmediato de implementación
 
-1. Continuar U6A —documentos reales y comunicación— con U6-02 (snapshots y PDFs).
-   U6-01, el perfil comercial/fiscal de empresa, está implementado localmente y a la
-   espera de validación de staging dentro de su gate de salida.
+1. Continuar U6A —documentos reales y comunicación— con U6-03 (entrega por email).
+   U6-01 y U6-02, perfil de empresa y snapshots/PDF históricos, están implementados
+   localmente y a la espera de validación de staging dentro de su gate de salida.
 2. Retomar SIF/VERI*FACTU tras U6A. U6B —cartera y recordatorios— queda subordinado al
    calendario SIF y no desplaza este punto de control.
 

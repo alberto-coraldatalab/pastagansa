@@ -1,15 +1,23 @@
 import { Injectable } from "@nestjs/common";
 import PDFDocument = require("pdfkit");
+import {
+  issuerAddressLines,
+  issuerContactLines,
+  issuerDisplayName,
+  issuerLegalName,
+  issuerPrimaryColor,
+  readIssuerSnapshot,
+  truncatePdfText,
+  type IssuerSnapshot,
+} from "../documents/issuer-snapshot";
 
 interface DecimalValue {
   toString(): string;
 }
 
 export interface QuotePdfInput {
-  company: {
-    legalName: string;
-    taxId: string;
-  };
+  issuerLogoMediaType: string | null;
+  issuerLogoContent: Uint8Array | null;
   quote: {
     code: string;
     status: string;
@@ -20,6 +28,7 @@ export interface QuotePdfInput {
     customerTaxId: string | null;
     billingAddress: unknown;
     notes: string | null;
+    issuerSnapshot: unknown;
     subtotal: DecimalValue;
     discountTotal: DecimalValue;
     taxTotal: DecimalValue;
@@ -55,14 +64,15 @@ const COLOR = {
 @Injectable()
 export class QuotePdfService {
   async render(input: QuotePdfInput): Promise<Buffer> {
-    const { company, quote } = input;
+    const { quote } = input;
+    const issuer = readIssuerSnapshot(quote.issuerSnapshot);
     const document = new PDFDocument({
       size: "A4",
       margins: { top: PAGE.top, right: 48, bottom: 48, left: PAGE.left },
       bufferPages: true,
       info: {
         Title: `Presupuesto ${quote.code}`,
-        Author: company.legalName,
+        Author: issuerLegalName(issuer),
         Subject: `Presupuesto para ${quote.customerLegalName}`,
         Creator: "Pastagansa",
       },
@@ -74,8 +84,8 @@ export class QuotePdfService {
       document.on("error", reject);
     });
 
-    this.drawDocumentHeader(document, input);
-    this.drawCustomer(document, input);
+    this.drawDocumentHeader(document, input, issuer);
+    this.drawCustomer(document, input, issuer);
     let rowY = this.drawTableHeader(document, document.y + 24);
     for (const line of quote.lines) {
       const rowHeight = Math.max(
@@ -92,9 +102,9 @@ export class QuotePdfService {
     }
     document.y = rowY + 20;
     this.ensureSpace(document, 150, quote.code);
-    this.drawTotals(document, input);
-    this.drawNotesAndTerms(document, input);
-    this.drawFooters(document, input);
+    this.drawTotals(document, input, issuer);
+    this.drawNotesAndTerms(document, input, issuer);
+    this.drawFooters(document, input, issuer);
     document.end();
     return completed;
   }
@@ -102,16 +112,26 @@ export class QuotePdfService {
   private drawDocumentHeader(
     document: PDFKit.PDFDocument,
     input: QuotePdfInput,
+    issuer: IssuerSnapshot,
   ) {
-    const { company, quote } = input;
-    document.circle(PAGE.left + 13, PAGE.top + 13, 11).fill(COLOR.primary);
-    document.circle(PAGE.left + 15, PAGE.top + 10, 3).fill(COLOR.paper);
+    const { quote } = input;
+    const primary = issuerPrimaryColor(issuer);
+    const hasLogo = Boolean(input.issuerLogoContent && issuer.logo);
+    if (hasLogo)
+      document.image(Buffer.from(input.issuerLogoContent!), PAGE.left, PAGE.top, {
+        fit: [78, 30],
+        valign: "center",
+      });
+    else {
+      document.circle(PAGE.left + 13, PAGE.top + 13, 11).fill(primary);
+      document.circle(PAGE.left + 15, PAGE.top + 10, 3).fill(COLOR.paper);
+    }
     document
       .font("Helvetica-Bold")
       .fontSize(19)
       .fillColor(COLOR.ink)
-      .text(company.legalName.toUpperCase(), PAGE.left + 34, PAGE.top + 5, {
-        width: 300,
+      .text(issuerDisplayName(issuer).toUpperCase(), PAGE.left + (hasLogo ? 88 : 34), PAGE.top + 5, {
+        width: hasLogo ? 246 : 300,
       });
     document
       .roundedRect(407, PAGE.top, 140, 30, 5)
@@ -119,7 +139,7 @@ export class QuotePdfService {
     document
       .font("Helvetica-Bold")
       .fontSize(13)
-      .fillColor(COLOR.primary)
+      .fillColor(primary)
       .text("PRESUPUESTO", 407, PAGE.top + 9, {
         width: 140,
         align: "center",
@@ -127,24 +147,37 @@ export class QuotePdfService {
     document.y = 106;
   }
 
-  private drawCustomer(document: PDFKit.PDFDocument, input: QuotePdfInput) {
-    const { company, quote } = input;
+  private drawCustomer(
+    document: PDFKit.PDFDocument,
+    input: QuotePdfInput,
+    issuer: IssuerSnapshot,
+  ) {
+    const { quote } = input;
+    const primary = issuerPrimaryColor(issuer);
     const top = document.y;
     document
       .font("Helvetica-Bold")
       .fontSize(12)
-      .fillColor(COLOR.primary)
+      .fillColor(primary)
       .text("Datos del emisor", PAGE.left, top);
     document
       .font("Helvetica-Bold")
       .fontSize(10)
       .fillColor(COLOR.ink)
-      .text(company.legalName, PAGE.left, top + 19, { width: 275 });
+      .text(issuerLegalName(issuer), PAGE.left, top + 19, { width: 275 });
+    const issuerDetails = [
+      issuer.taxId ? `NIF: ${issuer.taxId}` : null,
+      ...issuerAddressLines(issuer),
+      ...issuerContactLines(issuer),
+    ].filter((value): value is string => Boolean(value));
     document
       .font("Helvetica")
-      .fontSize(9)
+      .fontSize(8.5)
       .fillColor(COLOR.muted)
-      .text(`NIF: ${company.taxId}`, PAGE.left, top + 35);
+      .text(issuerDetails.join("\n") || "Datos fiscales no disponibles", PAGE.left, top + 35, {
+        width: 275,
+        lineGap: 2,
+      });
     const rows = [
       ["Nº de presupuesto", quote.code],
       ["Fecha de emisión", formatDate(quote.issueDate)],
@@ -159,11 +192,20 @@ export class QuotePdfService {
         .text(label, 364, y, { width: 105 });
       document.text(value, 469, y, { width: 78, align: "right" });
     });
-    const customerTop = top + 91;
+    const customerTop = Math.max(
+      top + 91,
+      top +
+        42 +
+        document.heightOfString(issuerDetails.join("\n"), {
+          width: 275,
+          lineGap: 2,
+        }) +
+        12,
+    );
     document
       .font("Helvetica-Bold")
       .fontSize(12)
-      .fillColor(COLOR.primary)
+      .fillColor(primary)
       .text("Datos del cliente", PAGE.left, customerTop);
     document
       .font("Helvetica-Bold")
@@ -189,7 +231,14 @@ export class QuotePdfService {
           lineGap: 2,
         },
       );
-    document.y = top + 174;
+    document.y =
+      customerTop +
+      36 +
+      document.heightOfString(
+        customerDetails.join("\n") || "Sin dirección de facturación",
+        { width: 330, lineGap: 2 },
+      ) +
+      12;
   }
 
   private drawContinuationHeader(document: PDFKit.PDFDocument, code: string) {
@@ -247,7 +296,11 @@ export class QuotePdfService {
       document.text(value, x, y + 7, { width, align, lineGap: 1 });
   }
 
-  private drawTotals(document: PDFKit.PDFDocument, input: QuotePdfInput) {
+  private drawTotals(
+    document: PDFKit.PDFDocument,
+    input: QuotePdfInput,
+    issuer: IssuerSnapshot,
+  ) {
     const { quote } = input;
     const x = 345;
     const width = PAGE.right - x;
@@ -273,16 +326,16 @@ export class QuotePdfService {
     }
     document
       .roundedRect(x - 10, y + 3, PAGE.right - x + 10, 34, 5)
-      .fill(COLOR.primarySoft);
+      .fill(tint(issuerPrimaryColor(issuer)));
     document
       .font("Helvetica-Bold")
       .fontSize(12)
-      .fillColor(COLOR.primary)
+      .fillColor(issuerPrimaryColor(issuer))
       .text("Total", x, y + 14, { width: 85 });
     document
       .font("Helvetica-Bold")
       .fontSize(12)
-      .fillColor(COLOR.primary)
+      .fillColor(issuerPrimaryColor(issuer))
       .text(formatMoney(quote.total, quote.currency), x + 85, y + 14, {
         width: width - 85,
         align: "right",
@@ -293,45 +346,64 @@ export class QuotePdfService {
   private drawNotesAndTerms(
     document: PDFKit.PDFDocument,
     input: QuotePdfInput,
+    issuer: IssuerSnapshot,
   ) {
     const { quote } = input;
-    this.ensureSpace(document, 105, quote.code);
+    const primary = issuerPrimaryColor(issuer);
+    const notes =
+      truncatePdfText([quote.notes, issuer.defaultNotes].filter(Boolean).join("\n")) ||
+      "Sin notas adicionales.";
+    const terms = truncatePdfText([
+      issuer.paymentInstructions,
+      issuer.bankIban ? `IBAN: ${issuer.bankIban}` : null,
+      issuer.paymentTerms,
+      quote.validUntil
+        ? `Oferta válida hasta el ${formatDate(quote.validUntil)}.`
+        : "Validez no especificada.",
+      `Moneda: ${quote.currency}`,
+    ]
+      .filter(Boolean)
+      .join("\n"));
+    const contentHeight = Math.max(
+      90,
+      document.heightOfString(notes, { width: 230, lineGap: 2 }) + 52,
+      document.heightOfString(terms, { width: 229, lineGap: 2 }) + 52,
+    );
+    this.ensureSpace(document, contentHeight + 28, quote.code);
     const top = document.y + 18;
     document
       .moveTo(PAGE.left, top)
       .lineTo(PAGE.right, top)
-      .strokeColor(COLOR.primary)
+      .strokeColor(primary)
       .lineWidth(1)
       .stroke();
     document
       .moveTo(300, top + 20)
-      .lineTo(300, top + 90)
+      .lineTo(300, top + contentHeight)
       .strokeColor("#F68AA5")
       .lineWidth(0.7)
       .stroke();
     document
       .font("Helvetica-Bold")
       .fontSize(10)
-      .fillColor(COLOR.primary)
+      .fillColor(primary)
       .text("NOTAS", PAGE.left, top + 22)
       .text("CONDICIONES DE PAGO", 318, top + 22);
     document
       .font("Helvetica")
       .fontSize(8.5)
       .fillColor(COLOR.muted)
-      .text(quote.notes || "Sin notas adicionales.", PAGE.left, top + 42, {
+      .text(notes, PAGE.left, top + 42, {
         width: 230,
         lineGap: 2,
       })
       .text(
-        quote.validUntil
-          ? `Oferta válida hasta el ${formatDate(quote.validUntil)}.\nMoneda: ${quote.currency}`
-          : `Validez no especificada.\nMoneda: ${quote.currency}`,
+        terms,
         318,
         top + 42,
         { width: 229, lineGap: 2 },
       );
-    document.y = top + 96;
+    document.y = top + contentHeight + 6;
   }
 
   private ensureSpace(
@@ -344,8 +416,12 @@ export class QuotePdfService {
     this.drawContinuationHeader(document, code);
   }
 
-  private drawFooters(document: PDFKit.PDFDocument, input: QuotePdfInput) {
-    const { company, quote } = input;
+  private drawFooters(
+    document: PDFKit.PDFDocument,
+    input: QuotePdfInput,
+    issuer: IssuerSnapshot,
+  ) {
+    const { quote } = input;
     const range = document.bufferedPageRange();
     for (
       let index = range.start;
@@ -363,10 +439,16 @@ export class QuotePdfService {
         .font("Helvetica")
         .fontSize(7.5)
         .fillColor(COLOR.muted)
-        .text(`${company.legalName} | NIF: ${company.taxId}`, PAGE.left, PAGE.footerY, {
-          width: 300,
-          lineBreak: false,
-        });
+        .text(
+          truncatePdfText(
+            issuer.documentFooter ||
+              `${issuerLegalName(issuer)}${issuer.taxId ? ` | NIF: ${issuer.taxId}` : ""}`,
+            110,
+          ),
+          PAGE.left,
+          PAGE.footerY,
+          { width: 300, lineBreak: false },
+        );
       document.text(
         `Pastagansa · ${quote.code} · Página ${index + 1} de ${range.count}`,
         307,
@@ -422,4 +504,12 @@ function billingAddressLines(value: unknown): string[] {
     [string("postalCode"), string("city")].filter(Boolean).join(" ") || null,
     [string("province"), string("country")].filter(Boolean).join(" · ") || null,
   ].filter((line): line is string => Boolean(line));
+}
+
+function tint(hex: string) {
+  const channel = (offset: number) =>
+    Math.round((255 + parseInt(hex.slice(offset, offset + 2), 16) * 2) / 3)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${channel(1)}${channel(3)}${channel(5)}`;
 }

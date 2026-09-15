@@ -1,5 +1,15 @@
 import { Injectable } from "@nestjs/common";
 import PDFDocument = require("pdfkit");
+import {
+  issuerAddressLines,
+  issuerContactLines,
+  issuerDisplayName,
+  issuerLegalName,
+  issuerPrimaryColor,
+  readIssuerSnapshot,
+  truncatePdfText,
+  type IssuerSnapshot,
+} from "../documents/issuer-snapshot";
 
 interface DecimalValue {
   toString(): string;
@@ -16,6 +26,9 @@ export interface InvoicePdfInput {
   originalInvoice?: { id: string; fullNumber: string | null } | null;
   issuerLegalName: string;
   issuerTaxId: string;
+  issuerSnapshot: unknown;
+  issuerLogoMediaType: string | null;
+  issuerLogoContent: Uint8Array | null;
   customerLegalName: string;
   customerTaxId: string | null;
   billingAddress: unknown;
@@ -52,13 +65,17 @@ const COLOR = {
 export class InvoicePdfService {
   async render(invoice: InvoicePdfInput): Promise<Buffer> {
     const isRectification = invoice.documentType === "CREDIT_NOTE";
+    const issuer = readIssuerSnapshot(invoice.issuerSnapshot, {
+      legalName: invoice.issuerLegalName,
+      taxId: invoice.issuerTaxId,
+    });
     const document = new PDFDocument({
       size: "A4",
       margins: { top: PAGE.top, right: 48, bottom: 48, left: PAGE.left },
       bufferPages: true,
       info: {
         Title: `${isRectification ? "Factura rectificativa" : "Factura"} ${invoice.fullNumber}`,
-        Author: invoice.issuerLegalName,
+        Author: issuerLegalName(issuer),
         Subject: `Factura para ${invoice.customerLegalName}`,
         Creator: "Pastagansa",
       },
@@ -70,8 +87,8 @@ export class InvoicePdfService {
       document.on("error", reject);
     });
 
-    this.header(document, invoice);
-    this.parties(document, invoice);
+    this.header(document, invoice, issuer);
+    this.parties(document, invoice, issuer);
     if (isRectification) this.rectification(document, invoice);
     let y = this.tableHeader(document, document.y + 22);
     for (const line of invoice.lines) {
@@ -90,25 +107,38 @@ export class InvoicePdfService {
     document.y = y + 20;
     this.ensureSpace(document, 145, invoice.fullNumber);
     this.totals(document, invoice);
-    this.notesAndTerms(document, invoice);
-    this.footers(document, invoice);
+    this.notesAndTerms(document, invoice, issuer);
+    this.footers(document, invoice, issuer);
     document.end();
     return completed;
   }
 
-  private header(document: PDFKit.PDFDocument, invoice: InvoicePdfInput) {
+  private header(
+    document: PDFKit.PDFDocument,
+    invoice: InvoicePdfInput,
+    issuer: IssuerSnapshot,
+  ) {
     const title =
       invoice.documentType === "CREDIT_NOTE"
         ? "FACTURA RECTIFICATIVA"
         : "FACTURA";
-    document.circle(PAGE.left + 13, PAGE.top + 13, 11).fill(COLOR.primary);
-    document.circle(PAGE.left + 15, PAGE.top + 10, 3).fill(COLOR.white);
+    const primary = issuerPrimaryColor(issuer);
+    const hasLogo = Boolean(invoice.issuerLogoContent && issuer.logo);
+    if (hasLogo)
+      document.image(Buffer.from(invoice.issuerLogoContent!), PAGE.left, PAGE.top, {
+        fit: [78, 30],
+        valign: "center",
+      });
+    else {
+      document.circle(PAGE.left + 13, PAGE.top + 13, 11).fill(primary);
+      document.circle(PAGE.left + 15, PAGE.top + 10, 3).fill(COLOR.white);
+    }
     document
       .font("Helvetica-Bold")
       .fontSize(19)
       .fillColor(COLOR.ink)
-      .text(invoice.issuerLegalName.toUpperCase(), PAGE.left + 34, PAGE.top + 5, {
-        width: 300,
+      .text(issuerDisplayName(issuer).toUpperCase(), PAGE.left + (hasLogo ? 88 : 34), PAGE.top + 5, {
+        width: hasLogo ? 246 : 300,
       });
     document
       .roundedRect(421, PAGE.top, 126, 30, 5)
@@ -116,7 +146,7 @@ export class InvoicePdfService {
     document
       .font("Helvetica-Bold")
       .fontSize(title.length > 12 ? 10 : 15)
-      .fillColor(COLOR.primary)
+      .fillColor(primary)
       .text(title, 421, PAGE.top + 8, { width: 126, align: "center" });
     document.y = 106;
   }
@@ -164,23 +194,36 @@ export class InvoicePdfService {
     document.y = top + height;
   }
 
-  private parties(document: PDFKit.PDFDocument, invoice: InvoicePdfInput) {
+  private parties(
+    document: PDFKit.PDFDocument,
+    invoice: InvoicePdfInput,
+    issuer: IssuerSnapshot,
+  ) {
     const top = document.y;
+    const primary = issuerPrimaryColor(issuer);
     document
       .font("Helvetica-Bold")
       .fontSize(12)
-      .fillColor(COLOR.primary)
+      .fillColor(primary)
       .text("Datos del emisor", PAGE.left, top);
     document
       .font("Helvetica-Bold")
       .fontSize(10)
       .fillColor(COLOR.ink)
-      .text(invoice.issuerLegalName, PAGE.left, top + 19, { width: 275 });
+      .text(issuerLegalName(issuer), PAGE.left, top + 19, { width: 275 });
+    const issuerDetails = [
+      issuer.taxId ? `NIF: ${issuer.taxId}` : null,
+      ...issuerAddressLines(issuer),
+      ...issuerContactLines(issuer),
+    ].filter((value): value is string => Boolean(value));
     document
       .font("Helvetica")
-      .fontSize(9)
+      .fontSize(8.5)
       .fillColor(COLOR.muted)
-      .text(`NIF: ${invoice.issuerTaxId}`, PAGE.left, top + 35);
+      .text(issuerDetails.join("\n") || "Datos fiscales no disponibles", PAGE.left, top + 35, {
+        width: 275,
+        lineGap: 2,
+      });
     const rows = [
       ["Nº de factura", invoice.fullNumber],
       ["Fecha de emisión", formatDate(invoice.issueDate)],
@@ -195,11 +238,20 @@ export class InvoicePdfService {
         .text(label, 364, y, { width: 105 });
       document.text(value, 469, y, { width: 78, align: "right" });
     });
-    const customerTop = top + 91;
+    const customerTop = Math.max(
+      top + 91,
+      top +
+        42 +
+        document.heightOfString(issuerDetails.join("\n"), {
+          width: 275,
+          lineGap: 2,
+        }) +
+        12,
+    );
     document
       .font("Helvetica-Bold")
       .fontSize(12)
-      .fillColor(COLOR.primary)
+      .fillColor(primary)
       .text("Datos del cliente", PAGE.left, customerTop);
     document
       .font("Helvetica-Bold")
@@ -225,7 +277,14 @@ export class InvoicePdfService {
           lineGap: 2,
         },
       );
-    document.y = top + 174;
+    document.y =
+      customerTop +
+      36 +
+      document.heightOfString(
+        details.join("\n") || "Sin dirección de facturación",
+        { width: 330, lineGap: 2 },
+      ) +
+      12;
   }
 
   private continuation(document: PDFKit.PDFDocument, number: string) {
@@ -321,44 +380,63 @@ export class InvoicePdfService {
   private notesAndTerms(
     document: PDFKit.PDFDocument,
     invoice: InvoicePdfInput,
+    issuer: IssuerSnapshot,
   ) {
-    this.ensureSpace(document, 105, invoice.fullNumber);
+    const primary = issuerPrimaryColor(issuer);
+    const notes =
+      truncatePdfText([invoice.notes, issuer.defaultNotes].filter(Boolean).join("\n")) ||
+      "Sin notas adicionales.";
+    const terms = truncatePdfText([
+      issuer.paymentInstructions,
+      issuer.bankIban ? `IBAN: ${issuer.bankIban}` : null,
+      issuer.paymentTerms,
+      invoice.dueDate
+        ? `Vencimiento: ${formatDate(invoice.dueDate)}`
+        : "Vencimiento no especificado",
+      `Moneda: ${invoice.currency}`,
+    ]
+      .filter(Boolean)
+      .join("\n"));
+    const contentHeight = Math.max(
+      90,
+      document.heightOfString(notes, { width: 230, lineGap: 2 }) + 52,
+      document.heightOfString(terms, { width: 229, lineGap: 2 }) + 52,
+    );
+    this.ensureSpace(document, contentHeight + 28, invoice.fullNumber);
     const top = document.y + 18;
     document
       .moveTo(PAGE.left, top)
       .lineTo(PAGE.right, top)
-      .strokeColor(COLOR.primary)
+      .strokeColor(primary)
       .lineWidth(1)
       .stroke();
     document
       .moveTo(300, top + 20)
-      .lineTo(300, top + 90)
+      .lineTo(300, top + contentHeight)
       .strokeColor("#F68AA5")
       .lineWidth(0.7)
       .stroke();
     document
       .font("Helvetica-Bold")
       .fontSize(10)
-      .fillColor(COLOR.primary)
+      .fillColor(primary)
       .text("NOTAS", PAGE.left, top + 22)
       .text("CONDICIONES DE PAGO", 318, top + 22);
     document
       .font("Helvetica")
       .fontSize(8.5)
       .fillColor(COLOR.muted)
-      .text(invoice.notes || "Sin notas adicionales.", PAGE.left, top + 42, {
+      .text(notes, PAGE.left, top + 42, {
         width: 230,
         lineGap: 2,
       })
       .text(
-        invoice.dueDate
-          ? `Vencimiento: ${formatDate(invoice.dueDate)}\nMoneda: ${invoice.currency}`
-          : `Vencimiento no especificado\nMoneda: ${invoice.currency}`,
+        terms,
         318,
         top + 42,
         { width: 229, lineGap: 2 },
       );
-    document.y = top + 96;
+    document.y = top + contentHeight + 6;
   }
 
   private ensureSpace(
@@ -371,7 +449,11 @@ export class InvoicePdfService {
     this.continuation(document, number);
   }
 
-  private footers(document: PDFKit.PDFDocument, invoice: InvoicePdfInput) {
+  private footers(
+    document: PDFKit.PDFDocument,
+    invoice: InvoicePdfInput,
+    issuer: IssuerSnapshot,
+  ) {
     const range = document.bufferedPageRange();
     for (let page = range.start; page < range.start + range.count; page += 1) {
       document.switchToPage(page);
@@ -385,12 +467,18 @@ export class InvoicePdfService {
         .font("Helvetica")
         .fontSize(7.5)
         .fillColor(COLOR.muted)
-        .text(`${invoice.issuerLegalName} | NIF: ${invoice.issuerTaxId}`, PAGE.left, PAGE.footer, {
-          width: 300,
-          lineBreak: false,
-        });
+        .text(
+          truncatePdfText(
+            issuer.documentFooter ||
+              `${issuerLegalName(issuer)}${issuer.taxId ? ` | NIF: ${issuer.taxId}` : ""}`,
+            110,
+          ),
+          PAGE.left,
+          PAGE.footer,
+          { width: 300, lineBreak: false },
+        );
       document.text(`Pastagansa · Página ${page + 1} de ${range.count}`, 347, PAGE.footer, {
-        width: 150,
+        width: 200,
         align: "right",
         lineBreak: false,
       });

@@ -14,6 +14,7 @@ import {
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditService } from "../audit/audit.service";
 import { TenantContextService } from "../tenancy/tenant-context.service";
+import { captureIssuerSnapshot } from "../documents/issuer-snapshot";
 import { CreateQuoteDto, QuoteLineDto, UpdateQuoteDto } from "./dto/quote.dto";
 import { ListQuotesDto } from "./dto/list-quotes.dto";
 import { decodeCursor, encodeCursor } from "../common/cursor";
@@ -57,6 +58,7 @@ export class QuotesService {
         ...this.scope(),
         ...(query.status ? { status: query.status } : {}),
       },
+      omit: { issuerLogoContent: true },
       include: { contact: { select: { legalName: true } } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       ...(cursor ? { cursor: { id: cursor.id }, skip: 1 } : {}),
@@ -77,6 +79,7 @@ export class QuotesService {
   async get(id: string) {
     const quote = await this.tenant.db.quote.findFirst({
       where: { id, ...this.scope() },
+      omit: { issuerLogoContent: true },
       include: {
         lines: { orderBy: { position: "asc" } },
         convertedInvoice: { select: { id: true, draftCode: true, status: true } },
@@ -88,14 +91,16 @@ export class QuotesService {
 
   async downloadPdf(id: string) {
     const quote = await this.get(id);
-    const { companyId } = this.scope();
-    const company = await this.tenant.db.company.findFirst({
-      where: { id: companyId },
-      select: { legalName: true, taxId: true },
+    const asset = await this.tenant.db.quote.findFirst({
+      where: { id, ...this.scope() },
+      select: { issuerLogoMediaType: true, issuerLogoContent: true },
     });
-    if (!company) throw new NotFoundException("Company not found");
     return {
-      content: await this.quotePdf.render({ company, quote }),
+      content: await this.quotePdf.render({
+        quote,
+        issuerLogoMediaType: asset?.issuerLogoMediaType ?? null,
+        issuerLogoContent: asset?.issuerLogoContent ?? null,
+      }),
       filename: `presupuesto-${safeFilename(quote.code)}.pdf`,
     };
   }
@@ -198,9 +203,12 @@ export class QuotesService {
     const allowedFrom = transitions[status];
     if (!allowedFrom || !allowedFrom.includes(expectedStatus))
       throw new BadRequestException(`Cannot transition a quote to ${status}`);
+    const issuer = status === QuoteStatus.SENT
+      ? await this.currentIssuerSnapshot()
+      : undefined;
     const changed = await this.tenant.db.quote.updateMany({
       where: { id, ...this.scope(), status: expectedStatus },
-      data: { status },
+      data: { status, ...(issuer?.snapshot ?? {}) },
     });
     if (changed.count !== 1)
       throw new ConflictException("Quote status changed concurrently");
@@ -313,6 +321,7 @@ export class QuotesService {
       zeroTotals(),
     );
     const address = contact.addresses[0];
+    const issuer = await this.currentIssuerSnapshot();
     const billingAddress = address
       ? {
           type: address.type,
@@ -331,6 +340,7 @@ export class QuotesService {
         customerLegalName: contact.legalName,
         customerTaxId: contact.taxId,
         billingAddress,
+        ...issuer.snapshot,
         issueDate: new Date(input.issueDate),
         validUntil: input.validUntil ? new Date(input.validUntil) : null,
         currency: input.currency ?? "EUR",
@@ -345,6 +355,16 @@ export class QuotesService {
     const { organizationId, companyId } = this.tenant.required;
     if (!companyId) throw new BadRequestException("x-company-id is required");
     return { organizationId, companyId };
+  }
+
+  private async currentIssuerSnapshot() {
+    const scope = this.scope();
+    const company = await this.tenant.db.company.findFirst({
+      where: { id: scope.companyId, organizationId: scope.organizationId },
+      include: { documentProfile: true, documentLogo: true },
+    });
+    if (!company) throw new NotFoundException("Company not found");
+    return { snapshot: captureIssuerSnapshot(company) };
   }
 }
 
@@ -379,9 +399,12 @@ export function calculateQuoteLine(input: QuoteLineDto, position: number) {
   };
 }
 
-function presentQuote<T extends { number: bigint | null }>(quote: T) {
+function presentQuote<
+  T extends { number: bigint | null; issuerLogoContent?: unknown },
+>(quote: T) {
+  const { issuerLogoContent: _issuerLogoContent, ...visible } = quote;
   return {
-    ...quote,
+    ...visible,
     number: quote.number?.toString() ?? null,
   };
 }

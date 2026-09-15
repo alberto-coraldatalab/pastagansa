@@ -344,6 +344,23 @@ describe("platform integrity", () => {
         currency: "EUR",
       })
       .expect(201);
+    await authed(accountA.accessToken, tenantA)
+      .patch("/v1/companies/current")
+      .send({
+        documentProfile: {
+          tradeName: "Profile A",
+          addressLine1: "Calle Snapshot 1",
+          city: "Madrid",
+          email: "facturas@profile-a.example",
+          bankIban: "ES91 2100 0418 4502 0005 1332",
+          paymentInstructions: "Transferencia bancaria",
+          paymentTerms: "Pago a 30 días",
+          defaultNotes: "Gracias por su confianza.",
+          documentFooter: "Profile A · B12345674",
+          primaryColor: "#123456",
+        },
+      })
+      .expect(200);
     const quoteSequence = await authed(accountA.accessToken, tenantA)
       .post("/v1/document-sequences")
       .send({ documentType: "QUOTE", series: "P2026", padding: 5 })
@@ -366,6 +383,12 @@ describe("platform integrity", () => {
     });
     expect(createdQuote.body.customerLegalName).toBe("Customer A");
     expect(createdQuote.body.lines[0].totalAmount).toBe("121");
+    expect(createdQuote.body.issuerSnapshot).toMatchObject({
+      source: "company_profile",
+      addressLine1: "Calle Snapshot 1",
+      bankIban: "ES9121000418450200051332",
+      primaryColor: "#123456",
+    });
     const quotePdf = await authed(accountA.accessToken, tenantA)
       .get(`/v1/quotes/${createdQuote.body.id}/pdf`)
       .expect("content-type", /application\/pdf/)
@@ -527,6 +550,27 @@ describe("platform integrity", () => {
       .expect(200);
     expect(issuedInvoice.body.status).toBe("ISSUED");
     expect(issuedInvoice.body.fullNumber).toBe("F2026-00001");
+    expect(issuedInvoice.body.issuerSnapshot).toMatchObject({
+      addressLine1: "Calle Snapshot 1",
+      documentFooter: "Profile A · B12345674",
+    });
+    await authed(accountA.accessToken, tenantA)
+      .patch("/v1/companies/current")
+      .send({
+        documentProfile: {
+          addressLine1: "Calle Nueva 99",
+          city: "Valencia",
+          primaryColor: "#654321",
+        },
+      })
+      .expect(200);
+    const frozenInvoice = await authed(accountA.accessToken, tenantA)
+      .get(`/v1/invoices/${invoiceDraft.body.id}`)
+      .expect(200);
+    expect(frozenInvoice.body.issuerSnapshot).toMatchObject({
+      addressLine1: "Calle Snapshot 1",
+      primaryColor: "#123456",
+    });
     const retriedIssue = await authed(accountA.accessToken, tenantA)
       .post(`/v1/invoices/${invoiceDraft.body.id}/issue`)
       .set("idempotency-key", "issue-invoice-a")

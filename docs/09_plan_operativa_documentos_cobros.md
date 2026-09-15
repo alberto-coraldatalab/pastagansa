@@ -143,6 +143,15 @@ mis documentos para no editar textos ni depender de valores hardcodeados.
 **Dependencias:** U6-01  
 **Entrega:** U6A
 
+**Estado real (15/09/2026):** implementado localmente y validado con migración,
+integración PostgreSQL, suites unitarias, lint, builds y render visual de una factura de
+cuatro páginas. Facturas y presupuestos guardan un snapshot versionado y una copia del
+logo sin exponer sus bytes en API. Las facturas lo actualizan en borrador y lo congelan
+al emitir; los presupuestos lo actualizan en borrador y lo congelan al enviar. El
+backfill de facturas usa solo emisor legal/NIF históricos y el de presupuestos queda
+marcado como incompleto, sin inventar datos desde el perfil vivo. Quedan para el gate
+U6A el E2E de navegador, restore drill de staging y el flujo de email de U6-03.
+
 ### Historia
 
 Como responsable administrativo quiero que una factura o presupuesto conserve los

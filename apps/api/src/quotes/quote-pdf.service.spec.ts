@@ -13,7 +13,8 @@ describe("QuotePdfService", () => {
       totalAmount: decimal("163.35"),
     }));
     const pdf = await service.render({
-      company: { legalName: "Empresa Ejemplo, S.L.", taxId: "B12345674" },
+      issuerLogoMediaType: null,
+      issuerLogoContent: null,
       quote: {
         code: "PRE-2026-0001",
         status: "DRAFT",
@@ -29,6 +30,17 @@ describe("QuotePdfService", () => {
           country: "ES",
         },
         notes: "Oferta válida durante el periodo indicado.",
+        issuerSnapshot: {
+          version: 1,
+          source: "company_profile",
+          legalName: "Empresa Ejemplo, S.L.",
+          taxId: "B12345674",
+          addressLine1: "Calle Ejemplo, 1",
+          city: "Madrid",
+          email: "hola@ejemplo.es",
+          paymentInstructions: "Transferencia bancaria",
+          bankIban: "ES9121000418450200051332",
+        },
         subtotal: decimal("9000"),
         discountTotal: decimal("900"),
         taxTotal: decimal("1701"),

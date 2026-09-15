@@ -18,6 +18,7 @@ import {
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditService } from "../audit/audit.service";
 import { decodeCursor, encodeCursor } from "../common/cursor";
+import { captureIssuerSnapshot } from "../documents/issuer-snapshot";
 import { TenantContextService } from "../tenancy/tenant-context.service";
 import { TaxService } from "../tax/tax.service";
 import { AccountingService } from "../accounting/accounting.service";
@@ -70,6 +71,7 @@ export class InvoicesService {
         ...(query.status ? { status: query.status } : {}),
         ...(query.documentType ? { documentType: query.documentType } : {}),
       },
+      omit: { issuerLogoContent: true },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       ...(cursor ? { cursor: { id: cursor.id }, skip: 1 } : {}),
       take: query.limit + 1,
@@ -90,6 +92,7 @@ export class InvoicesService {
   async get(id: string) {
     const invoice = await this.tenant.db.invoice.findFirst({
       where: { id, ...this.scope() },
+      omit: { issuerLogoContent: true },
       include: {
         lines: {
           orderBy: { position: "asc" },
@@ -108,11 +111,17 @@ export class InvoicesService {
     const invoice = await this.get(id);
     if (invoice.status === InvoiceStatus.DRAFT || !invoice.fullNumber)
       throw new ConflictException("Only issued invoices have an official PDF");
+    const asset = await this.tenant.db.invoice.findFirst({
+      where: { id, ...this.scope() },
+      select: { issuerLogoMediaType: true, issuerLogoContent: true },
+    });
     return {
       filename: `factura-${safeFilename(invoice.fullNumber)}.pdf`,
       content: await this.pdf.render({
         ...invoice,
         fullNumber: invoice.fullNumber,
+        issuerLogoMediaType: asset?.issuerLogoMediaType ?? null,
+        issuerLogoContent: asset?.issuerLogoContent ?? null,
       }),
     };
   }
@@ -235,6 +244,7 @@ export class InvoicesService {
         });
     if (input.lines) await this.validateCatalogItems(input.lines);
     const totals = sumInvoiceLines(lines);
+    const issuer = await this.currentIssuerSnapshot();
 
     try {
       const rectification = await this.tenant.db.invoice.create({
@@ -247,8 +257,9 @@ export class InvoicesService {
           rectificationKind: input.kind,
           rectificationImpact: input.impact,
           rectificationReason: input.reason.trim(),
-          issuerLegalName: original.issuerLegalName,
-          issuerTaxId: original.issuerTaxId,
+          issuerLegalName: issuer.legalName,
+          issuerTaxId: issuer.taxId,
+          ...issuer.snapshot,
           customerLegalName: original.customerLegalName,
           customerTaxId: original.customerTaxId,
           customerEmail: original.customerEmail,
@@ -425,6 +436,7 @@ export class InvoicesService {
       allocated.number,
       sequence.padding,
     );
+    const issuer = await this.currentIssuerSnapshot();
     try {
       const changed = await this.tenant.db.invoice.updateMany({
         where: { id, ...scope, status: InvoiceStatus.DRAFT },
@@ -436,6 +448,9 @@ export class InvoicesService {
           issuanceKey: idempotencyKey,
           issuedAt: new Date(),
           status: InvoiceStatus.ISSUED,
+          issuerLegalName: issuer.legalName,
+          issuerTaxId: issuer.taxId,
+          ...issuer.snapshot,
         },
       });
       if (changed.count !== 1)
@@ -565,11 +580,8 @@ export class InvoicesService {
     if (input.dueDate && input.dueDate < input.issueDate)
       throw new BadRequestException("dueDate cannot precede issueDate");
     const scope = this.scope();
-    const [company, contact] = await Promise.all([
-      this.tenant.db.company.findFirst({
-        where: { id: scope.companyId, organizationId: scope.organizationId },
-        select: { legalName: true, taxId: true },
-      }),
+    const [issuer, contact] = await Promise.all([
+      this.currentIssuerSnapshot(),
       this.tenant.db.contact.findFirst({
         where: {
           id: input.contactId,
@@ -586,7 +598,6 @@ export class InvoicesService {
         },
       }),
     ]);
-    if (!company) throw new NotFoundException("Company not found");
     if (!contact)
       throw new BadRequestException(
         "Invoice contact must be an active customer in this company",
@@ -608,8 +619,9 @@ export class InvoicesService {
     return {
       document: {
         contactId: input.contactId,
-        issuerLegalName: company.legalName,
-        issuerTaxId: company.taxId,
+        issuerLegalName: issuer.legalName,
+        issuerTaxId: issuer.taxId,
+        ...issuer.snapshot,
         customerLegalName: contact.legalName,
         customerTaxId: contact.taxId,
         customerEmail: contact.email,
@@ -655,6 +667,21 @@ export class InvoicesService {
         },
       });
     }
+  }
+
+  private async currentIssuerSnapshot() {
+    const scope = this.scope();
+    const company = await this.tenant.db.company.findFirst({
+      where: { id: scope.companyId, organizationId: scope.organizationId },
+      include: { documentProfile: true, documentLogo: true },
+    });
+    if (!company) throw new NotFoundException("Company not found");
+    const snapshot = captureIssuerSnapshot(company);
+    return {
+      legalName: company.legalName,
+      taxId: company.taxId,
+      snapshot,
+    };
   }
 
   private async validateCatalogItems(lines: InvoiceLineDto[]) {
@@ -808,8 +835,11 @@ function sumInvoiceLines(
   );
 }
 
-function presentInvoice<T extends { number: bigint | null }>(invoice: T) {
-  return { ...invoice, number: invoice.number?.toString() ?? null };
+function presentInvoice<
+  T extends { number: bigint | null; issuerLogoContent?: unknown },
+>(invoice: T) {
+  const { issuerLogoContent: _issuerLogoContent, ...visible } = invoice;
+  return { ...visible, number: invoice.number?.toString() ?? null };
 }
 
 export function formatInvoiceNumber(
