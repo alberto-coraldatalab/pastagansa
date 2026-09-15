@@ -326,7 +326,7 @@ export class QuotePdfService {
     }
     document
       .roundedRect(x - 10, y + 3, PAGE.right - x + 10, 34, 5)
-      .fill(tint(issuerPrimaryColor(issuer)));
+      .fill(COLOR.primarySoft);
     document
       .font("Helvetica-Bold")
       .fontSize(12)
@@ -504,12 +504,4 @@ function billingAddressLines(value: unknown): string[] {
     [string("postalCode"), string("city")].filter(Boolean).join(" ") || null,
     [string("province"), string("country")].filter(Boolean).join(" · ") || null,
   ].filter((line): line is string => Boolean(line));
-}
-
-function tint(hex: string) {
-  const channel = (offset: number) =>
-    Math.round((255 + parseInt(hex.slice(offset, offset + 2), 16) * 2) / 3)
-      .toString(16)
-      .padStart(2, "0");
-  return `#${channel(1)}${channel(3)}${channel(5)}`;
 }
