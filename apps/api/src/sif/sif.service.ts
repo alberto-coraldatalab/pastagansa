@@ -16,6 +16,7 @@ import {
   hashSifRegistration,
   SIF_HASH_SPECIFICATION_VERSION,
 } from "./sif-hash-v1";
+import { verifySifChain } from "./sif-chain";
 
 @Injectable()
 export class SifService {
@@ -31,6 +32,14 @@ export class SifService {
         orderBy: { chainPosition: "asc" },
       })
     ).map(presentSifRecord);
+  }
+
+  async verifyChain() {
+    const records = await this.tenant.db.sifRecord.findMany({
+      where: this.scope(),
+      orderBy: { chainPosition: "asc" },
+    });
+    return verifySifChain(records);
   }
 
   async createRegistration(invoiceId: string) {

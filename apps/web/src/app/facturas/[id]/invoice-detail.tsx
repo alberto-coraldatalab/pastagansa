@@ -854,6 +854,11 @@ function TracePanel({ invoice }: { invoice: Invoice }) {
                   {trace.data.sifRecord.hashAlgorithm} · tipo{" "}
                   {trace.data.sifRecord.invoiceType}
                 </small>
+                <small>
+                  {trace.data.sifVerification.valid
+                    ? `Cadena SIF verificada · ${trace.data.sifVerification.recordsChecked} registros`
+                    : `Cadena SIF con incidencia · ${trace.data.sifVerification.firstInvalid?.reason ?? "revisar registro"}`}
+                </small>
                 <dl>
                   <div>
                     <dt>Huella</dt>

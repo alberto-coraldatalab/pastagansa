@@ -191,6 +191,15 @@ export interface InvoiceTrace {
     hashAlgorithm: string;
     specificationVersion: string;
   };
+  sifVerification: {
+    valid: boolean;
+    recordsChecked: number;
+    firstInvalid: {
+      id: string;
+      chainPosition: string;
+      reason: string;
+    } | null;
+  };
 }
 
 export interface InvoicePage {

@@ -9,6 +9,12 @@ import { SifService } from "./sif.service";
 export class SifController {
   constructor(private readonly sif: SifService) {}
 
+  @Get("verification")
+  @RequirePermissions("sif_record.read")
+  verification() {
+    return this.sif.verifyChain();
+  }
+
   @Get()
   @RequirePermissions("sif_record.read")
   list(@Query() query: ListSifRecordsDto) {

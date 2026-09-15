@@ -23,11 +23,16 @@ export async function GET(
     const taxPage = (await tax.json()) as { data: unknown[] };
     const sif = await tenantApiRequest(`/v1/sif/records?invoiceId=${id.data}`);
     if (!sif.ok) return apiError(sif);
+    const sifVerification = await tenantApiRequest(
+      "/v1/sif/records/verification",
+    );
+    if (!sifVerification.ok) return apiError(sifVerification);
     const sifRecords = (await sif.json()) as unknown[];
     return NextResponse.json({
       journalEntry: journalPage.data[0] ?? null,
       taxEntry: taxPage.data[0] ?? null,
       sifRecord: sifRecords[0] ?? null,
+      sifVerification: await sifVerification.json(),
     });
   } catch (error) {
     if (error instanceof SessionError)
