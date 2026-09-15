@@ -286,7 +286,13 @@ Gate:
 
 ## Orden inmediato de implementación
 
-1. Retomar SIF/VERI*FACTU con U5 ya cerrado.
+1. Ejecutar U6A —documentos reales y comunicación— con un máximo de doce
+   días-persona y gate de salida explícito.
+2. Retomar SIF/VERI*FACTU tras U6A. U6B —cartera y recordatorios— queda subordinado al
+   calendario SIF y no desplaza este punto de control.
+
+El backlog detallado, dependencias y criterios de aceptación de U6 están en
+[Operativa de documentos y cobros](09_plan_operativa_documentos_cobros.md).
 
 ## Alcance aplazado hasta superar el hito
 
