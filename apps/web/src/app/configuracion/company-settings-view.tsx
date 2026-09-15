@@ -68,7 +68,14 @@ export function CompanySettingsView() {
   });
 
   function updateCompany(field: keyof Omit<CompanySettingsInput, "documentProfile">, value: string) {
-    setFormOverride((current) => current ?? (company.data ? { ...companySettingsInput(company.data), [field]: value } : current));
+    setFormOverride(
+      (current) =>
+        current
+          ? { ...current, [field]: value }
+          : company.data
+            ? { ...companySettingsInput(company.data), [field]: value }
+            : current,
+    );
   }
   function updateProfile(field: keyof CompanyDocumentProfile, value: string) {
     setFormOverride(
