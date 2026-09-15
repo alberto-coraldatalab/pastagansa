@@ -122,6 +122,7 @@ enum CommercialDocumentEventType {
   PARTIALLY_PAID
   PAID
   PAYMENT_PROMISED
+  NOTE
 }
 
 enum CommercialEventSource {

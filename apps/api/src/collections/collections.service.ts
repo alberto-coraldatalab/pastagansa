@@ -17,12 +17,16 @@ export class CollectionsService {
     const asOf = await this.asOf(query.asOf);
     const rows = await this.rows({ ...query, asOf, limit: 100_000 });
     const summary = emptySummary();
+    const operational = { open: new Decimal(0), promised: new Decimal(0), disputed: new Decimal(0) };
     const byCustomer = new Map<string, { contactId: string; customer: string; amount: Decimal; count: number }>();
     const forecast = { days30: new Decimal(0), days60: new Decimal(0), days90: new Decimal(0) };
     for (const row of rows) {
       summary.total = summary.total.plus(row.amountDue);
       summary.count += 1;
       if (row.bucket) summary[row.bucket] = summary[row.bucket].plus(row.amountDue);
+      if (row.operationalStatus === "DISPUTED") operational.disputed = operational.disputed.plus(row.amountDue);
+      else if (row.operationalStatus === "PROMISED") operational.promised = operational.promised.plus(row.amountDue);
+      else operational.open = operational.open.plus(row.amountDue);
       const customer = byCustomer.get(row.contactId) ?? { contactId: row.contactId, customer: row.customerLegalName, amount: new Decimal(0), count: 0 };
       customer.amount = customer.amount.plus(row.amountDue); customer.count += 1; byCustomer.set(row.contactId, customer);
       for (const installment of row.openInstallments) {
@@ -37,6 +41,7 @@ export class CollectionsService {
       currency: "EUR",
       total: summary.total.toFixed(2), count: summary.count,
       buckets: Object.fromEntries(buckets.map((bucket) => [bucket, summary[bucket].toFixed(2)])),
+      operational: Object.fromEntries(Object.entries(operational).map(([key, value]) => [key, value.toFixed(2)])),
       forecast: Object.fromEntries(Object.entries(forecast).map(([key, value]) => [key, value.toFixed(2)])),
       customers: [...byCustomer.values()].sort((a, b) => b.amount.comparedTo(a.amount)).map((item) => ({ ...item, amount: item.amount.toFixed(2) })),
     };

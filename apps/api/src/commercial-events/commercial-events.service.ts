@@ -15,6 +15,7 @@ const manualTypes = new Set<CommercialDocumentEventType>([
   CommercialDocumentEventType.REJECTED,
   CommercialDocumentEventType.DISPUTED,
   CommercialDocumentEventType.PAYMENT_PROMISED,
+  CommercialDocumentEventType.NOTE,
 ]);
 
 @Injectable()

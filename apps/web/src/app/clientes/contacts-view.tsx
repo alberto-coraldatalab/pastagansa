@@ -2,13 +2,16 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { contactPayload, type Contact, type ContactPage } from "@/lib/contacts";
 
 export function ContactsView() {
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get("search")?.slice(0, 100) ?? "";
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState(initialSearch);
+  const [searchInput, setSearchInput] = useState(initialSearch);
   const [cursor, setCursor] = useState<string>();
   const [history, setHistory] = useState<(string | undefined)[]>([]);
   const [kind, setKind] = useState<"ALL" | "CUSTOMER" | "SUPPLIER">("ALL");
