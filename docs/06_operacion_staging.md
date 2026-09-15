@@ -25,8 +25,24 @@ de PostgreSQL deben coincidir con `POSTGRES_ADMIN_PASSWORD` y
 `POSTGRES_APP_PASSWORD`; si contienen caracteres reservados de una URL deben
 codificarse. Generar `JWT_SECRET` con al menos 32 caracteres aleatorios.
 
-SMTP es opcional y no forma parte del gate actual. Sin proveedor, la web desactiva el
-envío y ofrece la descarga PDF. No se deben inventar valores SMTP para staging.
+SMTP es opcional. Sin proveedor, la web desactiva el envío y ofrece la descarga PDF.
+No se deben inventar valores SMTP para staging. Para habilitar entrega por correo y
+recordatorios, añadir al `.env.staging` privado los datos reales del proveedor:
+
+```dotenv
+SMTP_HOST=smtp.proveedor.example
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=usuario-smtp
+SMTP_PASSWORD=secreto-del-proveedor
+SMTP_FROM=Facturación <facturacion@tu-dominio.example>
+```
+
+Usar `SMTP_SECURE=true` normalmente solo con el puerto 465; con STARTTLS en el 587
+debe ser `false`. `SMTP_HOST` y `SMTP_FROM` se configuran siempre juntos, y si se
+indica `SMTP_USER` también es obligatorio `SMTP_PASSWORD`. Tras guardar el archivo,
+desplegar de nuevo para recrear la API con esas variables. Las credenciales no se
+imprimen ni se añaden al repositorio.
 
 El staging aislado usa `THROTTLE_LIMIT=1000` para que los recorridos de aceptación
 completos no compartan y agoten la ventana por IP. Producción conserva el límite normal
