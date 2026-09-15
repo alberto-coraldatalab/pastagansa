@@ -21,6 +21,7 @@ import { PurchasesModule } from "./purchases/purchases.module";
 import { AccountingModule } from "./accounting/accounting.module";
 import { BankingModule } from "./banking/banking.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
+import { CollectionsModule } from "./collections/collections.module";
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
     AccountingModule,
     BankingModule,
     DashboardModule,
+    CollectionsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
