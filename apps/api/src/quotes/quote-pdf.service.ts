@@ -104,8 +104,8 @@ export class QuotePdfService {
     input: QuotePdfInput,
   ) {
     const { company, quote } = input;
-    document.circle(PAGE.left + 13, PAGE.top + 16, 11).fill(COLOR.primary);
-    document.circle(PAGE.left + 15, PAGE.top + 13, 3).fill(COLOR.paper);
+    document.circle(PAGE.left + 13, PAGE.top + 13, 11).fill(COLOR.primary);
+    document.circle(PAGE.left + 15, PAGE.top + 10, 3).fill(COLOR.paper);
     document
       .font("Helvetica-Bold")
       .fontSize(19)

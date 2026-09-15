@@ -101,8 +101,8 @@ export class InvoicePdfService {
       invoice.documentType === "CREDIT_NOTE"
         ? "FACTURA RECTIFICATIVA"
         : "FACTURA";
-    document.circle(PAGE.left + 13, PAGE.top + 16, 11).fill(COLOR.primary);
-    document.circle(PAGE.left + 15, PAGE.top + 13, 3).fill(COLOR.white);
+    document.circle(PAGE.left + 13, PAGE.top + 13, 11).fill(COLOR.primary);
+    document.circle(PAGE.left + 15, PAGE.top + 10, 3).fill(COLOR.white);
     document
       .font("Helvetica-Bold")
       .fontSize(19)
