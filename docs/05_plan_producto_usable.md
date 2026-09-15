@@ -252,7 +252,7 @@ incidencia media —no poder convertir un cliente en proveedor desde la web— y
 staging. El workflow manual de aceptación puede ejecutar los dos recorridos y auditorías WCAG
 contra una URL HTTPS externa, con confirmación explícita de escritura. El guion moderado
 define consignas, métricas, evidencias y severidades. El stack reproducible de
-PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 30 migraciones,
+PostgreSQL, API y web construye imágenes desde el mismo commit, aplica 31 migraciones,
 espera readiness real y supera el smoke test. El 10/09/2026 se ensayó localmente un dump
 custom y su restauración aislada, verificando migraciones, tablas críticas y recuentos
 de datos; CI repite ese ensayo en cada cambio.
@@ -262,7 +262,7 @@ de datos; CI repite ese ensayo en cada cambio.
 Resultado: el usuario prepara una oferta, comparte su PDF y registra la decisión del
 cliente antes de facturar.
 
-Estado real: en curso. El API ya conservaba líneas, totales, snapshot del cliente,
+Estado real: completada. El API ya conservaba líneas, totales, snapshot del cliente,
 PDF y transiciones atómicas. La web expone ahora listado paginado y filtrable, alta y
 edición de borradores con catálogo o concepto libre, plazo de validez, condiciones,
 descarga PDF y los estados enviado, aceptado, rechazado, caducado y cancelado. Un
@@ -272,10 +272,10 @@ ambos documentos. El E2E de venta cubre creación, PDF, aceptación y conversió
 incluida una auditoría WCAG del borrador. Los presupuestos usan ya una serie
 comercial configurable con asignación atómica y conservan ese número en listado,
 detalle y PDF.
-
-Pendiente para cerrar U5:
-
-- validar el recorrido actualizado en staging.
+El 15/09/2026, el recorrido actualizado se desplegó en
+`ledger.coraldatalab.com` después de un backup y superó los 3/3 E2E remotos de
+venta, compra y seguridad, junto con las auditorías WCAG. Un segundo backup del
+esquema actualizado superó el ensayo de restauración con las 31 migraciones.
 
 Gate:
 
@@ -286,8 +286,7 @@ Gate:
 
 ## Orden inmediato de implementación
 
-1. Completar presupuesto comercial usable (U5).
-2. Retomar SIF/VERI*FACTU una vez cerrado U5.
+1. Retomar SIF/VERI*FACTU con U5 ya cerrado.
 
 ## Alcance aplazado hasta superar el hito
 
